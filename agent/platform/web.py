@@ -106,6 +106,9 @@ class WebPlatform:
                 links.last.scroll_into_view_if_needed()
                 links.last.hover()
                 self.page.mouse.wheel(0, 2500)       # a real scroll inside the list, which is what loads more
+                links.last.evaluate("""a => { for (let e = a.parentElement; e; e = e.parentElement)
+                    if (e.scrollHeight > e.clientHeight + 10 && getComputedStyle(e).overflowY !== 'visible') {
+                      e.scrollTop = e.scrollHeight; break; } }""")
                 for _ in range(int(self.batch_wait_s * 4)):   # give the next batch time to load
                     if links.count() > shown:
                         break

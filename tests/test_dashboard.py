@@ -125,3 +125,16 @@ def test_reject_on_a_job_not_awaiting_a_decision_is_409(client, app, world):
     world.new_follower("mia"); app.engine.run_once()                 # mock: auto-sent, job completed
     did = app.db.scalar("SELECT id FROM drafts")
     assert client.post(f"/api/drafts/{did}/reject", headers=H).status_code == 409
+
+
+def test_send_all_hellos_approves_only_the_hellos_shown(world, llm, db):
+    """One click sends the hellos the operator was looking at; ids not on the page, or not hellos, are refused."""
+    app = build_app(make_settings(mode=Mode.EXECUTE), db=db, platform=RealishPlatform(world), world=world, llm=llm)
+    c = TestClient(create_dashboard(app, TOKEN), base_url="http://127.0.0.1")
+    world.new_follower("mia"); world.new_follower("noah"); world.new_follower("zoe")
+    app.engine.run_once()
+    ids = {d["target"]: d["id"] for d in c.get("/api/status", headers=H).json()["drafts"]}
+    r = c.post("/api/drafts/approve-all", headers=H, json={"ids": [ids["mia"], ids["noah"], "drf_not_real"]}).json()
+    assert (r["approved"], r["refused"]) == (2, 1)
+    settle(app.engine, 3)
+    assert sorted(u for u, _ in world.sent_log) == ["mia", "noah"]          # zoe wasn't shown/approved

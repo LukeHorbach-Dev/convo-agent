@@ -130,6 +130,14 @@ async function ctl(a) { if (a === 'emergency-stop' && !confirm('Stop everything 
   await api('/api/control/' + a, {method:'POST'}); refresh(); }
 function togglePause() { ctl(S && S.run_state === 'paused' ? 'resume' : 'pause'); }
 async function approve(id) { const text = document.getElementById('t_' + id).value; await api(`/api/drafts/${id}/approve`, {method:'POST', body: JSON.stringify({text})}); refresh(); }
+async function approveAll() {
+  const ids = (S ? S.drafts : []).filter(isHello).map(d => d.id);
+  if (!ids.length || !confirm(`Send all ${ids.length} hellos shown on this page?`)) return;
+  // Edits typed into the boxes are not used here; edit a hello and press its own Send to change the words.
+  const r = await api('/api/drafts/approve-all', {method:'POST', body: JSON.stringify({ids})}); refresh();
+  if (r.refused) alert(`${r.approved} sent to the queue. ${r.refused} could not be approved; they stay on the page.`);
+}
+const isHello = d => d.job_state === 'awaiting_approval' && (JSON.parse(d.context || '{}').kind === 'intro');
 async function reject(id) { await api(`/api/drafts/${id}/reject`, {method:'POST', body:'{}'}); refresh(); }
 async function resolve(id, delivered) { await api(`/api/outbox/${id}/resolve`, {method:'POST', body: JSON.stringify({delivered})}); refresh(); }
 async function jobAct(id, a) { await api(`/api/jobs/${id}/${a}`, {method:'POST'}); refresh(); }
@@ -188,7 +196,10 @@ async function refresh() {
   const [s, h] = await Promise.all([api('/api/status'), api('/api/health')]);
   S = s; const sum = s.summary;
   statusBox(s);
-  document.getElementById('drafts').innerHTML = s.drafts.length ? s.drafts.map(draftCard).join('')
+  const hellos = s.drafts.filter(isHello).length;
+  document.getElementById('drafts').innerHTML = s.drafts.length ?
+    (hellos > 1 ? `<div class="row" style="margin-bottom:10px"><button class="go" onclick="approveAll()">Send all ${hellos} hellos</button>
+       <span class="muted">Read them first. Replies always need their own Send.</span></div>` : '') + s.drafts.map(draftCard).join('')
     : '<p class="muted">Nothing right now. New hellos and replies show up here for you to check.</p>';
   helpCards(s);
   const list = sum.audience === 'following' ? 'People you follow' : 'Followers seen';

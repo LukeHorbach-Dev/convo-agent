@@ -39,6 +39,10 @@ def load_or_create_token(data_dir: Path) -> str:
     return token
 
 
+class ApproveAllBody(BaseModel):
+    ids: list[str]
+
+
 class ApproveBody(BaseModel):
     text: str | None = None
 
@@ -168,6 +172,24 @@ def create_dashboard(app: App, token: str, scheduler=None) -> FastAPI:
             raise HTTPException(409, str(e))
         wake()
         return {"ok": True}
+
+    @api.post("/api/drafts/approve-all", dependencies=[Depends(auth)])
+    def approve_all(body: ApproveAllBody):
+        """Approve, as shown, the hellos the operator was looking at (their ids come from the page). Replies and
+        anything flagged for review are left for one-by-one approval."""
+        done, refused = 0, []
+        for draft_id in body.ids:
+            d = db.one("SELECT d.context, j.state, j.kind FROM drafts d JOIN jobs j ON j.id = d.job_id WHERE d.id = ?", (draft_id,))
+            if d is None or d["kind"] != "intro" or d["state"] != "awaiting_approval":
+                refused.append(draft_id)
+                continue
+            try:
+                engine.approve_draft(draft_id)
+                done += 1
+            except Exception:
+                refused.append(draft_id)
+        wake()
+        return {"ok": True, "approved": done, "refused": len(refused)}
 
     @api.post("/api/drafts/{draft_id}/reject", dependencies=[Depends(auth)])
     def reject(draft_id: str):
