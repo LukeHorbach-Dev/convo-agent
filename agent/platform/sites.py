@@ -134,16 +134,22 @@ class InstagramProfile(SiteProfile):
         return ['main header :text-is("Requested")', 'main :text("This account is private")']
 
     def read_messages_js(self) -> str:
-        # No stable ids or roles for bubbles: read innermost dir=auto text in the thread; bubbles right of centre are ours.
+        # No stable ids or roles for bubbles: read innermost dir=auto text in the conversation pane. The pane is the
+        # column above the message box (the inbox list sits to its left inside the same main element); bubbles right
+        # of the pane's centre are ours. Centred lines (dates, "Seen", "You're now friends") are status, not messages.
         return """() => {
           const main = document.querySelector('[role="main"]'); if (!main) return null;
-          const r = main.getBoundingClientRect(), mid = r.left + r.width / 2, box = main.querySelector('[contenteditable="true"]');
+          const box = main.querySelector('[contenteditable="true"]');
+          const r = main.getBoundingClientRect(), pane = box ? box.getBoundingClientRect() : r;
+          const left = box ? pane.left - 60 : r.left, right = box ? pane.right + 60 : r.right, mid = (left + right) / 2;
+          const status = /^(seen|sent|delivered|seen by .+|active (now|.+ ago)|you're now friends.*|say hi!?|((today|yesterday|mon|tue|wed|thu|fri|sat|sun)\\w* )?\\d{1,2}:\\d{2}( ?[ap]m)?)$/i;
           const out = [];
           main.querySelectorAll('div[dir="auto"], span[dir="auto"]').forEach(e => {
             if ((box && box.contains(e)) || e.querySelector('[dir="auto"]') || e.closest('header, a, [role="button"]')) return;
-            const t = e.innerText.trim(), b = e.getBoundingClientRect();
-            if (!t || !b.width || b.top < r.top + 70) return;
-            out.push({id: null, direction: (b.left + b.width / 2) > mid ? 'out' : 'in', text: t, top: b.top});
+            const t = e.innerText.trim(), b = e.getBoundingClientRect(), c = b.left + b.width / 2;
+            if (!t || !b.width || b.top < r.top + 70 || c < left || c > right || status.test(t)) return;
+            if (Math.abs(c - mid) < 30 && b.width < (right - left) * 0.5) return;
+            out.push({id: null, direction: c > mid ? 'out' : 'in', text: t, top: b.top});
           });
           return out.sort((a, b) => a.top - b.top);
         }"""

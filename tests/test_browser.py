@@ -268,3 +268,30 @@ def test_health_reports_browser_state(site):
     web.whoami()
     h = web.health()
     assert h["state"] == "ready" and h["ok"] and "url" in h
+
+
+def test_instagram_message_reader_on_a_page_shaped_like_instagram():
+    """The Instagram reader against a static page with the live layout: inbox list and conversation in one
+    main[role=main], composer under the conversation, status lines that aren't messages."""
+    from playwright.sync_api import sync_playwright
+    from agent.platform.sites import INSTAGRAM
+    bubble = '<div style="display:flex;justify-content:{side}"><div style="max-width:60%"><span dir="auto">{t}</span></div></div>'
+    html = f"""<body style="margin:0;width:1400px"><main role="main" style="display:flex;margin-left:72px">
+      <div aria-label="Thread list" style="width:400px"><div role="button"><span dir="auto">Abby Cook</span>
+        <span dir="auto">hey there</span><abbr>2m</abbr></div></div>
+      <div style="width:900px;padding-top:100px">
+        <div style="text-align:center"><span dir="auto">Today 7:14 PM</span></div>
+        {bubble.format(side="flex-start", t="hey how was today?")}
+        {bubble.format(side="flex-end", t="Hey im Luke :)")}
+        <div style="text-align:right"><span dir="auto">Seen</span></div>
+        {bubble.format(side="flex-start", t="10:30 works for me, a really long message that spans quite a lot of the conversation width")}
+        <div role="textbox" contenteditable="true" style="margin:20px 40px">&nbsp;</div>
+      </div></main></body>"""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 1400, "height": 900})
+        page.set_content(html)
+        msgs = page.evaluate(INSTAGRAM.read_messages_js())
+        browser.close()
+    assert [(m["direction"], m["text"][:12]) for m in msgs] == [
+        ("in", "hey how was "), ("out", "Hey im Luke "), ("in", "10:30 works ")]

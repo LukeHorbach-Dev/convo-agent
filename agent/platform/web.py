@@ -209,10 +209,15 @@ class WebPlatform:
             typed = box.input_value() if box.evaluate("e => 'value' in e") else box.inner_text()
             if typed.strip() != text.strip():
                 raise SelectorDrift("the message box did not accept the text")
+            # Instagram only shows Send once there is text; if it never appears, Enter sends from the message box.
             send = self._visible(self.site.send_button())
-            if send.count() == 0:
-                raise SelectorDrift("send control not found")
-            send.first.click()
+            try:
+                send.first.wait_for(state="visible", timeout=2000)
+                send.first.click()
+            except Exception:
+                if send.count():
+                    raise
+                box.press("Enter")
         # Up to the click, failure means nothing was sent. After it, failure means "unknown".
         self.sup.run("type message", lambda: self._visible(self.site.composer()).first.wait_for(state="visible"))
         try:
