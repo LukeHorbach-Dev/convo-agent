@@ -1,0 +1,22 @@
+## Clean install from git-tracked files only (64 files; personal data files absent), 2026-10-28T16:50:23Z
+install: ok
+Python 3.12.3
+
+$ python -m pytest
+218 passed in 64.43s (0:01:04)
+
+$ python -m agent demo
+invariants_ok = True
+   no_duplicate_message True
+   at_most_one_intro_each True
+   under_age_username_never_contacted True
+   opted_out_not_messaged_after_stop True
+   injection_not_auto_sent True
+   restricted_account_skipped True
+
+$ AGENT_PLATFORM=mock_web AGENT_MOCK_SITE_URL=https://www.instagram.com python -m agent run --headless
+exit status: 1
+configuration error: mock_site_url must be a local http URL, got 'https://www.instagram.com'
+
+$ CHAOS_SEEDS=300 python -m pytest tests/test_chaos.py
+301 passed in 151.43s (0:02:31)

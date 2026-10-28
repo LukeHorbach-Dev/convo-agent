@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+data/*.db*
+data/browser-profile/
+data/dashboard-token
+data/diagnostics/
+.env
+.pytest_cache/
+data/profile.json
+data/*.log
+data/scheduler.lock
+data/never.txt
+data/intro-list.txt

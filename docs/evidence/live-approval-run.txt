@@ -1,0 +1,9 @@
+## Live run: mock_web through Chromium, approval required (2026-10-28T16:45:15Z)
+before approval: jobs {'awaiting_approval': 2, 'skipped': 1} | outbox [('ollie_paints', 'pending'), ('mia.skis', 'pending')]
+drafts waiting: [('ollie_paints', "Hey, I'm new here :)"), ('mia.skis', "Hey, I'm new here :)")]
+approve with a rule-breaking edit -> HTTP 409
+approve without token          -> HTTP 401
+approve                        -> HTTP 200
+approve the same draft again   -> HTTP 409
+after approval: outbox [('ollie_paints', 'sent', 'operator'), ('mia.skis', 'pending', None)]
+shutdown log: {"ts": "2026-10-28T16:45:24", "level": "INFO", "component": "main", "msg": "shutdown", "outcome": "clean"}
