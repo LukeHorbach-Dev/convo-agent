@@ -117,7 +117,8 @@ def create_site(world: MockWorld) -> FastAPI:
         with world.lock:
             acct = world.accounts.get(username)
             if username == world.me:
-                return page(world, f'<h1 data-testid="profile-username">{E(username)}</h1>'
+                return page(world, f'<header><h1 data-testid="profile-username">{E(username)}</h1>'
+                                   '<a href="/accounts/edit/">Edit profile</a></header>'
                                    f'<a href="/{E(username)}/followers/">{len(world.follower_events)} followers</a>')
             if not acct:
                 return HTMLResponse("not found", status_code=404)

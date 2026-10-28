@@ -129,6 +129,19 @@ def test_missing_page_element_saves_a_screenshot(site, tmp_path):
     assert shot.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
 
 
+def test_identity_from_own_profile_page(site):
+    """Instagram-style identity check: only your own profile shows Edit profile."""
+    import dataclasses
+    world, server, web = site
+    world.new_follower("mia")
+    marker = 'header a[href="/accounts/edit/"]'
+    prof = dataclasses.replace(web.site)
+    prof.own_profile_marker = lambda: marker
+    assert WebPlatform(web.sup, prof, "lukehorbach2").whoami() == "lukehorbach2"
+    with pytest.raises(AuthenticationRequired):
+        WebPlatform(web.sup, prof, "mia").whoami()
+
+
 def test_selector_drift_everywhere_opens_circuit(site, db):
     world, server, web = site
     s = make_settings(); s.policy.intro_existing_followers = True

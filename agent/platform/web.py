@@ -5,7 +5,7 @@ import logging
 import re
 from collections import Counter
 
-from ..core.errors import AmbiguousState, DeliveryUnknown, PermissionRestricted, SelectorDrift
+from ..core.errors import AmbiguousState, AuthenticationRequired, DeliveryUnknown, PermissionRestricted, SelectorDrift
 from .base import Capabilities, FollowerObservation, ObservedMessage, SendResult, ThreadSnapshot
 from .browser import BrowserSupervisor
 from .sites import SiteProfile, content_id
@@ -47,6 +47,15 @@ class WebPlatform:
         return self.page.locator(selector).filter(visible=True)
 
     def whoami(self) -> str:
+        if (marker := self.site.own_profile_marker()) is not None:
+            self.sup.goto(self.site.url(self.site.profile_path(self.me)), expect=re.escape(f"/{self.me}/"), ready="header")
+            def check():
+                if self._visible(marker).count() == 0:
+                    self.sup.save_screenshot("identity")
+                    raise AuthenticationRequired(f"{self.me}'s profile has no Edit profile button: the browser seems to be "
+                                                 f"signed in to a different account (or the button moved)")
+                return self.me
+            return self.sup.run("whoami", check)
         self.sup.goto(self.site.url(self.site.inbox_path()), expect=r"/direct/", ready=self.site.nav_profile())
         def read():
             user = username_from_href(self._visible(self.site.nav_profile()).first.get_attribute("href"))

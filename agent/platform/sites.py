@@ -41,6 +41,7 @@ class SiteProfile:
 
     # --- locators (overridden per site) ---
     def nav_profile(self) -> str: raise NotImplementedError
+    def own_profile_marker(self) -> str | None: return None   # shown only on your own profile; None = read the nav
     def profile_path(self, username: str) -> str: return f"/{username}/"
     def followers_path(self, me: str) -> str: return f"/{me}/followers/"
     def followers_link(self, me: str) -> str: return f'a[href$="/{me}/followers/"]'   # on your profile; opens the list
@@ -90,6 +91,11 @@ class InstagramProfile(SiteProfile):
 
     def nav_profile(self):
         return 'a[role="link"]:has-text("Profile")'
+
+    def own_profile_marker(self):
+        # The sidebar collapses to icons on some pages, so identity is checked on the profile page instead: only
+        # the signed-in account sees "Edit profile" there.
+        return 'header a[href="/accounts/edit/"], header a:has-text("Edit profile")'
 
     def follower_links(self):
         return 'div[role="dialog"] a[href^="/"]'
