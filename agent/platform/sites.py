@@ -49,7 +49,7 @@ class SiteProfile:
     def followers_ready(self) -> str: raise NotImplementedError
     def inbox_ready(self) -> str: raise NotImplementedError
     def inbox_path(self) -> str: return "/direct/inbox/"
-    def thread_links(self) -> str: raise NotImplementedError
+    def thread_rows(self) -> str: raise NotImplementedError    # inbox entries; clicking one opens /direct/t/<id>/
     def thread_path(self, key: str) -> str: return f"/direct/t/{key}/"
     def thread_ready(self) -> str: raise NotImplementedError
     def thread_username(self) -> str: raise NotImplementedError
@@ -65,7 +65,7 @@ class MockSiteProfile(SiteProfile):
     def follower_links(self): return 'div[role="dialog"] [data-testid="follower"]'
     def followers_ready(self): return 'div[role="dialog"]'
     def inbox_ready(self): return '[data-testid="inbox-ready"]'
-    def thread_links(self): return '[data-testid="thread-link"]'
+    def thread_rows(self): return '[aria-label="Thread list"] [data-testid="thread-row"]'
     def thread_ready(self): return '[data-testid="thread-username"]'
     def thread_username(self): return '[data-testid="thread-username"]'
     def message_button(self): return '[data-testid="message-button"]'
@@ -104,20 +104,22 @@ class InstagramProfile(SiteProfile):
         # The "796 followers" link in your profile header; the text fallback covers a header without that href.
         return f'a[href$="/{me}/followers/"], header a:has-text("followers")'
 
-    def thread_links(self):
-        return 'a[href^="/direct/t/"]'
+    def thread_rows(self):
+        # Inbox rows are div[role=button] without links, inside div[aria-label="Thread list"]. Conversation rows show a
+        # time (<abbr>); the notes strip above them doesn't. Innermost such button only.
+        return 'div[aria-label="Thread list"] div[role="button"]:has(abbr):not(:has(div[role="button"] abbr))'
 
     def followers_ready(self):
         return 'div[role="dialog"]'
 
     def inbox_ready(self):
-        return 'div[role="main"], a[href^="/direct/t/"]'
+        return 'div[aria-label="Thread list"]'
 
     def thread_ready(self):
-        return 'div[role="main"] [role="textbox"][contenteditable="true"], div[role="main"] [role="grid"]'
+        return '[role="main"] [role="textbox"][contenteditable="true"], [role="main"] [role="grid"]'
 
     def thread_username(self):
-        return 'div[role="main"] header a[href^="/"], div[role="main"] a[href^="/"][role="link"]'
+        return '[role="main"] header a[href^="/"], [role="main"] a[href^="/"][role="link"]'
 
     def message_button(self):
         return 'main header [role="button"]:text-is("Message"), main header button:text-is("Message")'
@@ -134,7 +136,7 @@ class InstagramProfile(SiteProfile):
     def read_messages_js(self) -> str:
         # No stable ids or roles for bubbles: read innermost dir=auto text in the thread; bubbles right of centre are ours.
         return """() => {
-          const main = document.querySelector('div[role="main"]'); if (!main) return null;
+          const main = document.querySelector('[role="main"]'); if (!main) return null;
           const r = main.getBoundingClientRect(), mid = r.left + r.width / 2, box = main.querySelector('[contenteditable="true"]');
           const out = [];
           main.querySelectorAll('div[dir="auto"], span[dir="auto"]').forEach(e => {

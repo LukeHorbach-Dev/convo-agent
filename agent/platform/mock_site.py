@@ -49,9 +49,11 @@ def create_site(world: MockWorld) -> FastAPI:
     @app.get("/direct/inbox/")
     def inbox():
         with world.lock:
-            links = "".join(f'<li><a data-testid="thread-link" href="/direct/t/{k}/">{E(t["username"])}</a></li>'
-                            for k, t in world.threads.items() if t["messages"])
-        return page(world, f'<h1 data-testid="inbox-ready">Inbox</h1><ul>{links}</ul>', "Inbox")
+            # Like Instagram: rows are role=button without links, each with the latest preview and a time.
+            rows = "".join(f'<div role="button" data-testid="thread-row" onclick="location.href=\'/direct/t/{k}/\'">'
+                           f'{E(t["username"])} {E(t["messages"][-1]["text"][:30])} #{len(t["messages"])} · <abbr>{len(t["messages"])}m</abbr></div>'
+                           for k, t in world.threads.items() if t["messages"])
+        return page(world, f'<h1 data-testid="inbox-ready">Inbox</h1><div aria-label="Thread list">{rows}</div>', "Inbox")
 
     @app.get("/direct/t/{key}/")
     def thread(key: str):

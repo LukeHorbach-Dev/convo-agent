@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from collections import Counter
 
 from ..core.errors import AmbiguousState, AuthenticationRequired, DeliveryUnknown, PermissionRestricted, SelectorDrift
@@ -30,6 +31,9 @@ class WebPlatform:
         self.is_real = site.is_real
         self.max_threads = max_threads
         self.max_scrolls = max_scrolls
+        self.full_reread_s = 600.0
+        self._rows_read: dict[str, None] = {}   # inbox row texts already read (insertion-ordered, capped)
+        self._last_full_read = time.monotonic()
 
     def capabilities(self) -> Capabilities:
         return Capabilities(follower_events=self.site.follower_events, read_threads=True, send=True,
@@ -106,19 +110,46 @@ class WebPlatform:
         log.info("read followers list", extra={"outcome": f"{len(found)} followers seen"})
         return found
 
-    def _thread_keys(self) -> list[str]:
+    ROW_TEXT_JS = """el => { const c = el.cloneNode(true); c.querySelectorAll('abbr').forEach(a => a.remove());
+                             return c.innerText.replace(/\\s*·\\s*$/, '').replace(/\\s+/g, ' ').trim(); }"""
+
+    def _open_inbox(self) -> None:
         self.sup.goto(self.site.url(self.site.inbox_path()), expect=r"/direct/", ready=self.site.inbox_ready())
-        def read():
-            keys = []
-            for a in self._visible(self.site.thread_links()).all()[: self.max_threads]:
-                m = re.search(r"/direct/t/([^/]+)/?", a.get_attribute("href") or "")
-                if m and m.group(1) not in keys:
-                    keys.append(m.group(1))
-            return keys
-        return self.sup.run("list threads", read)
 
     def list_threads(self) -> list[ThreadSnapshot]:
-        return [self.read_thread(k) for k in self._thread_keys()]
+        """Inbox rows have no links, so each conversation is opened by clicking its row. Only rows whose text
+        (name and latest-message preview, minus the time) changed since they were last read are opened; everything
+        is re-read every `full_reread_s` in case a new message repeats the previous preview exactly."""
+        if time.monotonic() - self._last_full_read > self.full_reread_s:
+            self._rows_read.clear()
+            self._last_full_read = time.monotonic()
+        self._open_inbox()
+        rows = self._visible(self.site.thread_rows())
+        texts = self.sup.run("list threads", lambda: [r.evaluate(self.ROW_TEXT_JS) for r in rows.all()[: self.max_threads]])
+        snaps: list[ThreadSnapshot] = []
+        for text in texts:
+            if text in self._rows_read:
+                continue
+            if snaps:
+                self._open_inbox()
+            def open_row(text=text):
+                for r in rows.all()[: self.max_threads]:
+                    if r.evaluate(self.ROW_TEXT_JS) == text:
+                        r.click()
+                        self.page.wait_for_url(re.compile(r"/direct/t/[^/]+"), timeout=self.sup.cfg.action_timeout_ms)
+                        self._visible(self.site.thread_ready()).first.wait_for(
+                            state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
+                        return re.search(r"/direct/t/([^/]+)", self.page.url).group(1)
+                return None                          # the row changed or moved away meanwhile; next poll gets it
+            key = self.sup.run("open thread", open_row)
+            if key is None:
+                continue
+            snaps.append(self._read_open_thread(key))
+            self._rows_read[text] = None
+            while len(self._rows_read) > 500:
+                self._rows_read.pop(next(iter(self._rows_read)))
+        log.info("read inbox", extra={"outcome": f"{len(texts)} conversations, {len(snaps)} opened"})
+        return snaps
 
     def _read_open_thread(self, key: str) -> ThreadSnapshot:
         def read():
@@ -195,7 +226,6 @@ class WebPlatform:
             msgs = self.page.evaluate(self.site.read_messages_js()) or []
             return sum(1 for m in msgs if m["direction"] == "out" and m["text"] == text) > before
         # Explicit bounded wait on an observable condition: our message appearing in the thread.
-        import time
         deadline = time.monotonic() + self.sup.cfg.action_timeout_ms / 1000
         try:
             while not self.sup.run("confirm send", confirmed):

@@ -101,10 +101,25 @@ def test_older_follower_below_known_ones_is_not_introduced(site, db):
 def test_inspect_reports_page_structure_without_clicking(site):
     from agent.platform.inspect_page import inspect
     world, _, web = site
-    world.new_follower("mia")
+    world.new_follower("mia"); world.incoming("mia", "secret words")
     report = inspect(web, settle_ms=0)
-    assert "== profile:" in report and "== inbox:" in report
+    assert "== profile:" in report and "== inbox:" in report and "== thread:" in report and "== their-profile:" in report
+    assert "1 incoming, 0 outgoing" in report and "secret" not in report      # counts only, never message text
     assert "visible /" in report and world.sent_log == []
+
+
+def test_inbox_rows_are_opened_only_when_they_change(site):
+    """Instagram inbox rows have no links: each is clicked. Unchanged rows aren't reopened on the next poll."""
+    world, _, web = site
+    world.new_follower("mia"); world.new_follower("noah")
+    world.incoming("mia", "hey"); world.incoming("noah", "yo")
+    assert sorted(t.username for t in web.list_threads()) == ["mia", "noah"]
+    assert web.list_threads() == []
+    world.incoming("mia", "you there?")
+    [snap] = web.list_threads()
+    assert snap.username == "mia" and snap.messages[-1].text == "you there?"
+    web.full_reread_s = 0                                       # periodic full re-read
+    assert len(web.list_threads()) == 2
 
 
 # 1. a page that never finishes loading
