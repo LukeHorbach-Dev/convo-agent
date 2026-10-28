@@ -29,6 +29,7 @@ class SiteProfile:
     login_url_patterns: list[str] = field(default_factory=list)
     challenge_url_patterns: list[str] = field(default_factory=list)
     login_selectors: list[str] = field(default_factory=list)
+    ready_timeout_ms: int | None = None  # how long to wait for a page's key element; None = the action timeout
     notes: tuple[str, ...] = ()
 
     def url(self, path: str) -> str:
@@ -141,6 +142,7 @@ INSTAGRAM = InstagramProfile(
     login_url_patterns=[r"/accounts/login"],
     challenge_url_patterns=[r"/challenge/", r"/checkpoint/", r"/accounts/suspended", r"/two_factor"],
     login_selectors=['input[name="password"]'],
+    ready_timeout_ms=25_000,             # a full page load renders the app first and pop-ups like followers later
     notes=("Instagram Web has no new-follower event stream; followers are inferred by diffing the list",
            "message ids are content hashes (no stable ids in the page)",
            "delivery checks re-read the thread and are best effort",

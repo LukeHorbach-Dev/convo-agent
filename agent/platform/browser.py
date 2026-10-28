@@ -179,11 +179,25 @@ class BrowserSupervisor:
             try:
                 # Only visible matches count: sites like Instagram keep hidden copies of containers (e.g. empty
                 # role=dialog elements) earlier in the page, and waiting on the first match would wait on a hidden one.
-                self.page.locator(ready).filter(visible=True).first.wait_for(state="visible", timeout=self.cfg.action_timeout_ms)
+                self.page.locator(ready).filter(visible=True).first.wait_for(
+                    state="visible", timeout=self.site.ready_timeout_ms or self.cfg.action_timeout_ms)
             except Exception as e:
                 self.check_session()
+                self._snapshot("selector-drift")
                 raise SelectorDrift(f"expected element not found on {self.site.redact_url(self.page.url)}: {ready}") from e
         self.run(f"goto {self.site.redact_url(url)}", nav)
+
+    def _snapshot(self, label: str) -> None:
+        """Save a screenshot of what the page showed, for the operator. Local only (data/diagnostics is git-ignored);
+        one file per label, overwritten each time. Never raises."""
+        try:
+            out = self.cfg.user_data_dir.parent / "diagnostics"
+            out.mkdir(parents=True, exist_ok=True)
+            path = out / f"last-{label}.png"
+            self.page.screenshot(path=str(path), timeout=self.cfg.health_check_timeout_ms)
+            log.info("saved screenshot", extra={"outcome": str(path)})
+        except Exception:
+            pass
 
     def check_session(self) -> None:
         """Detect login walls and verification challenges. Never interacts with them."""

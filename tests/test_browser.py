@@ -121,6 +121,14 @@ def test_selector_drift_detected(site):
         web.open_dm("mia")
 
 
+def test_missing_page_element_saves_a_screenshot(site, tmp_path):
+    _, server, web = site
+    with pytest.raises(SelectorDrift):
+        web.sup.goto(server.url + "/", expect=".*", ready='[data-testid="does-not-exist"]')
+    shot = tmp_path / "diagnostics" / "last-selector-drift.png"
+    assert shot.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
 def test_selector_drift_everywhere_opens_circuit(site, db):
     world, server, web = site
     s = make_settings(); s.policy.intro_existing_followers = True
