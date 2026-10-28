@@ -123,3 +123,30 @@ def test_dashboard_does_not_execute_message_content(world, llm, db):
     finally:
         server.should_exit = True
         t.join(5)
+
+
+def test_waiting_hellos_are_capped_and_the_rest_wait_their_turn(world, llm, db):
+    """With a long list, only a few hellos are prepared ahead of your approval; approving one lets the next start."""
+    s = make_settings(mode=Mode.EXECUTE)
+    s.limits.max_waiting_intros = 2
+    app = build_app(s, db=db, platform=RealishPlatform(world), world=world, llm=llm)
+    for i in range(5):
+        world.add_account(f"friend{i}")
+    app.engine.import_intro_list([f"friend{i}" for i in range(5)])
+    settle(app.engine, 4)
+    states = job_states(app.db)
+    assert sorted(states.values()).count("awaiting_approval") == 2 and list(states.values()).count("queued") == 3
+    assert world.sent_log == []
+
+
+def test_list_is_reread_only_every_interval(world, llm, db):
+    s = make_settings()
+    s.list_check_interval_s = 3600
+    calls = []
+    plat = MockPlatform(world)
+    real_poll = plat.poll_followers
+    plat.poll_followers = lambda: calls.append(1) or real_poll()
+    app = build_app(s, db=db, platform=plat, world=world, llm=llm)
+    for _ in range(3):
+        app.engine.run_once()
+    assert len(calls) == 1

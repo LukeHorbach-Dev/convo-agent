@@ -44,7 +44,8 @@ class SiteProfile:
     def own_profile_marker(self) -> str | None: return None   # shown only on your own profile; None = read the nav
     def profile_path(self, username: str) -> str: return f"/{username}/"
     def followers_path(self, me: str) -> str: return f"/{me}/followers/"
-    def followers_link(self, me: str) -> str: return f'a[href$="/{me}/followers/"]'   # on your profile; opens the list
+    def list_link(self, me: str, which: str = "followers") -> str:   # on your profile; opens that list
+        return f'a[href$="/{me}/{which}/"]'
     def follower_links(self) -> str: raise NotImplementedError
     def followers_ready(self) -> str: raise NotImplementedError
     def inbox_ready(self) -> str: raise NotImplementedError
@@ -100,9 +101,10 @@ class InstagramProfile(SiteProfile):
     def follower_links(self):
         return 'div[role="dialog"] a[href^="/"]'
 
-    def followers_link(self, me: str) -> str:
-        # The "796 followers" link in your profile header; the text fallback covers a header without that href.
-        return f'a[href$="/{me}/followers/"], header a:has-text("followers")'
+    def list_link(self, me: str, which: str = "followers") -> str:
+        # The "796 followers" / "1,465 following" link in your profile header; the text fallback covers a header
+        # without that href.
+        return f'a[href$="/{me}/{which}/"], header a:has-text("{which}")'
 
     def thread_rows(self):
         # Inbox rows are div[role=button] without links, inside div[aria-label="Thread list"]. Conversation rows show a
@@ -122,7 +124,10 @@ class InstagramProfile(SiteProfile):
         return '[role="main"] header a[href^="/"], [role="main"] a[href^="/"][role="link"]'
 
     def message_button(self):
-        return 'main header [role="button"]:text-is("Message"), main header button:text-is("Message")'
+        # Seen live: a div[role=button] reading "Message" in the profile header. Kept to <main> so the sidebar's
+        # "Messages" link never matches (text-is is exact).
+        return ('main header [role="button"]:text-is("Message"), main header button:text-is("Message"), '
+                'main [role="button"]:text-is("Message")')
 
     def composer(self):
         return '[role="textbox"][contenteditable="true"]'

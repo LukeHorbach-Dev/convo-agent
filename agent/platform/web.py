@@ -24,13 +24,15 @@ def username_from_href(href: str | None) -> str | None:
 
 
 class WebPlatform:
-    def __init__(self, sup: BrowserSupervisor, site: SiteProfile, me: str, max_threads: int = 20, max_scrolls: int = 8):
+    def __init__(self, sup: BrowserSupervisor, site: SiteProfile, me: str, max_threads: int = 20, max_scrolls: int = 8,
+                 audience: str = "followers"):
         self.sup = sup
         self.site = site
         self.me = me
         self.is_real = site.is_real
         self.max_threads = max_threads
         self.max_scrolls = max_scrolls
+        self.audience = audience                 # which list on your profile: "followers" or "following"
         self.full_reread_s = 600.0
         self._rows_read: dict[str, None] = {}   # inbox row texts already read (insertion-ordered, capped)
         self._last_full_read = time.monotonic()
@@ -69,9 +71,11 @@ class WebPlatform:
         return self.sup.run("whoami", read)
 
     def poll_followers(self) -> list[FollowerObservation]:
-        # Open the list the way a person does: your profile, then the followers link. Loading /followers/ directly
-        # doesn't open the pop-up on Instagram in every browser session.
-        link = self.site.followers_link(self.me)
+        """Read the list chosen by `audience` (your followers, or the people you follow), newest first.
+        Opened the way a person does: your profile, then the list link. Loading the list's address directly
+        doesn't open the pop-up on Instagram in every browser session."""
+        which = self.audience
+        link = self.site.list_link(self.me, which)
         self.sup.goto(self.site.url(self.site.profile_path(self.me)), expect=re.escape(f"/{self.me}/"), ready=link)
         def open_list():
             self._visible(link).first.click()
@@ -79,18 +83,18 @@ class WebPlatform:
                 self._visible(self.site.followers_ready()).first.wait_for(
                     state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
             except Exception as e:
-                self.sup.save_screenshot("selector-drift-followers")
-                raise SelectorDrift(f"followers list did not open after clicking {link}: {self.site.followers_ready()}") from e
-        log.info("opening followers list", extra={"outcome": "clicking the followers link on your profile"})
-        self.sup.run("open followers", open_list)
+                self.sup.save_screenshot(f"selector-drift-{which}")
+                raise SelectorDrift(f"{which} list did not open after clicking {link}: {self.site.followers_ready()}") from e
+        log.info(f"opening {which} list", extra={"outcome": f"clicking the {which} link on your profile"})
+        self.sup.run(f"open {which}", open_list)
         def read():
             links = self._visible(self.site.follower_links())
             try:
                 # The pop-up appears first and fills in a moment later.
                 links.first.wait_for(state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
             except Exception as e:
-                self.sup.save_screenshot("selector-drift-followers")
-                raise SelectorDrift(f"followers list opened but no accounts appeared in it: {self.site.follower_links()}") from e
+                self.sup.save_screenshot(f"selector-drift-{which}")
+                raise SelectorDrift(f"{which} list opened but no accounts appeared in it: {self.site.follower_links()}") from e
             seen: dict[str, str | None] = {}
             for _ in range(self.max_scrolls):
                 for a in links.all():
@@ -106,8 +110,8 @@ class WebPlatform:
                 else:
                     break                            # nothing more loaded: end of the list
             return [FollowerObservation(u, d, None, "inferred", None) for u, d in seen.items()]
-        found = self.sup.run("read followers", read)
-        log.info("read followers list", extra={"outcome": f"{len(found)} followers seen"})
+        found = self.sup.run(f"read {which}", read)
+        log.info(f"read {which} list", extra={"outcome": f"{len(found)} accounts seen"})
         return found
 
     ROW_TEXT_JS = """el => { const c = el.cloneNode(true); c.querySelectorAll('abbr').forEach(a => a.remove());

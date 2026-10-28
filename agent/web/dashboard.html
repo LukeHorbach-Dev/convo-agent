@@ -5,64 +5,95 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Conversation Agent</title>
 <style>
-  :root { --bg:#f6f4ef; --card:#fff; --ink:#1b1b1b; --muted:#5f5f5f; --line:#e3ded3; --ok:#2e7d32; --warn:#b26a00; --bad:#b00020; --accent:#1f4fd1; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#16171a; --card:#1f2125; --ink:#ececec; --muted:#a3a3a3; --line:#33353b; } }
+  :root { --bg:#f6f4ef; --card:#fff; --ink:#1b1b1b; --muted:#5f5f5f; --line:#e3ded3; --ok:#2e7d32; --okbg:#e8f3e9;
+          --warn:#8a5300; --warnbg:#fdf3e2; --bad:#b00020; --badbg:#fbe9ec; --accent:#1f4fd1; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16171a; --card:#1f2125; --ink:#ececec; --muted:#a3a3a3; --line:#33353b;
+          --okbg:#1d2f20; --warnbg:#33290f; --badbg:#3a1a20; --ok:#7bc47f; --warn:#e0a84a; --bad:#ff7a8a; } }
   * { box-sizing: border-box; }
-  body { margin:0; font: var(--size, 17px)/1.6 Verdana, system-ui, -apple-system, Segoe UI, sans-serif; letter-spacing:.01em; background:var(--bg); color:var(--ink); }
-  .plain { background:var(--bg); border-radius:8px; padding:8px 10px; margin:6px 0; }
-  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:14px 20px; border-bottom:1px solid var(--line); background:var(--card); position:sticky; top:0; }
-  h1 { font-size:18px; margin:0 12px 0 0; }
-  .pill { padding:3px 10px; border-radius:999px; font-weight:600; font-size:13px; border:1px solid var(--line); }
-  .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
-  button { font:inherit; padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; }
-  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  body { margin:0; font: var(--size, 18px)/1.6 Verdana, system-ui, -apple-system, Segoe UI, sans-serif; letter-spacing:.01em;
+         background:var(--bg); color:var(--ink); }
+  .wrap { max-width:900px; margin:0 auto; padding:0 16px 40px; }
+  header { position:sticky; top:0; z-index:1; background:var(--card); border-bottom:1px solid var(--line); }
+  .bar { max-width:900px; margin:0 auto; padding:12px 16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  h1 { font-size:1em; margin:0; flex:1; }
+  button { font:inherit; font-size:.9em; padding:8px 14px; border-radius:10px; border:1px solid var(--line); background:var(--card);
+           color:var(--ink); cursor:pointer; }
+  button.go { background:var(--ok); color:#fff; border-color:var(--ok); font-weight:700; }
   button.danger { background:var(--bad); color:#fff; border-color:var(--bad); }
-  main { display:grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap:16px; padding:16px 20px; }
-  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; min-width:0; }
-  h2 { font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 10px; }
-  table { width:100%; border-collapse:collapse; font-size:13px; }
+  .status { border-radius:14px; padding:16px 18px; margin:18px 0; font-size:1.1em; }
+  .status.ok { background:var(--okbg); } .status.warn { background:var(--warnbg); } .status.bad { background:var(--badbg); }
+  .status small { display:block; font-size:.75em; color:var(--muted); margin-top:4px; }
+  h2 { font-size:1.05em; margin:28px 0 10px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:12px; }
+  .who { font-weight:700; font-size:1.05em; }
+  .plain { background:var(--bg); border-radius:10px; padding:10px 12px; margin:8px 0; }
+  textarea { width:100%; font:inherit; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--bg);
+             color:var(--ink); margin:6px 0; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px; }
+  .muted { color:var(--muted); font-size:.85em; }
+  .nums { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px; }
+  .num { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; }
+  .num b { display:block; font-size:1.6em; }
+  .help { border-left:5px solid var(--warn); }
+  details { margin-top:30px; } summary { cursor:pointer; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:14px; }
   td, th { text-align:left; padding:5px 6px; border-top:1px solid var(--line); vertical-align:top; overflow-wrap:anywhere; }
-  .draft { border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:10px; }
-  .draft textarea { width:100%; font:inherit; padding:6px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--ink); }
-  .muted { color:var(--muted); font-size:13px; }
-  .wide { grid-column: 1 / -1; }
-  #login { max-width:420px; margin:80px auto; background:var(--card); padding:20px; border-radius:12px; border:1px solid var(--line); }
-  #login input { width:100%; padding:8px; font:inherit; margin:8px 0; }
+  h3 { font-size:14px; color:var(--muted); margin:16px 0 6px; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  #login { max-width:440px; margin:80px auto; background:var(--card); padding:22px; border-radius:14px; border:1px solid var(--line); }
+  #login input { width:100%; padding:10px; font:inherit; margin:10px 0; }
 </style>
 </head>
 <body>
 <div id="login" hidden>
   <h1>Conversation Agent</h1>
-  <p class="muted">Paste the dashboard token from <code>data/dashboard-token</code>.</p>
-  <input id="tok" type="password" autocomplete="off"><button class="primary" onclick="saveToken()">Open</button>
+  <p class="muted">Paste your dashboard password (the token in <code>data/dashboard-token</code>).</p>
+  <input id="tok" type="password" autocomplete="off"><button class="go" onclick="saveToken()">Open</button>
 </div>
 <div id="app" hidden>
-<header>
+<header><div class="bar">
   <h1>Conversation Agent</h1>
-  <span id="run" class="pill"></span><span id="circuit" class="pill"></span><span id="mode" class="pill"></span><span id="approval" class="pill"></span>
-  <span style="flex:1"></span>
-  <button onclick="ctl('pause')">Pause</button><button onclick="ctl('resume')">Resume</button>
-  <button onclick="ctl('stop')">Stop</button><button class="danger" onclick="ctl('emergency-stop')">Emergency stop</button>
-  <button onclick="ctl('clear-emergency-stop')">Clear e-stop</button><button onclick="ctl('close-circuit')">Close circuit</button>
+  <button id="pausebtn" onclick="togglePause()">Pause</button>
+  <button class="danger" onclick="ctl('emergency-stop')">Emergency stop</button>
   <button onclick="size(-1)" title="Smaller text">A-</button><button onclick="size(1)" title="Bigger text">A+</button>
-</header>
-<p id="reason" class="muted" style="padding:0 20px"></p>
-<main>
-  <section><h2>Health</h2><table id="health"></table></section>
-  <section><h2>Queue</h2><div id="queue"></div></section>
-  <section class="wide"><h2>Drafts waiting for you</h2><div id="drafts"></div></section>
-  <section class="wide"><h2>Active jobs</h2><table id="jobs"></table></section>
-  <section><h2>Delivery</h2><table id="outbox"></table></section>
-  <section><h2>New events</h2><table id="events"></table></section>
-  <section><h2>Skipped and needs review</h2><table id="skipped"></table></section>
-  <section><h2>Recovery decisions</h2><table id="recovery"></table></section>
-  <section><h2>Recent errors</h2><table id="errors"></table></section>
-  <section><h2>Journal</h2><table id="journal"></table></section>
-</main>
+</div></header>
+<div class="wrap">
+  <div id="status" class="status"></div>
+
+  <h2>Waiting for your OK</h2>
+  <div id="drafts"></div>
+
+  <div id="helpbox" hidden><h2>Needs your help</h2><div id="help"></div></div>
+
+  <h2>Today</h2>
+  <div id="nums" class="nums"></div>
+
+  <h2>Recently sent</h2>
+  <div id="sent"></div>
+
+  <details><summary>Technical details (for troubleshooting)</summary>
+    <h3>Health</h3><table id="health"></table>
+    <h3>Jobs</h3><table id="jobs"></table>
+    <h3>Delivery</h3><table id="outbox"></table>
+    <h3>New events</h3><table id="events"></table>
+    <h3>Skipped</h3><table id="skipped"></table>
+    <h3>Recovery decisions</h3><table id="recovery"></table>
+    <h3>Journal</h3><table id="journal"></table>
+    <div class="row"><button onclick="ctl('stop')">Stop worker</button><button onclick="ctl('clear-emergency-stop')">Clear emergency stop</button>
+      <button onclick="ctl('close-circuit')">Close circuit</button></div>
+  </details>
+</div>
 </div>
 <script>
+// start.sh opens the page with #token=...; the fragment never reaches the server. Keep it for this tab only.
+if (location.hash.startsWith('#token=')) {
+  sessionStorage.setItem('agentToken', decodeURIComponent(location.hash.slice(7)));
+  history.replaceState(null, '', location.pathname);
+}
 let TOKEN = sessionStorage.getItem('agentToken') || '';
+let S = null;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const at = iso => iso ? new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
 function saveToken() { TOKEN = document.getElementById('tok').value.trim(); sessionStorage.setItem('agentToken', TOKEN); boot(); }
 async function api(path, opts = {}) {
   const r = await fetch(path, {...opts, headers: {'X-Agent-Token': TOKEN, 'content-type': 'application/json', ...(opts.headers || {})}});
@@ -73,7 +104,7 @@ function show(ok) { document.getElementById('login').hidden = ok; document.getEl
 const table = (el, cols, data) => { document.getElementById(el).innerHTML =
   '<tr>' + cols.map(c => `<th>${esc(c[0])}</th>`).join('') + '</tr>' +
   (data.length ? data.map(r => '<tr>' + cols.map(c => `<td>${c[1](r)}</td>`).join('') + '</tr>').join('') : `<tr><td colspan="${cols.length}" class="muted">Nothing here</td></tr>`); };
-function size(d) { let v = parseInt(localStorage.getItem('agentSize') || '17') + d; v = Math.min(26, Math.max(13, v));
+function size(d) { let v = parseInt(localStorage.getItem('agentSize') || '18') + d; v = Math.min(28, Math.max(14, v));
   try { localStorage.setItem('agentSize', v); } catch (e) {} document.body.style.setProperty('--size', v + 'px'); }
 size(0);
 function speak(text, lang) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); if (lang) u.lang = lang; u.rate = 0.9; speechSynthesis.speak(u); }
@@ -84,47 +115,106 @@ document.addEventListener('click', e => {
   speak(text, b.dataset.lang || '');
 });
 const LANGS = {english:'en', spanish:'es', portuguese:'pt', french:'fr', german:'de', italian:'it', chinese:'zh', japanese:'ja', korean:'ko', dutch:'nl', turkish:'tr', russian:'ru', arabic:'ar', thai:'th', indonesian:'id'};
-const cls = s => ({running:'ok', closed:'ok', paused:'warn', half_open:'warn', open:'bad', stopped:'bad'})[s] || '';
-async function ctl(a) { if (a === 'emergency-stop' && !confirm('Stop all sending now?')) return; await api('/api/control/' + a, {method:'POST'}); refresh(); }
+// Plain-English versions of the error kinds the agent records.
+const PLAIN = {
+  selector_drift: "couldn't find something it needed on the Instagram page",
+  permission_restricted: "Instagram doesn't let you message this person",
+  ambiguous_state: "wasn't sure it had the right conversation open, so it stopped to be safe",
+  platform_unavailable: "Instagram didn't load",
+  transient: "a temporary hiccup",
+  authentication_required: "Instagram wants you to sign in again",
+  rate_limited: "Instagram asked it to slow down",
+  model_failure: "couldn't write a draft",
+};
+async function ctl(a) { if (a === 'emergency-stop' && !confirm('Stop everything now? Nothing will be sent until you clear it.')) return;
+  await api('/api/control/' + a, {method:'POST'}); refresh(); }
+function togglePause() { ctl(S && S.run_state === 'paused' ? 'resume' : 'pause'); }
 async function approve(id) { const text = document.getElementById('t_' + id).value; await api(`/api/drafts/${id}/approve`, {method:'POST', body: JSON.stringify({text})}); refresh(); }
 async function reject(id) { await api(`/api/drafts/${id}/reject`, {method:'POST', body:'{}'}); refresh(); }
 async function resolve(id, delivered) { await api(`/api/outbox/${id}/resolve`, {method:'POST', body: JSON.stringify({delivered})}); refresh(); }
 async function jobAct(id, a) { await api(`/api/jobs/${id}/${a}`, {method:'POST'}); refresh(); }
+
+function statusBox(s) {
+  const el = document.getElementById('status'), sum = s.summary;
+  const list = sum.audience === 'following' ? 'people you follow' : 'your followers';
+  let cls = 'ok', text, why = '';
+  if (s.emergency_stop) { cls = 'bad'; text = '⛔ Emergency stop is on. Nothing will be sent.';
+    why = 'Open "Technical details" at the bottom and press "Clear emergency stop" when you want to carry on.'; }
+  else if (s.run_state === 'paused') { cls = 'warn'; text = '⏸ Paused.'; why = s.pause_reason ? 'Why: ' + s.pause_reason + '. Press Resume (top right) when it\'s sorted.' : 'Press Resume (top right) to carry on.'; }
+  else if (s.run_state === 'stopped') { cls = 'bad'; text = '⏹ Stopped.'; why = s.pause_reason || ''; }
+  else if (s.circuit.effective_state === 'open') { cls = 'warn'; text = '⏳ Taking a short break after several problems in a row.';
+    why = (s.circuit.reason ? 'Last problem: ' + s.circuit.reason + '. ' : '') + 'It tries again by itself.'; }
+  else { text = '✅ Running. Watching your messages and ' + list + '.';
+    why = (sum.list_checked_at ? 'List last checked at ' + at(sum.list_checked_at) + '. ' : 'Reading your list now. ') +
+          'Nothing is sent until you press Send.'; }
+  el.className = 'status ' + cls; el.innerHTML = esc(text) + (why ? `<small>${esc(why)}</small>` : '');
+  document.getElementById('pausebtn').textContent = s.run_state === 'paused' ? 'Resume' : 'Pause';
+}
+
+function draftCard(d) {
+  const ctx = JSON.parse(d.context || '{}'), val = JSON.parse(d.validation || '{}');
+  const lang = (ctx.language || '').toLowerCase(), code = LANGS[lang] || '';
+  const hello = (d.intent || '').includes('intro') || ctx.kind === 'intro';
+  const said = ctx.their_message_english ? `<div class="plain"><b>They said</b>${lang && lang !== 'english' ? ' (in ' + esc(ctx.language) + ')' : ''}:
+      ${esc(ctx.their_message_english)} <button data-say="${esc(ctx.their_message_english)}" data-lang="en" title="Read out">🔊</button>
+      ${ctx.reply_english && lang !== 'english' ? `<br><b>Your reply means</b>: ${esc(ctx.reply_english)}` : ''}</div>` : '';
+  const note = d.job_state === 'needs_review' ? `<p class="bad">Check this one carefully: ${esc(d.rationale)}</p>` :
+               (val.problems || []).length ? `<p class="muted">Note: ${esc(val.problems.join(', '))}</p>` : '';
+  return `<div class="card"><div class="who">${hello ? 'Hello to' : 'Reply to'} @${esc(d.target)}</div>${note}${said}
+    <textarea id="t_${d.id}" rows="2">${esc(d.text)}</textarea>
+    <div class="row"><button class="go" onclick="approve('${d.id}')">Send</button><button onclick="reject('${d.id}')">Don't send</button>
+      <button data-say-from="t_${esc(d.id)}" data-lang="${esc(code)}">🔊 Read it out</button>
+      <span class="muted">You can change the words before pressing Send.</span></div></div>`;
+}
+
+function helpCards(s) {
+  const cards = [];
+  for (const o of s.outbox.filter(o => o.state === 'unknown'))
+    cards.push(`<div class="card help"><div class="who">Was this sent to @${esc(o.target)}?</div>
+      <div class="plain">${esc(o.text)}</div><p class="muted">The app couldn't tell. Check the chat on Instagram, then tell it:</p>
+      <div class="row"><button onclick="resolve('${o.id}', true)">Yes, it was sent</button><button onclick="resolve('${o.id}', false)">No, it wasn't</button></div></div>`);
+  for (const j of s.active_jobs.filter(j => ['needs_review', 'blocked'].includes(j.state) && !s.drafts.some(d => d.target === j.subject_key))) {
+    const what = j.kind === 'intro' ? 'the hello to' : 'the reply to';
+    const why = PLAIN[j.error_category] || (j.last_error || '').split(':').slice(-1)[0] || 'it needs a look';
+    cards.push(`<div class="card help"><div class="who">Stuck: ${what} @${esc(j.subject_key)}</div>
+      <p>The app ${esc(why)}.</p><p class="muted">${esc(j.last_error || '')}</p>
+      <div class="row"><button class="go" onclick="jobAct('${j.id}','retry')">Try again</button><button onclick="jobAct('${j.id}','skip')">Skip this person</button></div></div>`);
+  }
+  document.getElementById('helpbox').hidden = !cards.length;
+  document.getElementById('help').innerHTML = cards.join('');
+}
+
 async function refresh() {
   const [s, h] = await Promise.all([api('/api/status'), api('/api/health')]);
-  const set = (id, text, c) => { const e = document.getElementById(id); e.textContent = text; e.className = 'pill ' + (c || ''); };
-  set('run', s.emergency_stop ? 'EMERGENCY STOP' : s.run_state, s.emergency_stop ? 'bad' : cls(s.run_state));
-  set('circuit', 'circuit ' + s.circuit.effective_state, cls(s.circuit.effective_state));
-  set('mode', `${s.mode} on ${s.platform}`); set('approval', s.approval_required ? 'approval required' : 'autonomous (mock)', s.approval_required ? 'ok' : 'warn');
-  document.getElementById('reason').textContent = [s.pause_reason && 'Why: ' + s.pause_reason, s.circuit.reason && 'Circuit: ' + s.circuit.reason].filter(Boolean).join('  ·  ');
+  S = s; const sum = s.summary;
+  statusBox(s);
+  document.getElementById('drafts').innerHTML = s.drafts.length ? s.drafts.map(draftCard).join('')
+    : '<p class="muted">Nothing right now. New hellos and replies show up here for you to check.</p>';
+  helpCards(s);
+  const list = sum.audience === 'following' ? 'People you follow' : 'Followers seen';
+  document.getElementById('nums').innerHTML = [
+    [`${sum.sent_today} of ${sum.daily_limit}`, 'sent in the last 24 hours'],
+    [sum.hellos_waiting_turn, 'hellos waiting their turn'],
+    [sum.hellos_sent, 'hellos sent so far'],
+    [sum.on_list, list.toLowerCase() + ' (read so far)'],
+  ].map(([n, l]) => `<div class="num"><b>${esc(n)}</b>${esc(l)}</div>`).join('');
+  const sent = s.outbox.filter(o => o.state === 'sent').slice(0, 10);
+  document.getElementById('sent').innerHTML = sent.length ? sent.map(o =>
+    `<div class="card"><span class="who">@${esc(o.target)}</span> <span class="muted">${esc(at(o.updated_at))}</span><div>${esc(o.text)}</div></div>`).join('')
+    : '<p class="muted">Nothing sent yet.</p>';
+
   table('health', [['Part', r => esc(r[0])], ['OK', r => r[1] === true ? '<b class="ok">yes</b>' : r[1] === false ? '<b class="bad">no</b>' : '?'], ['Detail', r => esc(r[2])]],
     [['database', h.database.ok, h.database.error || ''], ['browser / platform', h.platform.ok, h.platform.state || h.platform.note || h.platform.adapter || ''],
-     ['model', h.model.ok, h.model.provider], ['worker', h.worker.ok, h.worker.last_error || (h.worker.seconds_since_tick ?? '') + 's since tick']]);
-  document.getElementById('queue').innerHTML = `<p><b>${s.queue_depth}</b> jobs in progress</p><p class="muted">` +
-    Object.entries(s.jobs_by_state).map(([k, v]) => `${esc(k)}: ${v}`).join(' · ') + '</p>';
-  document.getElementById('drafts').innerHTML = s.drafts.length ? s.drafts.map(d => {
-    const facts = JSON.parse(d.facts_used || '[]'), val = JSON.parse(d.validation || '{}'), ctx = JSON.parse(d.context || '{}');
-    const lang = (ctx.language || '').toLowerCase(), code = LANGS[lang] || '';
-    const plain = ctx.their_message_english ? `<div class="plain"><b>They said</b>${lang && lang !== 'english' ? ' (in ' + esc(ctx.language) + ')' : ''}: ${esc(ctx.their_message_english)}
-       <button data-say="${esc(ctx.their_message_english)}" data-lang="en" title="Read out">🔊</button>
-       ${ctx.reply_english && lang !== 'english' ? `<br><b>Your reply means</b>: ${esc(ctx.reply_english)}` : ''}</div>` : '';
-    return `<div class="draft"><b>@${esc(d.target)}</b> <span class="muted">${esc(d.job_state)} · ${esc(d.intent || '')}</span>
-      ${d.job_state === 'needs_review' ? `<p class="warn">Needs review: ${esc(d.rationale)}</p>` : ''}
-      ${plain}<textarea id="t_${d.id}" rows="2">${esc(d.text)}</textarea>
-      <button data-say-from="t_${esc(d.id)}" data-lang="${esc(code)}">🔊 Read reply</button>
-      <p class="muted">Facts used: ${facts.length ? facts.map(f => esc(f.text)).join('; ') : 'none'}${(val.problems || []).length ? ' · Problems: ' + esc(val.problems.join(', ')) : ''}</p>
-      <button class="primary" onclick="approve('${d.id}')">Approve and send</button> <button onclick="reject('${d.id}')">Reject</button></div>`; }).join('')
-    : '<p class="muted">No drafts waiting.</p>';
+     ['model', h.model.ok, h.model.provider], ['worker', h.worker.ok, h.worker.last_error || (h.worker.seconds_since_tick ?? '') + 's since tick'],
+     ['mode', true, `${s.mode} on ${s.platform}; ${s.approval_required ? 'approval required' : 'autonomous (mock)'}; circuit ${s.circuit.effective_state}`]]);
   table('jobs', [['Who', r => esc(r.subject_key)], ['Kind', r => esc(r.kind)], ['State', r => esc(r.state)], ['Tries', r => r.attempts],
-    ['Last error', r => esc(r.last_error || '')], ['', r => ['needs_review','blocked'].includes(r.state) ? `<button onclick="jobAct('${r.id}','retry')">Retry</button> <button onclick="jobAct('${r.id}','skip')">Skip</button>` : '']], s.active_jobs);
-  table('outbox', [['To', r => esc(r.target)], ['State', r => `<b class="${r.state === 'sent' ? 'ok' : r.state === 'unknown' ? 'bad' : ''}">${esc(r.state)}</b>`],
-    ['Text', r => esc(r.text)], ['', r => r.state === 'unknown' ? `<button onclick="resolve('${r.id}', true)">It was sent</button> <button onclick="resolve('${r.id}', false)">Not sent</button>` : '']], s.outbox);
-  table('events', [['Who', r => esc(r.username)], ['What', r => r.text !== undefined ? esc(r.text) : 'new follower (' + esc(r.source) + ')'], ['When', r => esc((r.observed_at || '').slice(11, 19))]],
+    ['Last error', r => esc(r.last_error || '')]], s.active_jobs);
+  table('outbox', [['To', r => esc(r.target)], ['State', r => esc(r.state)], ['Text', r => esc(r.text)]], s.outbox);
+  table('events', [['Who', r => esc(r.username)], ['What', r => r.text !== undefined ? esc(r.text) : 'on your list (' + esc(r.source) + ')'], ['When', r => esc(at(r.observed_at))]],
     [...s.incoming, ...s.follower_events].sort((a, b) => (b.observed_at || '').localeCompare(a.observed_at || '')).slice(0, 20));
   table('skipped', [['Who', r => esc(r.subject_key)], ['State', r => esc(r.state)], ['Why', r => esc(r.reason)]], [...s.skipped, ...s.not_contacted]);
-  table('recovery', [['When', r => esc(r.at.slice(11, 19))], ['Scope', r => esc(r.scope)], ['Who', r => esc(r.subject || '')], ['Category', r => esc(r.category)],
+  table('recovery', [['When', r => esc(at(r.at))], ['Scope', r => esc(r.scope)], ['Who', r => esc(r.subject || '')], ['Category', r => esc(r.category)],
     ['Decision', r => esc(r.decision)], ['Reason', r => esc((JSON.parse(r.detail || '{}')).reason || '')]], s.recovery);
-  table('errors', [['Who', r => esc(r.subject_key)], ['Category', r => esc(r.error_category)], ['Error', r => esc(r.last_error)]], s.errors);
   table('journal', [['Who', r => esc(r.target || '')], ['Note', r => esc(r.observation)], ['Basis', r => esc(r.basis)]], s.journal);
 }
 async function boot() { if (!TOKEN) return show(false); try { await refresh(); show(true); setInterval(refresh, 3000); } catch (e) { show(false); } }

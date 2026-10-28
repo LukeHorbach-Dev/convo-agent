@@ -12,6 +12,7 @@ import json
 import platform as pyplatform
 import secrets
 import time
+from datetime import timedelta
 from importlib.metadata import version
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from ..app import App
+from ..core.db import iso, now
 from ..core.observability import metrics, redact
 from ..core.recovery import RunState
 
@@ -131,6 +133,16 @@ def create_dashboard(app: App, token: str, scheduler=None) -> FastAPI:
                                "ORDER BY updated_at DESC LIMIT 20"),
             "journal": rows(db, "SELECT target, observation, basis, uncertainty, created_at FROM journal ORDER BY created_at DESC LIMIT 30"),
             "metrics": metrics.snapshot(),
+            "summary": {
+                "audience": app.settings.policy.audience,
+                "sent_today": db.scalar("SELECT COUNT(*) FROM outbox WHERE state = 'sent' AND updated_at >= ?",
+                                        (iso(now() - timedelta(days=1)),)),
+                "daily_limit": app.settings.limits.daily_send_limit,
+                "on_list": db.scalar("SELECT COUNT(*) FROM accounts WHERE follower_source IS NOT NULL"),
+                "hellos_waiting_turn": db.scalar("SELECT COUNT(*) FROM jobs WHERE kind = 'intro' AND state = 'queued'"),
+                "hellos_sent": db.scalar("SELECT COUNT(*) FROM accounts WHERE intro_status = 'sent'"),
+                "list_checked_at": db.get_state("list_checked_at"),
+            },
         }
 
     @api.post("/api/control/{action}", dependencies=[Depends(auth)])
@@ -209,6 +221,16 @@ def create_dashboard(app: App, token: str, scheduler=None) -> FastAPI:
             "transitions": rows(db, "SELECT job_id, from_state, to_state, reason, at FROM job_transitions ORDER BY id DESC LIMIT 200"),
             "recovery": rows(db, "SELECT * FROM recovery_events ORDER BY id DESC LIMIT 100"),
             "metrics": metrics.snapshot(),
+            "summary": {
+                "audience": app.settings.policy.audience,
+                "sent_today": db.scalar("SELECT COUNT(*) FROM outbox WHERE state = 'sent' AND updated_at >= ?",
+                                        (iso(now() - timedelta(days=1)),)),
+                "daily_limit": app.settings.limits.daily_send_limit,
+                "on_list": db.scalar("SELECT COUNT(*) FROM accounts WHERE follower_source IS NOT NULL"),
+                "hellos_waiting_turn": db.scalar("SELECT COUNT(*) FROM jobs WHERE kind = 'intro' AND state = 'queued'"),
+                "hellos_sent": db.scalar("SELECT COUNT(*) FROM accounts WHERE intro_status = 'sent'"),
+                "list_checked_at": db.get_state("list_checked_at"),
+            },
         }
 
     return api

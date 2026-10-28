@@ -37,6 +37,8 @@ def _settings(args) -> Settings:
     s = Settings(**overrides)
     if s.platform is PlatformKind.INSTAGRAM and s.mode is Mode.SIMULATE:
         s.mode = Mode.EXECUTE  # the real platform runs in execute mode, where every send needs approval
+    if s.platform is PlatformKind.INSTAGRAM and not s.list_check_interval_s:
+        s.list_check_interval_s = 1800  # re-read the (long) list every 30 minutes; messages are checked every tick
     try:
         s.check_consistency()          # validate before starting anything (mock site, browser, scheduler)
     except ValueError as e:

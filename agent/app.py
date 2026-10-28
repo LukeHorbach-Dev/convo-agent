@@ -45,7 +45,10 @@ def build_platform(settings: Settings, world: MockWorld | None = None) -> tuple[
     else:
         site = mock_site_profile(settings.mock_site_url)
     sup = BrowserSupervisor(settings.browser, site)
-    return WebPlatform(sup, site, settings.account_username), world
+    audience = settings.policy.audience
+    # Following lists run to well over a thousand accounts, so that list is scrolled much further.
+    return WebPlatform(sup, site, settings.account_username, audience=audience,
+                       max_scrolls=200 if audience == "following" else 8), world
 
 
 def build_app(settings: Settings | None = None, *, platform: PlatformAdapter | None = None, llm: LLMProvider | None = None,

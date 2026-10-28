@@ -14,7 +14,7 @@ command -v uv >/dev/null || { echo "uv is not installed or not on PATH. Open a n
 if [ -d "$OLD" ]; then
   step "Copying your personal files from $OLD"
   mkdir -p data
-  for f in data/profile.json data/never.txt data/intro-list.txt data/dashboard-token .env; do
+  for f in data/profile.json data/never.txt data/intro-list.txt data/dashboard-token; do
     if [ -f "$OLD/$f" ]; then cp -p "$OLD/$f" "$f"; echo "  copied $f"; else echo "  (no $f in the old folder)"; fi
   done
   if [ -d "$OLD/data/browser-profile" ]; then
@@ -25,7 +25,9 @@ if [ -d "$OLD" ]; then
 else
   step "No old folder at $OLD, so nothing to copy"
 fi
-[ -f .env ] || { cp .env.example .env; echo "  created .env from .env.example"; }
+# Settings always start from the current .env.example (new options appear there). Your old .env, if any, is
+# left in the old folder; copy any API key across by hand.
+cp .env.example .env; echo "  created .env from .env.example"
 
 step "Creating the Python environment"
 rm -rf .venv

@@ -100,8 +100,10 @@ def create_site(world: MockWorld) -> FastAPI:
             await asyncio.sleep(app.state.web["send_hang_s"] or 30)
         return JSONResponse({"ok": True, "id": mid})
 
+    @app.get("/{username}/following/")
     @app.get("/{username}/followers/")
     def followers(username: str, request: Request):
+        # The mock has one list: "following" shows the same accounts as "followers".
         # Like Instagram: loading /followers/ directly can show just the profile, with no list. The list opens when
         # you arrive from the profile's followers link.
         if not (request.headers.get("referer") or "").endswith(f"/{username}/"):
@@ -121,7 +123,8 @@ def create_site(world: MockWorld) -> FastAPI:
             if username == world.me:
                 return page(world, f'<header><h1 data-testid="profile-username">{E(username)}</h1>'
                                    '<a href="/accounts/edit/">Edit profile</a></header>'
-                                   f'<a href="/{E(username)}/followers/">{len(world.follower_events)} followers</a>')
+                                   f'<a href="/{E(username)}/followers/">{len(world.follower_events)} followers</a> '
+                                   f'<a href="/{E(username)}/following/">{len(world.follower_events)} following</a>')
             if not acct:
                 return HTMLResponse("not found", status_code=404)
             f = world.faults

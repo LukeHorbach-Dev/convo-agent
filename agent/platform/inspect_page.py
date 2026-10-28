@@ -57,7 +57,7 @@ def inspect(web: WebPlatform, settle_ms: int = 6000) -> str:
     site, me = web.site, web.me
     lines: list[str] = []
     web.sup.goto(site.url(site.profile_path(me)), expect=".*", ready="body")
-    lines += _report(web, "profile", [site.followers_link(me), site.own_profile_marker() or site.nav_profile(),
+    lines += _report(web, "profile", [site.list_link(me, "followers"), site.list_link(me, "following"), site.own_profile_marker() or site.nav_profile(),
                                       "header", "main", '[role="main"]'], settle_ms)
     web.sup.goto(site.url(site.inbox_path()), expect=".*", ready="body")
     lines += _report(web, "inbox", [site.inbox_ready(), site.thread_rows(), site.nav_profile(), "main",

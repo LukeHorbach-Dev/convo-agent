@@ -58,13 +58,16 @@ class JobQueue:
     def get(self, job_id: str) -> Job:
         return Job.from_row(self.db.one("SELECT * FROM jobs WHERE id = ?", (job_id,)))
 
-    def claim(self, owner: str, kinds: list[str] | None = None) -> Job | None:
+    def claim(self, owner: str, kinds: list[str] | None = None, hold_new: list[str] | None = None) -> Job | None:
         """Atomically claim the next eligible job. A subject with another leased job is skipped,
-        so two messages for the same conversation never run concurrently."""
+        so two messages for the same conversation never run concurrently. Jobs of a kind in `hold_new` are only
+        claimed if already approved (ready_to_send), not started fresh."""
         ts = iso()
         lease = iso(now() + timedelta(seconds=self.limits.lease_s))
         leased = ",".join("?" * len(LEASED_STATES))
         kind_sql = f"AND kind IN ({','.join('?' * len(kinds))})" if kinds else ""
+        if hold_new:
+            kind_sql += f" AND NOT (state = 'queued' AND kind IN ({','.join('?' * len(hold_new))}))"
         with self.db.transaction():
             row = self.db.one(
                 f"""SELECT * FROM jobs j WHERE state IN ('queued', 'ready_to_send')
@@ -72,7 +75,7 @@ class JobQueue:
                     AND NOT EXISTS (SELECT 1 FROM jobs o WHERE o.subject_key = j.subject_key AND o.id != j.id
                                     AND o.state IN ({leased}) AND o.lease_expires_at > ?)
                     ORDER BY CASE state WHEN 'ready_to_send' THEN 0 ELSE 1 END, created_at LIMIT 1""",
-                (ts, *(kinds or []), *LEASED_STATES, ts))
+                (ts, *(kinds or []), *(hold_new or []), *LEASED_STATES, ts))
             if not row:
                 return None
             # Compare-and-set on state: if another worker claimed it between SELECT and UPDATE, rowcount is 0.

@@ -18,7 +18,7 @@ class Crash(BaseException):
 
 
 def make_settings(**kw) -> Settings:
-    s = Settings(db_path=":memory:", profile_path=ROOT / "tests/fixtures/profile.json", **kw)
+    s = Settings(_env_file=None, db_path=":memory:", profile_path=ROOT / "tests/fixtures/profile.json", **kw)
     s.policy.never_list_path = None          # tests never read the operator's personal never-list
     s.limits.backoff_base_s = 0.001
     s.limits.backoff_max_s = 0.002

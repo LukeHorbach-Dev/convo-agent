@@ -41,6 +41,15 @@ and `data/intro-list.txt` (people to introduce yourself to) are personal and git
 
 ## Run
 
+**Everyday use:** `bash start.sh`. It starts the agent on Instagram and opens the dashboard, already logged in.
+Stop with Control + C.
+
+**Who it says hello to** is set by `AGENT_POLICY__AUDIENCE` in `.env`: `following` (the default in `.env.example`)
+means everyone you follow gets one hello, unless you already have a conversation with them; `followers` means only
+people who follow you after the first run. Either way every message waits for you to press Send, at most
+`AGENT_LIMITS__DAILY_SEND_LIMIT` (25) go out per 24 hours, and only `AGENT_LIMITS__MAX_WAITING_INTROS` (10) hellos
+are prepared at a time. On Instagram the list is re-read every 30 minutes; messages are checked every 30 seconds.
+
 ```bash
 .venv/bin/python -m agent demo                       # deterministic mock run with faults; prints a report; exit 1 if an invariant fails
 .venv/bin/python -m agent run                        # mock platform, autonomous, dashboard on http://127.0.0.1:8765/
@@ -63,7 +72,7 @@ immediately and survives restarts until you clear it.
 ## Test
 
 ```bash
-.venv/bin/python -m pytest                      # everything (about 1 minute, 218 tests)
+.venv/bin/python -m pytest                      # everything (about 2 minutes, 228 tests)
 .venv/bin/python -m pytest -m "not browser"     # skip the real-Chromium tests
 CHAOS_SEEDS=300 .venv/bin/python -m pytest tests/test_chaos.py   # longer randomized fault run
 ```

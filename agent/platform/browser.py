@@ -57,18 +57,34 @@ class BrowserSupervisor:
                 self.context = self._launcher(self._pw, self.cfg)
             else:
                 self.cfg.user_data_dir.mkdir(parents=True, exist_ok=True)
-                kwargs = dict(headless=self.cfg.headless, viewport={"width": 1400, "height": 900})
+                if self.cfg.headless:
+                    kwargs = dict(headless=True, viewport={"width": 1400, "height": 900})
+                else:
+                    # A visible window uses the real window size, opened full screen, so what you see is the page.
+                    kwargs = dict(headless=False, no_viewport=True, args=["--start-maximized"])
                 if self.cfg.executable_path:
                     kwargs["executable_path"] = self.cfg.executable_path
                 self.context = self._pw.chromium.launch_persistent_context(str(self.cfg.user_data_dir), **kwargs)
             self.context.set_default_timeout(self.cfg.action_timeout_ms)
             self.context.set_default_navigation_timeout(self.cfg.navigation_timeout_ms)
             self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
+            if not self.cfg.headless and not self._launcher:
+                self._maximize()
             self.restarts += 1
             self._to(BrowserState.READY)
         except Exception as e:
             self._to(BrowserState.FAILED)
             raise PlatformUnavailable(f"browser failed to start: {e}") from e
+
+    def _maximize(self) -> None:
+        """--start-maximized is ignored on macOS, so ask Chromium directly. Cosmetic: failures are ignored."""
+        try:
+            cdp = self.context.new_cdp_session(self.page)
+            win = cdp.send("Browser.getWindowForTarget")["windowId"]
+            cdp.send("Browser.setWindowBounds", {"windowId": win, "bounds": {"windowState": "maximized"}})
+            cdp.detach()
+        except Exception:
+            pass
 
     def stop(self) -> None:
         try:

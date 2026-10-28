@@ -98,7 +98,9 @@ class Engine:
         for _ in range(max_jobs):
             if self.controls.run_state is not RunState.RUNNING or not self.circuit.allow():
                 break
-            job = self.jobs.claim(self.owner)
+            # Prepare only a few hellos ahead of your approval; approved ones and replies always go ahead.
+            waiting = self.db.scalar("SELECT COUNT(*) FROM jobs WHERE kind = 'intro' AND state IN ('awaiting_approval', 'needs_review')")
+            job = self.jobs.claim(self.owner, hold_new=["intro"] if waiting >= self.s.limits.max_waiting_intros else None)
             if not job:
                 break
             self.process(job)
@@ -111,10 +113,17 @@ class Engine:
         if caps.follower_events == "unavailable":
             return 0
         n = 0
+        last = parse(self.db.get_state("list_checked_at"))
+        if last is not None and (now() - last).total_seconds() < self.s.list_check_interval_s:
+            return 0
         observations = self.platform.poll_followers()
+        self.db.set_state("list_checked_at", iso())
         if not observations:
             return 0                         # never take an empty read as the baseline: everyone would look new later
-        baseline = (caps.follower_events == "inferred" and not self.db.get_state("followers_baselined", False)
+        # "following": everyone you follow is someone to say hello to, so there's no baseline. "followers": the
+        # first read is a baseline (people who already followed you), unless intro_existing_followers.
+        by_followers = self.s.policy.audience == "followers"
+        baseline = (by_followers and caps.follower_events == "inferred" and not self.db.get_state("followers_baselined", False)
                     and not self.s.policy.intro_existing_followers)
         # An inferred list is newest first, so new followers come before everyone already known. Unknown names
         # further down are older followers that scrolled into view (e.g. after an unfollow), not new ones.
@@ -131,7 +140,7 @@ class Engine:
                     continue
                 acct = self._upsert_account(obs.username, obs.display_name, obs.platform_id, follower_source=obs.source)
                 n += 1
-                if baseline or (past_known and obs.source == "inferred"):
+                if baseline or (by_followers and past_known and obs.source == "inferred"):
                     self.db.execute("UPDATE accounts SET intro_status = CASE WHEN intro_status = 'none' THEN 'skipped' ELSE intro_status END, "
                                     "review_reason = COALESCE(review_reason, ?) WHERE id = ?",
                                     ("already a follower at first run" if baseline else "older follower, seen below known ones", acct["id"]))

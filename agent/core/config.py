@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -55,6 +56,7 @@ class LimitsConfig(BaseModel):
     queue_capacity: int = Field(5_000, ge=1)
     consecutive_account_failures: int = Field(2, ge=1)  # per-account, before skipping
     daily_send_limit: int = Field(25, ge=0)
+    max_waiting_intros: int = Field(10, ge=1)   # hellos prepared ahead of your approval; the rest wait their turn
 
 
 class CircuitConfig(BaseModel):
@@ -80,6 +82,9 @@ class PolicyConfig(BaseModel):
     # approval there is enforced in code (see agent.core.policy).
     mock_requires_approval: bool = False
     intros_enabled: bool = True
+    # Whose list the agent watches on your profile. "following": everyone you follow gets one hello (each still
+    # needs your approval, within the daily limit). "followers": only people who follow you after the first run.
+    audience: Literal["followers", "following"] = "followers"
     # When followers are inferred by diffing a list, the first observation is a baseline, not "new followers".
     # True = also introduce yourself to people who already followed you before the first run.
     intro_existing_followers: bool = False
@@ -104,6 +109,8 @@ class Settings(BaseSettings):
     mode: Mode = Mode.SIMULATE
     account_username: str = "lukehorbach2"
     poll_interval_s: float = Field(30.0, gt=0)
+    # How often the followers/following list is re-read (0 = every tick). Messages are still checked every tick.
+    list_check_interval_s: float = Field(0.0, ge=0)
     mock_site_url: str = "http://127.0.0.1:8899"
     browser: BrowserConfig = BrowserConfig()
     llm: LLMConfig = LLMConfig()

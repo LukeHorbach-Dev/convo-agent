@@ -122,6 +122,27 @@ def test_inbox_rows_are_opened_only_when_they_change(site):
     assert len(web.list_threads()) == 2
 
 
+def test_following_audience_says_hello_to_everyone_you_follow(site, db):
+    """audience=following: the list opened is "following", there's no baseline, and everyone on it gets a hello."""
+    world, _, _ = site
+    s = make_settings(); s.policy.audience = "following"
+    from agent.app import build_platform
+    from agent.core.config import PlatformKind
+    s.platform = PlatformKind.MOCK_WEB
+    s.mock_site_url = site[1].url
+    s.browser = site[2].sup.cfg
+    web, _ = build_platform(s, world)
+    world.new_follower("friend.one"); world.new_follower("friend.two")
+    app = build_app(s, db=db, platform=web, world=world)
+    try:
+        app.engine.run_once(); app.engine.run_once()
+        assert web.audience == "following"
+        assert sorted(u for u, _ in world.sent_log) == ["friend.one", "friend.two"]
+        assert not app.db.get_state("followers_baselined", False)
+    finally:
+        web.close()
+
+
 # 1. a page that never finishes loading
 def test_navigation_timeout_is_classified(site):
     world, server, web = site
