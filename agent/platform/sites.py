@@ -94,6 +94,10 @@ class InstagramProfile(SiteProfile):
     def follower_links(self):
         return 'div[role="dialog"] a[href^="/"]'
 
+    def followers_link(self, me: str) -> str:
+        # The "796 followers" link in your profile header; the text fallback covers a header without that href.
+        return f'a[href$="/{me}/followers/"], header a:has-text("followers")'
+
     def thread_links(self):
         return 'a[href^="/direct/t/"]'
 

@@ -31,6 +31,10 @@ uv pip install -p .venv/bin/python -e . --no-deps            # the app itself
 cp .env.example .env                                          # then edit (see docs/CONFIGURATION.md)
 ```
 
+**Fresh reinstall** (keeps your personal files and Instagram sign-in): rename the old folder to
+`convo-agent-old`, put the new `convo-agent` folder next to it, then run `bash setup-mac.sh` inside the new one.
+It copies your files across, installs everything, and runs the tests.
+
 `data/profile.json` (your facts, writing samples, intro templates), `data/never.txt` (never message these people)
 and `data/intro-list.txt` (people to introduce yourself to) are personal and git-ignored. Start from
 `data/profile.example.json` if they are missing.

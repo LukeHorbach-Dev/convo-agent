@@ -1,6 +1,7 @@
 """Browser-backed platform adapter. Site-specific details come from a SiteProfile; failures come back classified."""
 from __future__ import annotations
 
+import logging
 import re
 from collections import Counter
 
@@ -10,6 +11,7 @@ from .browser import BrowserSupervisor
 from .sites import SiteProfile, content_id
 
 USERNAME = re.compile(r"^/([A-Za-z0-9._]{1,30})/?$")
+log = logging.getLogger("web")
 RESERVED = {"direct", "explore", "reels", "accounts", "stories", "p", "reel", "about", "legal", "challenge", "api"}
 
 
@@ -66,6 +68,7 @@ class WebPlatform:
             except Exception as e:
                 self.sup.save_screenshot("selector-drift")
                 raise SelectorDrift(f"followers list did not open after clicking {link}: {self.site.followers_ready()}") from e
+        log.info("opening followers list", extra={"outcome": "clicking the followers link on your profile"})
         self.sup.run("open followers", open_list)
         def read():
             seen: dict[str, str | None] = {}
@@ -79,7 +82,9 @@ class WebPlatform:
                     break
                 self._visible(self.site.follower_links()).last.scroll_into_view_if_needed()
             return [FollowerObservation(u, d, None, "inferred", None) for u, d in seen.items()]
-        return self.sup.run("read followers", read)
+        found = self.sup.run("read followers", read)
+        log.info("read followers list", extra={"outcome": f"{len(found)} followers seen"})
+        return found
 
     def _thread_keys(self) -> list[str]:
         self.sup.goto(self.site.url(self.site.inbox_path()), expect=r"/direct/", ready=self.site.inbox_ready())
