@@ -36,6 +36,7 @@ def site(tmp_path):
                         action_timeout_ms=2000, health_check_timeout_ms=2000, max_recoveries_per_run=2)
     sup = BrowserSupervisor(cfg, profile)
     web = WebPlatform(sup, profile, world.me)
+    web.batch_wait_s = 0.5
     yield world, server, web
     web.close()
     server.stop()
@@ -105,6 +106,9 @@ def test_inspect_reports_page_structure_without_clicking(site):
     report = inspect(web, settle_ms=0)
     assert "== profile:" in report and "== inbox:" in report and "== thread:" in report and "== their-profile:" in report
     assert "1 incoming, 0 outgoing" in report and "secret" not in report      # counts only, never message text
+    from agent.platform.inspect_page import inspect_dm
+    dm = inspect_dm(web, "mia", settle_ms=0)
+    assert "== after-message-click:" in dm and world.sent_log == []
     assert "visible /" in report and world.sent_log == []
 
 
@@ -132,6 +136,7 @@ def test_following_audience_says_hello_to_everyone_you_follow(site, db):
     s.mock_site_url = site[1].url
     s.browser = site[2].sup.cfg
     web, _ = build_platform(s, world)
+    web.batch_wait_s = 0.5
     world.new_follower("friend.one"); world.new_follower("friend.two")
     app = build_app(s, db=db, platform=web, world=world)
     try:

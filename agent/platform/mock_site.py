@@ -134,7 +134,12 @@ def create_site(world: MockWorld) -> FastAPI:
                 btn = '<div role="button" data-testid="msg-btn-v2">Message</div>'
             else:
                 key = world.thread_for(username)
-                btn = f'<a role="button" data-testid="message-button" href="/direct/t/{key}/">Message</a>'
+                # Like Instagram: Message opens a small chat pop-up over the profile; its expand icon opens the
+                # full conversation.
+                btn = (f'<div role="button" data-testid="message-button" onclick="document.getElementById(\'chat\').hidden=false">Message</div>'
+                       f'<aside id="chat" hidden><b>{E(username)}</b><div role="button" onclick="location.href=\'/direct/t/{key}/\'">'
+                       f'<svg aria-label="Expand" width="16" height="16"><rect width="16" height="16"/></svg></div>'
+                       f'<div data-testid="popup-composer" contenteditable="true">Message...</div></aside>')
         # Like Instagram: the header (and its Message button) renders a moment after the page loads.
         header = f'<header><h1 data-testid="profile-username">{E(username)}</h1><p>{E(acct.bio)}</p>{btn}</header>'
         return page(world, f'<div id="app"></div><template id="h">{header}</template><script>setTimeout(() => '

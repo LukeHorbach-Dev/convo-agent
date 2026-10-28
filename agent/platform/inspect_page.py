@@ -94,3 +94,18 @@ def inspect(web: WebPlatform, settle_ms: int = 6000) -> str:
         texts = [t.strip()[:20] for t in web.page.locator('header [role="button"], header button').filter(visible=True).all_inner_texts()]
         lines.append(f"header button texts: {[t for t in texts if t]}")
     return "\n".join(lines)
+
+
+def inspect_dm(web: WebPlatform, username: str, settle_ms: int = 5000) -> str:
+    """Open `username`'s profile, press Message, and report what opens (pop-up or full conversation). Types and
+    sends nothing; the pop-up is closed with Escape afterwards."""
+    site = web.site
+    web.sup.goto(site.url(site.profile_path(username)), expect=".*", ready="body")
+    web.page.locator(site.message_button()).filter(visible=True).first.wait_for(state="visible", timeout=25_000)
+    lines = _report(web, "their-profile", [site.message_button(), *site.restricted_markers()], 0)
+    web.page.locator(site.message_button()).filter(visible=True).first.click()
+    lines += _report(web, "after-message-click", [site.dm_expand(), site.composer(), '[role="dialog"]', "aside",
+                                                  '[contenteditable="true"]', '[aria-label*="xpand" i]', 'a[href*="/direct/t/"]',
+                                                  '[role="button"]:has(svg)'], settle_ms)
+    web.page.keyboard.press("Escape")
+    return "\n".join(lines)

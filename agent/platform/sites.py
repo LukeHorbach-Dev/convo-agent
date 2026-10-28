@@ -58,6 +58,7 @@ class SiteProfile:
     def composer(self) -> str: raise NotImplementedError
     def send_button(self) -> str: raise NotImplementedError
     def restricted_markers(self) -> list[str]: return []
+    def dm_expand(self) -> str: return '[aria-label="Expand"]'   # on a chat pop-up: opens the full conversation
     def read_messages_js(self) -> str: raise NotImplementedError
 
 
@@ -134,6 +135,10 @@ class InstagramProfile(SiteProfile):
 
     def send_button(self):
         return '[role="button"]:text-is("Send"), [aria-label="Send"]'
+
+    def dm_expand(self):
+        # Seen live: Message on a profile can open a small chat pop-up (bottom right) with an expand icon top right.
+        return '[aria-label*="xpand" i], [aria-label*="full screen" i], [aria-label*="Open in" i]'
 
     def restricted_markers(self):
         return ['main header :text-is("Requested")', 'main :text("This account is private")']

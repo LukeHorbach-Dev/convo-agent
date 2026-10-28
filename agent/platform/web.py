@@ -33,6 +33,7 @@ class WebPlatform:
         self.max_threads = max_threads
         self.max_scrolls = max_scrolls
         self.audience = audience                 # which list on your profile: "followers" or "following"
+        self.batch_wait_s = 8.0                  # how long to wait for the next batch of the list after scrolling
         self.full_reread_s = 600.0
         self._rows_read: dict[str, None] = {}   # inbox row texts already read (insertion-ordered, capped)
         self._last_full_read = time.monotonic()
@@ -103,7 +104,9 @@ class WebPlatform:
                         seen[u] = (a.get_attribute("data-display-name") or None)
                 shown = links.count()
                 links.last.scroll_into_view_if_needed()
-                for _ in range(12):                  # give the next batch up to 3 s to load
+                links.last.hover()
+                self.page.mouse.wheel(0, 2500)       # a real scroll inside the list, which is what loads more
+                for _ in range(int(self.batch_wait_s * 4)):   # give the next batch time to load
                     if links.count() > shown:
                         break
                     self.page.wait_for_timeout(250)
@@ -203,11 +206,22 @@ class WebPlatform:
             if n > 1:
                 raise AmbiguousState(f"{username}: {n} Message controls found")
             btn.first.click()
-            self._visible(self.site.composer()).first.wait_for(state="visible", timeout=self.sup.cfg.action_timeout_ms)
-            m = re.search(r"/direct/t/([^/]+)/?", self.page.url)
-            if not m:
-                raise AmbiguousState(f"{username}: Message opened, but the conversation could not be identified")
-            return m.group(1)
+            # Instagram opens either the full conversation (/direct/t/<id>/) or a small chat pop-up over the
+            # profile. The pop-up has no address to come back to, so open it full size with its expand control.
+            deadline = time.monotonic() + (self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms) / 1000
+            expanded = False
+            while not re.search(r"/direct/t/[^/]+", self.page.url):
+                if not expanded and self._visible(self.site.dm_expand()).count():
+                    self._visible(self.site.dm_expand()).first.click()
+                    expanded = True
+                if time.monotonic() > deadline:
+                    self.sup.save_screenshot("selector-drift-dm")
+                    raise AmbiguousState(f"{username}: Message opened, but not as a full conversation"
+                                         + ("" if expanded else " (no expand control found on the chat pop-up)"))
+                self.page.wait_for_timeout(250)
+            self._visible(self.site.composer()).first.wait_for(
+                state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
+            return re.search(r"/direct/t/([^/]+)/?", self.page.url).group(1)
         key = self.sup.run(f"open dm {username}", click)
         return self._read_open_thread(key)
 

@@ -124,13 +124,13 @@ def cmd_import_list(args) -> int:
 
 def cmd_inspect(args) -> int:
     from .app import build_platform
-    from .platform.inspect_page import inspect
+    from .platform.inspect_page import inspect, inspect_dm
     s = _settings(args)
     if s.platform is PlatformKind.MOCK:
         raise SystemExit("inspect needs a browser platform: add --platform instagram (or mock_web)")
     web, _ = build_platform(s)
     try:
-        report = inspect(web)
+        report = inspect_dm(web, args.dm) if args.dm else inspect(web)
     finally:
         web.close()
     out = s.data_dir / "diagnostics" / "inspect.txt"
@@ -166,6 +166,8 @@ def main(argv=None) -> int:
         p = sub.add_parser(name)
         if name == "import-list":
             p.add_argument("file", help="text file, one username per line")
+        if name == "inspect":
+            p.add_argument("--dm", metavar="USERNAME", help="press Message on this person's profile and report what opens")
         p.add_argument("--db")
         p.add_argument("--platform", choices=[k.value for k in PlatformKind])
         p.add_argument("--mode", choices=[m.value for m in Mode])
