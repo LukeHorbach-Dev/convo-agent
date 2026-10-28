@@ -103,7 +103,9 @@ def create_site(world: MockWorld) -> FastAPI:
         with world.lock:
             items = "".join(f'<li><a data-testid="follower" data-display-name="{E(world.accounts[e["username"]].display_name)}" '
                             f'href="/{E(e["username"])}/">{E(e["username"])}</a></li>' for e in world.follower_events)
-        return page(world, f"<h1>Followers</h1><ul>{items}</ul>", "Followers")
+        # Like Instagram: the list is a modal role=dialog, and an empty, hidden role=dialog sits earlier in the DOM.
+        return page(world, '<div role="dialog" style="display:none"></div>'
+                           f'<div role="dialog"><h1>Followers</h1><ul>{items}</ul></div>', "Followers")
 
     @app.get("/{username}/")
     def profile(username: str):

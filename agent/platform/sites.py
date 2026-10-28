@@ -59,8 +59,8 @@ class SiteProfile:
 
 class MockSiteProfile(SiteProfile):
     def nav_profile(self): return '[data-testid="nav-profile"]'
-    def follower_links(self): return '[data-testid="follower"]'
-    def followers_ready(self): return 'main h1'
+    def follower_links(self): return 'div[role="dialog"] [data-testid="follower"]'
+    def followers_ready(self): return 'div[role="dialog"]'
     def inbox_ready(self): return '[data-testid="inbox-ready"]'
     def thread_links(self): return '[data-testid="thread-link"]'
     def thread_ready(self): return '[data-testid="thread-username"]'
@@ -90,7 +90,7 @@ class InstagramProfile(SiteProfile):
         return 'a[role="link"]:has-text("Profile")'
 
     def follower_links(self):
-        return 'div[role="dialog"] a[href^="/"][role="link"]'
+        return 'div[role="dialog"] a[href^="/"]'
 
     def thread_links(self):
         return 'a[href^="/direct/t/"]'

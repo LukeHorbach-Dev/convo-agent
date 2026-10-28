@@ -177,7 +177,9 @@ class BrowserSupervisor:
             if not re.search(expect, self.page.url):
                 raise AmbiguousState(f"unexpected redirect to {self.site.redact_url(self.page.url)}")
             try:
-                self.page.locator(ready).first.wait_for(state="visible", timeout=self.cfg.action_timeout_ms)
+                # Only visible matches count: sites like Instagram keep hidden copies of containers (e.g. empty
+                # role=dialog elements) earlier in the page, and waiting on the first match would wait on a hidden one.
+                self.page.locator(ready).filter(visible=True).first.wait_for(state="visible", timeout=self.cfg.action_timeout_ms)
             except Exception as e:
                 self.check_session()
                 raise SelectorDrift(f"expected element not found on {self.site.redact_url(self.page.url)}: {ready}") from e
@@ -194,7 +196,7 @@ class BrowserSupervisor:
             raise AuthenticationRequired("the site is asking for verification; complete it yourself in the browser, then resume")
         for sel in self.site.login_selectors:
             try:
-                if self.page.locator(sel).first.is_visible(timeout=500):
+                if self.page.locator(sel).filter(visible=True).count() > 0:
                     self.state = BrowserState.AUTH_REQUIRED
                     raise AuthenticationRequired("a login form is shown: please sign in, then resume")
             except AuthenticationRequired:

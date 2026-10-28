@@ -40,10 +40,14 @@ class WebPlatform:
     def page(self):
         return self.sup.page
 
+    def _visible(self, selector: str):
+        """Locator restricted to visible elements; hidden duplicates (common on Instagram) are ignored."""
+        return self.page.locator(selector).filter(visible=True)
+
     def whoami(self) -> str:
         self.sup.goto(self.site.url(self.site.inbox_path()), expect=r"/direct/", ready=self.site.nav_profile())
         def read():
-            user = username_from_href(self.page.locator(self.site.nav_profile()).first.get_attribute("href"))
+            user = username_from_href(self._visible(self.site.nav_profile()).first.get_attribute("href"))
             if not user:
                 raise AmbiguousState("could not read the logged-in account from the navigation")
             return user
@@ -55,13 +59,13 @@ class WebPlatform:
             seen: dict[str, str | None] = {}
             for _ in range(self.max_scrolls):
                 before = len(seen)
-                for a in self.page.locator(self.site.follower_links()).all():
+                for a in self._visible(self.site.follower_links()).all():
                     u = username_from_href(a.get_attribute("href"))
                     if u and u != self.me and u not in seen:
                         seen[u] = (a.get_attribute("data-display-name") or None)
                 if len(seen) == before:
                     break
-                self.page.locator(self.site.follower_links()).last.scroll_into_view_if_needed()
+                self._visible(self.site.follower_links()).last.scroll_into_view_if_needed()
             return [FollowerObservation(u, d, None, "inferred", None) for u, d in seen.items()]
         return self.sup.run("read followers", read)
 
@@ -69,7 +73,7 @@ class WebPlatform:
         self.sup.goto(self.site.url(self.site.inbox_path()), expect=r"/direct/", ready=self.site.inbox_ready())
         def read():
             keys = []
-            for a in self.page.locator(self.site.thread_links()).all()[: self.max_threads]:
+            for a in self._visible(self.site.thread_links()).all()[: self.max_threads]:
                 m = re.search(r"/direct/t/([^/]+)/?", a.get_attribute("href") or "")
                 if m and m.group(1) not in keys:
                     keys.append(m.group(1))
@@ -81,7 +85,7 @@ class WebPlatform:
 
     def _read_open_thread(self, key: str) -> ThreadSnapshot:
         def read():
-            names = {username_from_href(a.get_attribute("href")) for a in self.page.locator(self.site.thread_username()).all()}
+            names = {username_from_href(a.get_attribute("href")) for a in self._visible(self.site.thread_username()).all()}
             names.discard(None)
             names.discard(self.me)
             if len(names) != 1:
@@ -110,16 +114,16 @@ class WebPlatform:
         self.sup.goto(self.site.url(self.site.profile_path(username)), expect=re.escape(f"/{username}"), ready="body")
         def click():
             for marker in self.site.restricted_markers():
-                if self.page.locator(marker).count():
+                if self._visible(marker).count():
                     raise PermissionRestricted(f"{username}: messaging is not available ({marker})")
-            btn = self.page.locator(self.site.message_button())
+            btn = self._visible(self.site.message_button())
             n = btn.count()
             if n == 0:
                 raise SelectorDrift(f"{username}: no Message control found on the profile")
             if n > 1:
                 raise AmbiguousState(f"{username}: {n} Message controls found")
             btn.first.click()
-            self.page.locator(self.site.composer()).first.wait_for(state="visible", timeout=self.sup.cfg.action_timeout_ms)
+            self._visible(self.site.composer()).first.wait_for(state="visible", timeout=self.sup.cfg.action_timeout_ms)
             m = re.search(r"/direct/t/([^/]+)/?", self.page.url)
             if not m:
                 raise AmbiguousState(f"{username}: Message opened, but the conversation could not be identified")
@@ -132,17 +136,17 @@ class WebPlatform:
         before = sum(1 for m in snap.messages if m.direction == "out" and m.text == text)
 
         def type_and_send():
-            box = self.page.locator(self.site.composer()).first
+            box = self._visible(self.site.composer()).first
             box.fill(text)
             typed = box.input_value() if box.evaluate("e => 'value' in e") else box.inner_text()
             if typed.strip() != text.strip():
                 raise SelectorDrift("the message box did not accept the text")
-            send = self.page.locator(self.site.send_button())
+            send = self._visible(self.site.send_button())
             if send.count() == 0:
                 raise SelectorDrift("send control not found")
             send.first.click()
         # Up to the click, failure means nothing was sent. After it, failure means "unknown".
-        self.sup.run("type message", lambda: self.page.locator(self.site.composer()).first.wait_for(state="visible"))
+        self.sup.run("type message", lambda: self._visible(self.site.composer()).first.wait_for(state="visible"))
         try:
             self.sup.run("send", type_and_send)
         except SelectorDrift:
