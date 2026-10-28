@@ -20,6 +20,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
+from .. import __version__
 from ..app import App
 from ..core.db import iso, now
 from ..core.observability import metrics, redact
@@ -137,6 +138,7 @@ def create_dashboard(app: App, token: str, scheduler=None) -> FastAPI:
                                "ORDER BY updated_at DESC LIMIT 20"),
             "journal": rows(db, "SELECT target, observation, basis, uncertainty, created_at FROM journal ORDER BY created_at DESC LIMIT 30"),
             "metrics": metrics.snapshot(),
+            "version": __version__,
             "summary": {
                 "audience": app.settings.policy.audience,
                 "sent_today": db.scalar("SELECT COUNT(*) FROM outbox WHERE state = 'sent' AND updated_at >= ?",
@@ -243,6 +245,7 @@ def create_dashboard(app: App, token: str, scheduler=None) -> FastAPI:
             "transitions": rows(db, "SELECT job_id, from_state, to_state, reason, at FROM job_transitions ORDER BY id DESC LIMIT 200"),
             "recovery": rows(db, "SELECT * FROM recovery_events ORDER BY id DESC LIMIT 100"),
             "metrics": metrics.snapshot(),
+            "version": __version__,
             "summary": {
                 "audience": app.settings.policy.audience,
                 "sent_today": db.scalar("SELECT COUNT(*) FROM outbox WHERE state = 'sent' AND updated_at >= ?",

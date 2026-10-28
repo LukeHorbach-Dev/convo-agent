@@ -41,6 +41,10 @@ and `data/intro-list.txt` (people to introduce yourself to) are personal and git
 
 ## Run
 
+**Updating:** download the new `convo-agent.zip` into Downloads, stop the app, then `bash update.sh` in this folder.
+It keeps your sign-in, lists, history and settings, and prints the new version. Problems found on the live account
+and how each is guarded against: [docs/LIVE_ISSUES.md](docs/LIVE_ISSUES.md).
+
 **Everyday use:** `bash start.sh`. It starts the agent on Instagram and opens the dashboard, already logged in.
 Stop with Control + C.
 
@@ -72,7 +76,7 @@ immediately and survives restarts until you clear it.
 ## Test
 
 ```bash
-.venv/bin/python -m pytest                      # everything (about 2 minutes, 228 tests)
+.venv/bin/python -m pytest                      # everything (about 2 minutes, 232 tests)
 .venv/bin/python -m pytest -m "not browser"     # skip the real-Chromium tests
 CHAOS_SEEDS=300 .venv/bin/python -m pytest tests/test_chaos.py   # longer randomized fault run
 ```

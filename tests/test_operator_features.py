@@ -150,3 +150,21 @@ def test_list_is_reread_only_every_interval(world, llm, db):
     for _ in range(3):
         app.engine.run_once()
     assert len(calls) == 1
+
+
+def test_without_an_ai_key_real_replies_are_left_for_you_to_write(world, db):
+    """On a real platform with the fake model, a reply is never canned test text: the box is empty, the card
+    shows what they said, and nothing is sent until you type something and press Send."""
+    from agent.intel.llm import FakeLLM
+    app = build_app(make_settings(mode=Mode.EXECUTE), db=db, platform=RealishPlatform(world), world=world, llm=FakeLLM())
+    world.new_follower("mia"); app.engine.run_once()
+    app.engine.approve_draft(app.db.scalar("SELECT id FROM drafts")); settle(app.engine, 2)
+    world.incoming("mia", "how was your week?")
+    settle(app.engine, 2)
+    d = app.db.one("SELECT d.*, j.state FROM drafts d JOIN jobs j ON j.id = d.job_id WHERE j.kind = 'reply'")
+    assert d["text"] == "" and d["state"] == "needs_review"
+    assert "how was your week" in d["context"]
+    assert len(world.sent_log) == 1
+    app.engine.approve_draft(d["id"], "Pretty good, busy with uni")
+    settle(app.engine, 2)
+    assert world.sent_log[-1] == ("mia", "Pretty good, busy with uni")

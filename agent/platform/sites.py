@@ -59,6 +59,7 @@ class SiteProfile:
     def send_button(self) -> str: raise NotImplementedError
     def restricted_markers(self) -> list[str]: return []
     def dm_expand(self) -> str: return '[aria-label="Expand"]'   # on a chat pop-up: opens the full conversation
+    def dm_url(self, username: str) -> str | None: return None    # an address that opens a conversation, if any
     def read_messages_js(self) -> str: raise NotImplementedError
 
 
@@ -73,7 +74,8 @@ class MockSiteProfile(SiteProfile):
     def message_button(self): return '[data-testid="message-button"]'
     def composer(self): return '[data-testid="composer"]'
     def send_button(self): return '[data-testid="send-button"]'
-    def restricted_markers(self): return ['[data-testid="messaging-restricted"]']
+    def restricted_markers(self): return ['[data-testid="messaging-restricted"]', ':text("Sorry, this page isn\'t available")']
+    def dm_url(self, username): return self.url(f"/m/{username}/")
 
     def read_messages_js(self) -> str:
         return """() => [...document.querySelectorAll('[data-testid="message"]')].map(e => ({
@@ -136,12 +138,16 @@ class InstagramProfile(SiteProfile):
     def send_button(self):
         return '[role="button"]:text-is("Send"), [aria-label="Send"]'
 
+    def dm_url(self, username):
+        # Instagram's own short link for "message this account"; used only if the pop-up can't be expanded.
+        return f"https://ig.me/m/{username}"
+
     def dm_expand(self):
         # Seen live: Message on a profile can open a small chat pop-up (bottom right) with an expand icon top right.
         return '[aria-label*="xpand" i], [aria-label*="full screen" i], [aria-label*="Open in" i]'
 
     def restricted_markers(self):
-        return ['main header :text-is("Requested")', 'main :text("This account is private")']
+        return [':text("Sorry, this page isn\'t available")', ':text("User not found")', 'main header :text-is("Requested")', 'main :text("This account is private")']
 
     def read_messages_js(self) -> str:
         # No stable ids or roles for bubbles: read innermost dir=auto text in the conversation pane. The pane is the

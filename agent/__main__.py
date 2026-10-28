@@ -38,7 +38,9 @@ def _settings(args) -> Settings:
     if s.platform is PlatformKind.INSTAGRAM and s.mode is Mode.SIMULATE:
         s.mode = Mode.EXECUTE  # the real platform runs in execute mode, where every send needs approval
     if s.platform is PlatformKind.INSTAGRAM and not s.list_check_interval_s:
-        s.list_check_interval_s = 1800  # re-read the (long) list every 30 minutes; messages are checked every tick
+        # Re-read the list every 30 minutes for new followers; a following list of 1,000+ changes only when you
+        # follow someone, so every 6 hours. Messages are checked every tick either way.
+        s.list_check_interval_s = 6 * 3600 if s.policy.audience == "following" else 1800
     try:
         s.check_consistency()          # validate before starting anything (mock site, browser, scheduler)
     except ValueError as e:
@@ -78,6 +80,8 @@ def cmd_run(args) -> int:
     sched = Scheduler(app.engine, s.poll_interval_s)
     token = load_or_create_token(s.data_dir)
     sched.start()
+    from . import __version__
+    print(f"Conversation Agent {__version__} on {s.platform.value} ({s.mode.value}, list: {s.policy.audience})", file=sys.stderr)
     print(f"Dashboard: http://{s.dashboard.host}:{s.dashboard.port}/  (token in {s.data_dir / 'dashboard-token'})", file=sys.stderr)
     server = uvicorn.Server(uvicorn.Config(create_dashboard(app, token, sched), host=s.dashboard.host, port=s.dashboard.port, log_level="warning"))
 
@@ -160,7 +164,9 @@ def cmd_diagnose(args) -> int:
 
 
 def main(argv=None) -> int:
+    from . import __version__
     ap = argparse.ArgumentParser(prog="agent")
+    ap.add_argument("--version", action="version", version=f"Conversation Agent {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in ("demo", "run", "login", "migrate", "diagnose", "import-list", "inspect"):
         p = sub.add_parser(name)

@@ -25,7 +25,7 @@ def page(world: MockWorld, body: str, title: str = "Mock") -> HTMLResponse:
 
 def create_site(world: MockWorld) -> FastAPI:
     app = FastAPI()
-    app.state.web = {"hang_paths": set(), "send_hang_s": 0.0, "drift": False}
+    app.state.web = {"hang_paths": set(), "send_hang_s": 0.0, "drift": False, "no_expand": False}
 
     @app.middleware("http")
     async def faults(request: Request, call_next):
@@ -100,6 +100,14 @@ def create_site(world: MockWorld) -> FastAPI:
             await asyncio.sleep(app.state.web["send_hang_s"] or 30)
         return JSONResponse({"ok": True, "id": mid})
 
+    @app.get("/m/{username}/")
+    def dm_link(username: str):
+        # Like ig.me/m/<user>: opens the conversation with that account.
+        with world.lock:
+            if username not in world.accounts:
+                return HTMLResponse("<p>Sorry, this page isn't available.</p>", status_code=404)
+            return RedirectResponse(f"/direct/t/{world.thread_for(username)}/")
+
     @app.get("/{username}/following/")
     @app.get("/{username}/followers/")
     def followers(username: str, request: Request):
@@ -126,7 +134,7 @@ def create_site(world: MockWorld) -> FastAPI:
                                    f'<a href="/{E(username)}/followers/">{len(world.follower_events)} followers</a> '
                                    f'<a href="/{E(username)}/following/">{len(world.follower_events)} following</a>')
             if not acct:
-                return HTMLResponse("not found", status_code=404)
+                return page(world, "<p>Sorry, this page isn't available.</p>", "Page not found")
             f = world.faults
             if username in f.no_message_button:
                 btn = '<span data-testid="messaging-restricted">You can\'t message this account</span>'
@@ -136,9 +144,11 @@ def create_site(world: MockWorld) -> FastAPI:
                 key = world.thread_for(username)
                 # Like Instagram: Message opens a small chat pop-up over the profile; its expand icon opens the
                 # full conversation.
+                expand = ("" if app.state.web["no_expand"] else
+                          f'<div role="button" onclick="location.href=\'/direct/t/{key}/\'">'
+                          f'<svg aria-label="Expand" width="16" height="16"><rect width="16" height="16"/></svg></div>')
                 btn = (f'<div role="button" data-testid="message-button" onclick="document.getElementById(\'chat\').hidden=false">Message</div>'
-                       f'<aside id="chat" hidden><b>{E(username)}</b><div role="button" onclick="location.href=\'/direct/t/{key}/\'">'
-                       f'<svg aria-label="Expand" width="16" height="16"><rect width="16" height="16"/></svg></div>'
+                       f'<aside id="chat" hidden><b>{E(username)}</b>{expand}'
                        f'<div data-testid="popup-composer" contenteditable="true">Message...</div></aside>')
         # Like Instagram: the header (and its Message button) renders a moment after the page loads.
         header = f'<header><h1 data-testid="profile-username">{E(username)}</h1><p>{E(acct.bio)}</p>{btn}</header>'

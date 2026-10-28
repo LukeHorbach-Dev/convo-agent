@@ -148,6 +148,23 @@ def test_following_audience_says_hello_to_everyone_you_follow(site, db):
         web.close()
 
 
+def test_chat_popup_without_expand_falls_back_to_the_dm_address(site):
+    """Seen live: Message opens a chat pop-up. If it can't be expanded, the conversation is opened by address."""
+    world, server, web = site
+    world.new_follower("mia")
+    server.app.state.web["no_expand"] = True
+    snap = web.open_dm("mia")
+    assert snap.username == "mia" and "/direct/t/" in web.page.url
+
+
+def test_unavailable_profile_is_skipped_not_treated_as_a_broken_page(site):
+    """A deleted or renamed account shows "Sorry, this page isn't available": skip that person, don't count it
+    toward the page-changed alarm."""
+    _, _, web = site
+    with pytest.raises(PermissionRestricted):
+        web.open_dm("someone.who.left")
+
+
 # 1. a page that never finishes loading
 def test_navigation_timeout_is_classified(site):
     world, server, web = site

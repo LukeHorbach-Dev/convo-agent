@@ -71,6 +71,7 @@
   <h2>Recently sent</h2>
   <div id="sent"></div>
 
+  <p class="muted" id="ver"></p>
   <details><summary>Technical details (for troubleshooting)</summary>
     <h3>Health</h3><table id="health"></table>
     <h3>Jobs</h3><table id="jobs"></table>
@@ -166,7 +167,8 @@ function draftCard(d) {
   const said = ctx.their_message_english ? `<div class="plain"><b>They said</b>${lang && lang !== 'english' ? ' (in ' + esc(ctx.language) + ')' : ''}:
       ${esc(ctx.their_message_english)} <button data-say="${esc(ctx.their_message_english)}" data-lang="en" title="Read out">🔊</button>
       ${ctx.reply_english && lang !== 'english' ? `<br><b>Your reply means</b>: ${esc(ctx.reply_english)}` : ''}</div>` : '';
-  const note = d.job_state === 'needs_review' ? `<p class="bad">Check this one carefully: ${esc(d.rationale)}</p>` :
+  const note = val.manual ? `<p class="muted">Type your reply in the box, then press Send. (Add an AI key to get suggestions.)</p>` :
+               d.job_state === 'needs_review' ? `<p class="bad">Check this one carefully: ${esc(d.rationale)}</p>` :
                (val.problems || []).length ? `<p class="muted">Note: ${esc(val.problems.join(', '))}</p>` : '';
   return `<div class="card"><div class="who">${hello ? 'Hello to' : 'Reply to'} @${esc(d.target)}</div>${note}${said}
     <textarea id="t_${d.id}" rows="2">${esc(d.text)}</textarea>
@@ -195,6 +197,7 @@ function helpCards(s) {
 async function refresh() {
   const [s, h] = await Promise.all([api('/api/status'), api('/api/health')]);
   S = s; const sum = s.summary;
+  document.getElementById('ver').textContent = 'Version ' + s.version;
   statusBox(s);
   const hellos = s.drafts.filter(isHello).length;
   document.getElementById('drafts').innerHTML = s.drafts.length ?

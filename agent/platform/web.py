@@ -5,6 +5,7 @@ import logging
 import re
 import time
 from collections import Counter
+from urllib.parse import urlsplit
 
 from ..core.errors import AmbiguousState, AuthenticationRequired, DeliveryUnknown, PermissionRestricted, SelectorDrift
 from .base import Capabilities, FollowerObservation, ObservedMessage, SendResult, ThreadSnapshot
@@ -98,10 +99,11 @@ class WebPlatform:
                 raise SelectorDrift(f"{which} list opened but no accounts appeared in it: {self.site.follower_links()}") from e
             seen: dict[str, str | None] = {}
             for _ in range(self.max_scrolls):
-                for a in links.all():
-                    u = username_from_href(a.get_attribute("href"))
+                # One round trip per batch: a list of 1,000+ accounts makes per-link calls very slow.
+                for href, name in links.evaluate_all("els => els.map(e => [e.getAttribute('href'), e.dataset.displayName || null])"):
+                    u = username_from_href(href)
                     if u and u != self.me and u not in seen:
-                        seen[u] = (a.get_attribute("data-display-name") or None)
+                        seen[u] = name
                 shown = links.count()
                 links.last.scroll_into_view_if_needed()
                 links.last.hover()
@@ -209,24 +211,35 @@ class WebPlatform:
             if n > 1:
                 raise AmbiguousState(f"{username}: {n} Message controls found")
             btn.first.click()
-            # Instagram opens either the full conversation (/direct/t/<id>/) or a small chat pop-up over the
-            # profile. The pop-up has no address to come back to, so open it full size with its expand control.
-            deadline = time.monotonic() + (self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms) / 1000
-            expanded = False
-            while not re.search(r"/direct/t/[^/]+", self.page.url):
-                if not expanded and self._visible(self.site.dm_expand()).count():
-                    self._visible(self.site.dm_expand()).first.click()
-                    expanded = True
-                if time.monotonic() > deadline:
-                    self.sup.save_screenshot("selector-drift-dm")
-                    raise AmbiguousState(f"{username}: Message opened, but not as a full conversation"
-                                         + ("" if expanded else " (no expand control found on the chat pop-up)"))
-                self.page.wait_for_timeout(250)
-            self._visible(self.site.composer()).first.wait_for(
-                state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
-            return re.search(r"/direct/t/([^/]+)/?", self.page.url).group(1)
+            return self._wait_for_conversation(username)
         key = self.sup.run(f"open dm {username}", click)
+        if key is None and (url := self.site.dm_url(username)):
+            # Fallback: Instagram's own "message this account" address.
+            log.info("opening conversation by address", extra={"outcome": "the chat pop-up could not be expanded"})
+            self.sup.goto(url, expect=re.escape(urlsplit(self.site.base_url).netloc), ready="body")
+            key = self.sup.run(f"open dm {username} by address", lambda: self._wait_for_conversation(username))
+        if key is None:
+            self.sup.save_screenshot("selector-drift-dm")
+            raise AmbiguousState(f"{username}: Message opened, but not as a full conversation")
         return self._read_open_thread(key)
+
+    def _wait_for_conversation(self, username: str) -> str | None:
+        """After pressing Message: Instagram opens either the full conversation (/direct/t/<id>/) or a small chat
+        pop-up over the profile, which has no address to come back to. Expand the pop-up if there is one. Returns
+        the conversation id, or None if no full conversation opened in time."""
+        deadline = time.monotonic() + (self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms) / 1000
+        expanded = False
+        while not re.search(r"/direct/t/[^/]+", self.page.url):
+            if not expanded and self._visible(self.site.dm_expand()).count():
+                self._visible(self.site.dm_expand()).first.click()
+                expanded = True
+            if time.monotonic() > deadline:
+                log.info("conversation did not open", extra={"outcome": "expanded pop-up" if expanded else "no expand control"})
+                return None
+            self.page.wait_for_timeout(250)
+        self._visible(self.site.composer()).first.wait_for(
+            state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
+        return re.search(r"/direct/t/([^/]+)/?", self.page.url).group(1)
 
     def send(self, thread_key: str, text: str, operation_id: str) -> SendResult:
         snap = self.read_thread(thread_key)

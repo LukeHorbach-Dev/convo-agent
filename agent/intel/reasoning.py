@@ -89,9 +89,12 @@ def check_text(text: str) -> list[str]:
 
 
 class Drafter:
-    def __init__(self, profile: Profile, llm: LLMProvider):
+    def __init__(self, profile: Profile, llm: LLMProvider, manual_replies: bool = False):
         self.profile = profile
         self.llm = llm
+        # True on a real platform without a real model: never put canned test text in front of the operator as
+        # a reply; leave the box empty for them to write it.
+        self.manual_replies = manual_replies
 
     def system_prompt(self, facts: list[Fact]) -> str:
         p = self.profile
@@ -126,6 +129,10 @@ with confidence), and questions of theirs still unanswered (open_question)."""
     def draft_reply(self, history: list[tuple[str, str]], memory: list[str]) -> DraftOutcome:
         """history: [(direction, text)] oldest first; direction in {'in','out'}."""
         last_in = next((t for d, t in reversed(history) if d == "in"), "")
+        if self.manual_replies:
+            return DraftOutcome(action="escalate", reason="no AI key set up, so type your reply in the box",
+                                validation={"problems": [], "manual": True},
+                                plain={"their_message_english": last_in})
         injection = bool(INJECTION.search(last_in))
         facts = self.profile.relevant_facts(" ".join(t for d, t in history[-6:] if d == "in"))
         convo = "\n".join(f"{'THEM' if d == 'in' else 'ME'}: {t}" for d, t in history[-20:])

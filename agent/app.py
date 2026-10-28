@@ -63,5 +63,6 @@ def build_app(settings: Settings | None = None, *, platform: PlatformAdapter | N
         platform, world = build_platform(settings, world)
     llm = llm or build_provider(settings.llm)
     profile = profile or Profile.load(settings.profile_path)
-    engine = Engine(settings, db, platform, Drafter(profile, llm), profile)
+    manual = platform.is_real and getattr(llm, "name", "") == "fake"
+    engine = Engine(settings, db, platform, Drafter(profile, llm, manual_replies=manual), profile)
     return App(settings, db, platform, llm, profile, engine, world)
