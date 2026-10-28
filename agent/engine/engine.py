@@ -112,8 +112,13 @@ class Engine:
             return 0
         n = 0
         observations = self.platform.poll_followers()
+        if not observations:
+            return 0                         # never take an empty read as the baseline: everyone would look new later
         baseline = (caps.follower_events == "inferred" and not self.db.get_state("followers_baselined", False)
                     and not self.s.policy.intro_existing_followers)
+        # An inferred list is newest first, so new followers come before everyone already known. Unknown names
+        # further down are older followers that scrolled into view (e.g. after an unfollow), not new ones.
+        past_known = False
         for obs in observations:
             dedup = f"event:{obs.event_id}" if obs.event_id else f"{obs.source}:{obs.username}"
             with self.db.transaction():
@@ -122,12 +127,14 @@ class Engine:
                                                                      json.dumps({"display_name": obs.display_name})))
                 if cur.rowcount == 0:
                     metrics.inc("duplicate_events_prevented")
+                    past_known = True
                     continue
                 acct = self._upsert_account(obs.username, obs.display_name, obs.platform_id, follower_source=obs.source)
                 n += 1
-                if baseline:
+                if baseline or (past_known and obs.source == "inferred"):
                     self.db.execute("UPDATE accounts SET intro_status = CASE WHEN intro_status = 'none' THEN 'skipped' ELSE intro_status END, "
-                                    "review_reason = COALESCE(review_reason, 'already a follower at first run') WHERE id = ?", (acct["id"],))
+                                    "review_reason = COALESCE(review_reason, ?) WHERE id = ?",
+                                    ("already a follower at first run" if baseline else "older follower, seen below known ones", acct["id"]))
                     continue
                 if not self.s.policy.intros_enabled:
                     continue

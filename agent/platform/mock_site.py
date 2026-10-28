@@ -107,7 +107,7 @@ def create_site(world: MockWorld) -> FastAPI:
                                f'<h1 data-testid="profile-username">{E(username)}</h1>', "Profile")
         with world.lock:
             items = "".join(f'<li><a data-testid="follower" data-display-name="{E(world.accounts[e["username"]].display_name)}" '
-                            f'href="/{E(e["username"])}/">{E(e["username"])}</a></li>' for e in world.follower_events)
+                            f'href="/{E(e["username"])}/">{E(e["username"])}</a></li>' for e in reversed(world.follower_events))   # newest first, like Instagram
         # Like Instagram: the list is a modal role=dialog, and an empty, hidden role=dialog sits earlier in the DOM.
         return page(world, '<div role="dialog" style="display:none"></div>'
                            f'<div role="dialog"><h1>Followers</h1><ul>{items}</ul></div>', "Followers")

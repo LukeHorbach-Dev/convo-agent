@@ -10,6 +10,7 @@ import logging
 import re
 import time
 from typing import Callable, TypeVar
+from urllib.parse import urlsplit
 
 from ..core.config import BrowserConfig
 from ..core.errors import (AmbiguousState, AuthenticationRequired, BrowserCrashed, InterventionRequired, PlatformUnavailable,
@@ -183,7 +184,9 @@ class BrowserSupervisor:
                     state="visible", timeout=self.site.ready_timeout_ms or self.cfg.action_timeout_ms)
             except Exception as e:
                 self.check_session()
-                self.save_screenshot("selector-drift")
+                path = urlsplit(self.page.url).path
+                self.save_screenshot("selector-drift-" + ("inbox" if path.startswith("/direct/inbox") else
+                                                          "thread" if path.startswith("/direct/t/") else "page"))
                 raise SelectorDrift(f"expected element not found on {self.site.redact_url(self.page.url)}: {ready}") from e
         self.run(f"goto {self.site.redact_url(url)}", nav)
 

@@ -71,6 +71,42 @@ def test_end_to_end_engine_through_browser(site, db):
     assert job_states(app.db, "reply")["mia.skis"] == "completed"
 
 
+def test_empty_followers_read_is_never_the_baseline(site, db):
+    """An empty list (still loading, or not found) must not become the baseline, or everyone would look new later."""
+    world, _, web = site
+    s = make_settings(); s.policy.intro_existing_followers = False
+    app = build_app(s, db=db, platform=web, world=world)
+    app.engine.run_once()                                       # list is empty: no baseline
+    assert not app.db.get_state("followers_baselined", False)
+    world.new_follower("old.one"); world.new_follower("old.two")
+    app.engine.run_once()                                       # first real read is the baseline
+    assert app.db.get_state("followers_baselined") is True
+    assert world.sent_log == []
+
+
+def test_older_follower_below_known_ones_is_not_introduced(site, db):
+    """The list is newest first; an unknown name below known ones is an old follower that scrolled into view."""
+    world, _, web = site
+    s = make_settings(); s.policy.intro_existing_followers = False
+    world.new_follower("known.a"); world.new_follower("known.b")
+    app = build_app(s, db=db, platform=web, world=world)
+    app.engine.run_once()                                       # baseline
+    world.new_follower("older.one")
+    world.follower_events.insert(0, world.follower_events.pop())   # oldest position: bottom of the list
+    world.new_follower("fresh.one")                             # newest: top of the list
+    app.engine.run_once()
+    assert [u for u, _ in world.sent_log] == ["fresh.one"]
+
+
+def test_inspect_reports_page_structure_without_clicking(site):
+    from agent.platform.inspect_page import inspect
+    world, _, web = site
+    world.new_follower("mia")
+    report = inspect(web, settle_ms=0)
+    assert "== profile:" in report and "== inbox:" in report
+    assert "visible /" in report and world.sent_log == []
+
+
 # 1. a page that never finishes loading
 def test_navigation_timeout_is_classified(site):
     world, server, web = site
@@ -125,7 +161,7 @@ def test_missing_page_element_saves_a_screenshot(site, tmp_path):
     _, server, web = site
     with pytest.raises(SelectorDrift):
         web.sup.goto(server.url + "/", expect=".*", ready='[data-testid="does-not-exist"]')
-    shot = tmp_path / "diagnostics" / "last-selector-drift.png"
+    shot = tmp_path / "diagnostics" / "last-selector-drift-page.png"
     assert shot.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
 
 

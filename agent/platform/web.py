@@ -75,21 +75,32 @@ class WebPlatform:
                 self._visible(self.site.followers_ready()).first.wait_for(
                     state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
             except Exception as e:
-                self.sup.save_screenshot("selector-drift")
+                self.sup.save_screenshot("selector-drift-followers")
                 raise SelectorDrift(f"followers list did not open after clicking {link}: {self.site.followers_ready()}") from e
         log.info("opening followers list", extra={"outcome": "clicking the followers link on your profile"})
         self.sup.run("open followers", open_list)
         def read():
+            links = self._visible(self.site.follower_links())
+            try:
+                # The pop-up appears first and fills in a moment later.
+                links.first.wait_for(state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
+            except Exception as e:
+                self.sup.save_screenshot("selector-drift-followers")
+                raise SelectorDrift(f"followers list opened but no accounts appeared in it: {self.site.follower_links()}") from e
             seen: dict[str, str | None] = {}
             for _ in range(self.max_scrolls):
-                before = len(seen)
-                for a in self._visible(self.site.follower_links()).all():
+                for a in links.all():
                     u = username_from_href(a.get_attribute("href"))
                     if u and u != self.me and u not in seen:
                         seen[u] = (a.get_attribute("data-display-name") or None)
-                if len(seen) == before:
-                    break
-                self._visible(self.site.follower_links()).last.scroll_into_view_if_needed()
+                shown = links.count()
+                links.last.scroll_into_view_if_needed()
+                for _ in range(12):                  # give the next batch up to 3 s to load
+                    if links.count() > shown:
+                        break
+                    self.page.wait_for_timeout(250)
+                else:
+                    break                            # nothing more loaded: end of the list
             return [FollowerObservation(u, d, None, "inferred", None) for u, d in seen.items()]
         found = self.sup.run("read followers", read)
         log.info("read followers list", extra={"outcome": f"{len(found)} followers seen"})
