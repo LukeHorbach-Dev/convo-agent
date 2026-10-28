@@ -99,7 +99,12 @@ def create_site(world: MockWorld) -> FastAPI:
         return JSONResponse({"ok": True, "id": mid})
 
     @app.get("/{username}/followers/")
-    def followers(username: str):
+    def followers(username: str, request: Request):
+        # Like Instagram: loading /followers/ directly can show just the profile, with no list. The list opens when
+        # you arrive from the profile's followers link.
+        if not (request.headers.get("referer") or "").endswith(f"/{username}/"):
+            return page(world, '<div role="dialog" style="display:none"></div>'
+                               f'<h1 data-testid="profile-username">{E(username)}</h1>', "Profile")
         with world.lock:
             items = "".join(f'<li><a data-testid="follower" data-display-name="{E(world.accounts[e["username"]].display_name)}" '
                             f'href="/{E(e["username"])}/">{E(e["username"])}</a></li>' for e in world.follower_events)
@@ -112,7 +117,8 @@ def create_site(world: MockWorld) -> FastAPI:
         with world.lock:
             acct = world.accounts.get(username)
             if username == world.me:
-                return page(world, f'<h1 data-testid="profile-username">{E(username)}</h1>')
+                return page(world, f'<h1 data-testid="profile-username">{E(username)}</h1>'
+                                   f'<a href="/{E(username)}/followers/">{len(world.follower_events)} followers</a>')
             if not acct:
                 return HTMLResponse("not found", status_code=404)
             f = world.faults

@@ -183,11 +183,11 @@ class BrowserSupervisor:
                     state="visible", timeout=self.site.ready_timeout_ms or self.cfg.action_timeout_ms)
             except Exception as e:
                 self.check_session()
-                self._snapshot("selector-drift")
+                self.save_screenshot("selector-drift")
                 raise SelectorDrift(f"expected element not found on {self.site.redact_url(self.page.url)}: {ready}") from e
         self.run(f"goto {self.site.redact_url(url)}", nav)
 
-    def _snapshot(self, label: str) -> None:
+    def save_screenshot(self, label: str) -> None:
         """Save a screenshot of what the page showed, for the operator. Local only (data/diagnostics is git-ignored);
         one file per label, overwritten each time. Never raises."""
         try:

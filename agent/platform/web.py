@@ -54,7 +54,19 @@ class WebPlatform:
         return self.sup.run("whoami", read)
 
     def poll_followers(self) -> list[FollowerObservation]:
-        self.sup.goto(self.site.url(self.site.followers_path(self.me)), expect=r"/followers", ready=self.site.followers_ready())
+        # Open the list the way a person does: your profile, then the followers link. Loading /followers/ directly
+        # doesn't open the pop-up on Instagram in every browser session.
+        link = self.site.followers_link(self.me)
+        self.sup.goto(self.site.url(self.site.profile_path(self.me)), expect=re.escape(f"/{self.me}/"), ready=link)
+        def open_list():
+            self._visible(link).first.click()
+            try:
+                self._visible(self.site.followers_ready()).first.wait_for(
+                    state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
+            except Exception as e:
+                self.sup.save_screenshot("selector-drift")
+                raise SelectorDrift(f"followers list did not open after clicking {link}: {self.site.followers_ready()}") from e
+        self.sup.run("open followers", open_list)
         def read():
             seen: dict[str, str | None] = {}
             for _ in range(self.max_scrolls):

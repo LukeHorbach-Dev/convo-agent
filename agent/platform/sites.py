@@ -43,6 +43,7 @@ class SiteProfile:
     def nav_profile(self) -> str: raise NotImplementedError
     def profile_path(self, username: str) -> str: return f"/{username}/"
     def followers_path(self, me: str) -> str: return f"/{me}/followers/"
+    def followers_link(self, me: str) -> str: return f'a[href$="/{me}/followers/"]'   # on your profile; opens the list
     def follower_links(self) -> str: raise NotImplementedError
     def followers_ready(self) -> str: raise NotImplementedError
     def inbox_ready(self) -> str: raise NotImplementedError
