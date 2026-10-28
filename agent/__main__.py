@@ -83,6 +83,8 @@ def cmd_run(args) -> int:
     signal.signal(signal.SIGTERM, shutdown)
     try:
         server.run()
+    except KeyboardInterrupt:
+        pass                       # Ctrl+C: shut down quietly; cleanup below always runs
     finally:
         clean = sched.stop(timeout_s=30)
         app.platform.close()
