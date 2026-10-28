@@ -181,6 +181,14 @@ class WebPlatform:
     def open_dm(self, username: str) -> ThreadSnapshot:
         self.sup.goto(self.site.url(self.site.profile_path(username)), expect=re.escape(f"/{username}"), ready="body")
         def click():
+            # The profile header renders after the page loads: wait until either a Message control or a
+            # "can't message" marker shows, instead of deciding on a half-built page.
+            either = ", ".join([self.site.message_button(), *self.site.restricted_markers()])
+            try:
+                self._visible(either).first.wait_for(state="visible",
+                                                     timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
+            except Exception:
+                self.sup.save_screenshot("selector-drift-profile")
             for marker in self.site.restricted_markers():
                 if self._visible(marker).count():
                     raise PermissionRestricted(f"{username}: messaging is not available ({marker})")

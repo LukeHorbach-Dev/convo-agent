@@ -132,7 +132,10 @@ def create_site(world: MockWorld) -> FastAPI:
             else:
                 key = world.thread_for(username)
                 btn = f'<a role="button" data-testid="message-button" href="/direct/t/{key}/">Message</a>'
-        return page(world, f'<header><h1 data-testid="profile-username">{E(username)}</h1><p>{E(acct.bio)}</p>{btn}</header>')
+        # Like Instagram: the header (and its Message button) renders a moment after the page loads.
+        header = f'<header><h1 data-testid="profile-username">{E(username)}</h1><p>{E(acct.bio)}</p>{btn}</header>'
+        return page(world, f'<div id="app"></div><template id="h">{header}</template><script>setTimeout(() => '
+                           f'document.getElementById("app").replaceWith(document.getElementById("h").content), 400)</script>')
 
     return app
 
