@@ -55,6 +55,18 @@ class UnfollowBody(BaseModel):
     confirm: str = ""
 
 
+class WindowBody(BaseModel):
+    minimized: bool
+
+
+def save_env(values: dict[str, str], path: Path = Path(".env")) -> None:
+    """Set keys in the local .env (kept owner-only: it can hold the API key)."""
+    lines = [l for l in (path.read_text().splitlines() if path.exists() else [])
+             if l.split("=", 1)[0].strip() not in values]
+    path.write_text("\n".join(lines + [f"{k}={v}" for k, v in values.items()]) + "\n")
+    path.chmod(0o600)
+
+
 class KeyBody(BaseModel):
     key: str
 
@@ -151,7 +163,9 @@ def create_dashboard(app: App, token: str, scheduler=None) -> FastAPI:
             "metrics": metrics.snapshot(),
             "version": __version__,
             "summary": summary(),
-            "ai": {"provider": getattr(engine.drafter.llm, "name", "?"), "manual_replies": engine.drafter.manual_replies},
+            "ai": {"provider": getattr(engine.drafter.llm, "name", "?"), "manual_replies": engine.drafter.manual_replies,
+                   "model": app.settings.llm.model},
+            "window_minimized": app.settings.browser.start_minimized,
         }
 
     def summary() -> dict:
@@ -170,6 +184,8 @@ def create_dashboard(app: App, token: str, scheduler=None) -> FastAPI:
                 "unfollows_waiting": db.scalar("SELECT COUNT(*) FROM jobs WHERE kind = 'unfollow' AND state IN ('queued', 'blocked', 'retry_scheduled')"),
                 "unfollowed_total": db.scalar("SELECT COUNT(*) FROM accounts WHERE unfollowed_at IS NOT NULL"),
                 "daily_unfollow_limit": lim.daily_unfollow_limit,
+                "ai_spend": db.get_state("ai_spend", {}) or {},
+                "today": iso()[:10],
         }
 
     @api.get("/api/following", dependencies=[Depends(auth)])
@@ -202,16 +218,23 @@ def create_dashboard(app: App, token: str, scheduler=None) -> FastAPI:
         if not re.fullmatch(r"sk-ant-[A-Za-z0-9_\-]{20,}", key):
             raise HTTPException(400, "that doesn't look like an Anthropic API key (it starts with sk-ant-)")
         from ..intel.llm import build_provider
-        env = Path(".env")
-        lines = [l for l in (env.read_text().splitlines() if env.exists() else [])
-                 if not l.startswith(("AGENT_LLM__PROVIDER=", "AGENT_LLM__API_KEY="))]
-        env.write_text("\n".join(lines + ["AGENT_LLM__PROVIDER=anthropic", f"AGENT_LLM__API_KEY={key}"]) + "\n")
-        env.chmod(0o600)
+        save_env({"AGENT_LLM__PROVIDER": "anthropic", "AGENT_LLM__API_KEY": key})
         app.settings.llm.provider = "anthropic"
         app.settings.llm.api_key = SecretStr(key)
         engine.drafter.llm = build_provider(app.settings.llm)
         engine.drafter.manual_replies = False
         db.audit("operator", "ai_key_set", {})
+        return {"ok": True}
+
+    @api.post("/api/settings/window", dependencies=[Depends(auth)])
+    def set_window(body: WindowBody):
+        """Tuck the Instagram window away (minimised to the Dock, still working) or bring it back."""
+        app.settings.browser.start_minimized = body.minimized
+        save_env({"AGENT_BROWSER__START_MINIMIZED": "true" if body.minimized else "false"})
+        sup = getattr(app.platform, "sup", None)
+        if sup is not None:
+            sup.window_request = "minimized" if body.minimized else "maximized"
+        wake()
         return {"ok": True}
 
     @api.post("/api/control/{action}", dependencies=[Depends(auth)])

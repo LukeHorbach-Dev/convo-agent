@@ -9,4 +9,8 @@ cd "$(dirname "$0")"
       open "http://127.0.0.1:8765/#token=$(cat data/dashboard-token)"; exit 0
     fi
   done ) &
+# caffeinate keeps the Mac from going to sleep while the app runs (the screen can still turn off).
+if command -v caffeinate >/dev/null; then
+  AGENT_PLATFORM=instagram exec caffeinate -i .venv/bin/python -m agent run
+fi
 AGENT_PLATFORM=instagram exec .venv/bin/python -m agent run

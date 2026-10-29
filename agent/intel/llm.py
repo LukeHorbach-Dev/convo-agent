@@ -13,8 +13,24 @@ from ..core.errors import ErrorCategory, InterventionRequired, ModelFailure
 class LLMProvider(Protocol):
     name: str
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict: ...
+    def complete_json(self, system: str | list[str], user: str, schema: dict) -> dict: ...
     def health(self) -> dict: ...
+
+
+# US dollars per million tokens: input, output, cache read, cache write (5-minute). From Anthropic's price list,
+# October 2026; used only to show an estimate of what drafting has cost.
+PRICES = {
+    "claude-opus-5-5": (4.00, 20.00, 0.20, 5.00),
+    "claude-sonnet-5-5": (2.00, 10.00, 0.20, 2.50),
+    "claude-haiku-5-5": (0.10, 0.50, 0.01, 0.125),
+}
+
+
+def cost_usd(model: str, usage) -> float:
+    price = next((v for k, v in PRICES.items() if model and model.startswith(k)), PRICES["claude-opus-5-5"])
+    get = lambda f: getattr(usage, f, 0) or 0
+    return (get("input_tokens") * price[0] + get("output_tokens") * price[1] + get("cache_read_input_tokens") * price[2]
+            + get("cache_creation_input_tokens") * price[3]) / 1_000_000
 
 
 class AnthropicProvider:
@@ -27,12 +43,19 @@ class AnthropicProvider:
         # max_retries=0: retries are owned by the RecoveryManager so they are bounded and audited.
         self.client = anthropic.Anthropic(api_key=key, timeout=cfg.timeout_s, max_retries=0)
         self.cfg = cfg
+        self.last_cost_usd = 0.0
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict:
+    def complete_json(self, system: str | list[str], user: str, schema: dict) -> dict:
         a = self._anthropic
+        # The first part of a two-part system prompt is identical on every call: cache it, so later drafts pay
+        # about a twentieth of the price for it (prompts below the model's minimum size simply aren't cached).
+        parts = [system] if isinstance(system, str) else system
+        blocks = [{"type": "text", "text": t} for t in parts]
+        if len(blocks) > 1:
+            blocks[0]["cache_control"] = {"type": "ephemeral"}
         try:
             resp = self.client.messages.create(
-                model=self.cfg.model, max_tokens=self.cfg.max_tokens, system=system,
+                model=self.cfg.model, max_tokens=self.cfg.max_tokens, system=blocks,
                 messages=[{"role": "user", "content": user}],
                 output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
                 extra_headers={"anthropic-beta": "server-side-fallback-2026-07-01"},
@@ -48,6 +71,7 @@ class AnthropicProvider:
             if e.status_code >= 500:
                 raise ModelFailure(f"model provider error {e.status_code}") from e
             raise ModelFailure(f"model request rejected ({e.status_code}): {e}", category=ErrorCategory.PERMANENT) from e
+        self.last_cost_usd = cost_usd(resp.model, resp.usage)
         if resp.stop_reason == "refusal":
             raise ModelFailure("model declined to draft this message", category=ErrorCategory.OPERATOR_INTERVENTION_REQUIRED)
         if resp.stop_reason == "max_tokens":
@@ -75,7 +99,8 @@ class FakeLLM:
         self.responder = responder or self.default_responder
         self.delay_s = 0.0
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict:
+    def complete_json(self, system: str | list[str], user: str, schema: dict) -> dict:
+        system = system if isinstance(system, str) else "\n\n".join(system)
         self.calls.append((system, user))
         if self.delay_s:
             time.sleep(self.delay_s)

@@ -29,6 +29,8 @@ class Mode(StrEnum):
 class BrowserConfig(BaseModel):
     user_data_dir: Path = Path("data/browser-profile")
     headless: bool = False
+    # Visible window, but minimised to the Dock: it keeps working while you use other apps.
+    start_minimized: bool = False
     executable_path: str | None = None
     navigation_timeout_ms: int = Field(20_000, ge=1_000, le=120_000)
     action_timeout_ms: int = Field(8_000, ge=500, le=60_000)

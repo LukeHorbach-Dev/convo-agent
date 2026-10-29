@@ -36,6 +36,8 @@ class Profile(BaseModel):
     boundaries: list[str] = Field(default_factory=list)
     needs_approval_topics: list[str] = Field(default_factory=list)
     intro_templates: list[str] = Field(default_factory=list)
+    # Free-text description of how he writes (openers, connectors, hedges, punctuation), used in reply prompts.
+    voice: str = ""
 
     @classmethod
     def load(cls, path: Path) -> "Profile":

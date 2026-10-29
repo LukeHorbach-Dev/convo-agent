@@ -5,100 +5,222 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Conversation Agent</title>
 <style>
-  :root { --bg:#f6f4ef; --card:#fff; --ink:#1b1b1b; --muted:#5f5f5f; --line:#e3ded3; --ok:#2e7d32; --okbg:#e8f3e9;
-          --warn:#8a5300; --warnbg:#fdf3e2; --bad:#b00020; --badbg:#fbe9ec; --accent:#1f4fd1; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#16171a; --card:#1f2125; --ink:#ececec; --muted:#a3a3a3; --line:#33353b;
-          --okbg:#1d2f20; --warnbg:#33290f; --badbg:#3a1a20; --ok:#7bc47f; --warn:#e0a84a; --bad:#ff7a8a; } }
+  :root {
+    --bg:#f6f5f2; --surface:#ffffff; --sunk:#f0efeb; --ink:#16181d; --muted:#5d636e; --line:#e4e2dc;
+    --accent:#3b5bdb; --accent-soft:#e8ecfc; --go:#1d8a4c; --go-soft:#e3f3e9; --warn:#a2610b; --warn-soft:#fbf0dc;
+    --bad:#c22f2f; --bad-soft:#fbe6e6; --them:#efeeea; --me:#e3e9fd;
+    --on-color:#ffffff;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --size: 18px; --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#121316; --surface:#1c1d21; --sunk:#25272c; --ink:#ececee; --muted:#a2a6af; --line:#2f3137;
+    --accent:#8ea2ff; --accent-soft:#252c47; --go:#4cc27e; --go-soft:#1a3326; --warn:#e3a54a; --warn-soft:#3a2d16;
+    --bad:#ff8080; --bad-soft:#3d1f22; --them:#2a2c31; --me:#262f4d; --on-color:#0d0f14; } }
+  :root.easy { --font: Verdana, Tahoma, sans-serif; letter-spacing: .02em; }
   * { box-sizing: border-box; }
-  body { margin:0; font: var(--size, 18px)/1.6 Verdana, system-ui, -apple-system, Segoe UI, sans-serif; letter-spacing:.01em;
-         background:var(--bg); color:var(--ink); }
-  .wrap { max-width:900px; margin:0 auto; padding:0 16px 40px; }
-  header { position:sticky; top:0; z-index:1; background:var(--card); border-bottom:1px solid var(--line); }
-  .bar { max-width:900px; margin:0 auto; padding:12px 16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-  h1 { font-size:1em; margin:0; flex:1; }
-  button { font:inherit; font-size:.9em; padding:8px 14px; border-radius:10px; border:1px solid var(--line); background:var(--card);
-           color:var(--ink); cursor:pointer; }
-  button.go { background:var(--ok); color:#fff; border-color:var(--ok); font-weight:700; }
-  button.danger { background:var(--bad); color:#fff; border-color:var(--bad); }
-  .status { border-radius:14px; padding:16px 18px; margin:18px 0; font-size:1.1em; }
-  .status.ok { background:var(--okbg); } .status.warn { background:var(--warnbg); } .status.bad { background:var(--badbg); }
-  .status small { display:block; font-size:.75em; color:var(--muted); margin-top:4px; }
-  h2 { font-size:1.05em; margin:28px 0 10px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:12px; }
-  .who { font-weight:700; font-size:1.05em; }
-  .plain { background:var(--bg); border-radius:10px; padding:10px 12px; margin:8px 0; }
-  textarea { width:100%; font:inherit; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--bg);
-             color:var(--ink); margin:6px 0; }
-  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px; }
-  .muted { color:var(--muted); font-size:.85em; }
-  .nums { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px; }
-  .num { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; }
-  .num b { display:block; font-size:1.6em; }
-  .help { border-left:5px solid var(--warn); }
-  details { margin-top:30px; } summary { cursor:pointer; color:var(--muted); }
-  table { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:14px; }
-  td, th { text-align:left; padding:5px 6px; border-top:1px solid var(--line); vertical-align:top; overflow-wrap:anywhere; }
-  h3 { font-size:14px; color:var(--muted); margin:16px 0 6px; }
-  .ok { color:var(--ok); } .bad { color:var(--bad); }
-  #login { max-width:440px; margin:80px auto; background:var(--card); padding:22px; border-radius:14px; border:1px solid var(--line); }
-  #login input { width:100%; padding:10px; font:inherit; margin:10px 0; }
+  html { font-size: var(--size); }
+  body { margin:0; font: 1rem/1.6 var(--font); background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; }
+  button, input, textarea { font: inherit; color: inherit; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 0 16px 60px; }
+
+  /* top bar and tabs */
+  .top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent);
+         backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .bar { max-width: 780px; margin: 0 auto; padding: 12px 16px 0; display: flex; align-items: center; gap: 12px; }
+  .brand { font-weight: 700; font-size: 1.05rem; flex: 1; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px;
+          font-size: .8rem; font-weight: 600; background: var(--go-soft); color: var(--go); white-space: nowrap; }
+  .chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); } .chip.bad { background: var(--bad-soft); color: var(--bad); }
+  .tabs { max-width: 780px; margin: 0 auto; padding: 8px 12px 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .tab { border: 0; background: none; padding: 10px 12px; border-bottom: 3px solid transparent; color: var(--muted);
+         font-weight: 600; cursor: pointer; white-space: nowrap; font-size: .92rem; }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .badge { display: inline-block; min-width: 1.5em; padding: 0 .45em; margin-left: 4px; border-radius: 999px;
+           background: var(--accent); color: var(--on-color); font-size: .75rem; line-height: 1.5em; text-align: center; }
+
+  /* building blocks */
+  h2 { font-size: 1.15rem; margin: 28px 0 10px; }
+  h3 { font-size: 1rem; margin: 0 0 6px; }
+  p { margin: 6px 0; }
+  .muted { color: var(--muted); font-size: .88rem; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin: 12px 0; }
+  .hero { border-radius: var(--radius); padding: 18px 20px; margin: 20px 0 8px; background: var(--go-soft); }
+  .hero.warn { background: var(--warn-soft); } .hero.bad { background: var(--bad-soft); }
+  .hero b { display: block; font-size: 1.15rem; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .grow { flex: 1; min-width: 0; }
+  .btn { border: 1px solid var(--line); background: var(--surface); padding: 10px 16px; border-radius: 12px; cursor: pointer;
+         font-weight: 600; font-size: .92rem; }
+  .btn:hover { border-color: var(--muted); }
+  .btn.go { background: var(--go); border-color: var(--go); color: var(--on-color); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-color); }
+  .btn.danger { background: var(--bad); border-color: var(--bad); color: var(--on-color); }
+  .btn.quiet { background: none; border-color: transparent; color: var(--muted); padding: 10px 8px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .field { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--sunk); }
+  .field:focus, .btn:focus-visible, .tab:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 1px; border-color: var(--accent); }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+  @media (max-width: 560px) { .tiles { grid-template-columns: 1fr 1fr; } }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+  .tile b { display: block; font-size: 1.5rem; line-height: 1.2; }
+  .tile span { color: var(--muted); font-size: .85rem; }
+
+  /* message cards */
+  .who { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+            background: var(--accent-soft); color: var(--accent); flex: none; }
+  .name { font-weight: 700; }
+  .kind { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 8px;
+          border-radius: 6px; background: var(--sunk); color: var(--muted); }
+  .kind.reply { background: var(--accent-soft); color: var(--accent); }
+  .bubble { border-radius: 18px; padding: 10px 14px; max-width: 92%; margin: 6px 0; }
+  .plain { background: var(--them); border-bottom-left-radius: 6px; }
+  .mine { background: var(--me); border-bottom-right-radius: 6px; margin-left: auto; max-width: 100%; }
+  .mine textarea { width: 100%; border: 0; background: transparent; resize: vertical; padding: 0; min-height: 3.2em; outline: none; }
+  .note { font-size: .88rem; padding: 8px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); margin: 8px 0; }
+  .say { border: 0; background: none; cursor: pointer; padding: 0 4px; font-size: 1rem; }
+  .help { border-left: 5px solid var(--warn); }
+
+  /* people list */
+  .person { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-top: 1px solid var(--line); cursor: pointer; }
+  .person:first-child { border-top: 0; }
+  .person input { width: 20px; height: 20px; accent-color: var(--accent); }
+  .tag { font-size: .78rem; color: var(--muted); }
+
+  .switch { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+  .switch input { width: 22px; height: 22px; accent-color: var(--accent); }
+  details > summary { cursor: pointer; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0 14px; }
+  td, th { text-align: left; padding: 5px 6px; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+  .empty { text-align: center; padding: 36px 16px; color: var(--muted); }
+  .empty b { display: block; color: var(--ink); font-size: 1.05rem; margin-bottom: 4px; }
+  #login { max-width: 440px; margin: 12vh auto; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<div id="login" hidden>
-  <h1>Conversation Agent</h1>
-  <p class="muted">Paste your dashboard password (the token in <code>data/dashboard-token</code>).</p>
-  <input id="tok" type="password" autocomplete="off"><button class="go" onclick="saveToken()">Open</button>
+<div id="login" class="card" hidden>
+  <h3>Conversation Agent</h3>
+  <p class="muted">Start the app with <b>bash start.sh</b> and this page logs in by itself. Or paste the password from <code>data/dashboard-token</code>.</p>
+  <input id="tok" class="field" type="password" autocomplete="off" placeholder="Password">
+  <p><button class="btn primary" onclick="saveToken()">Open</button></p>
 </div>
+
 <div id="app" hidden>
-<header><div class="bar">
-  <h1>Conversation Agent</h1>
-  <button id="pausebtn" onclick="togglePause()">Pause</button>
-  <button class="danger" onclick="ctl('emergency-stop')">Emergency stop</button>
-  <button onclick="size(-1)" title="Smaller text">A-</button><button onclick="size(1)" title="Bigger text">A+</button>
-</div></header>
-<div class="wrap">
-  <div id="status" class="status"></div>
-
-  <h2>Waiting for your OK</h2>
-  <div id="drafts"></div>
-
-  <div id="helpbox" hidden><h2>Needs your help</h2><div id="help"></div></div>
-
-  <h2>Today</h2>
-  <div id="nums" class="nums"></div>
-
-  <h2>Recently sent</h2>
-  <div id="sent"></div>
-
-  <h2>People you follow</h2>
-  <div class="card">
-    <div class="row"><input id="fq" placeholder="Search a name" oninput="loadFollowing(0)" style="flex:1;font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
-      <button onclick="unfollowSelected()">Unfollow selected</button>
-      <button class="danger" onclick="unfollowEveryone()">Unfollow everyone</button></div>
-    <p class="muted" id="unf"></p>
-    <div id="flist"></div>
-    <div class="row"><button id="fprev" onclick="loadFollowing(FOFF - 50)">Previous</button><button id="fnext" onclick="loadFollowing(FOFF + 50)">Next</button>
-      <span class="muted" id="fpage"></span></div>
+  <div class="top">
+    <div class="bar">
+      <div class="brand">Conversation Agent</div>
+      <span id="chip" class="chip">Running</span>
+      <button id="pausebtn" class="btn" onclick="togglePause()">Pause</button>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="check">To check<span id="nbadge" class="badge" hidden></span></button>
+      <button class="tab" role="tab" data-tab="people">People</button>
+      <button class="tab" role="tab" data-tab="sent">Sent</button>
+      <button class="tab" role="tab" data-tab="settings">Settings</button>
+      <button class="tab" role="tab" data-tab="help">Help</button>
+    </nav>
   </div>
 
-  <h2>Replies in your style</h2>
-  <div class="card" id="ai"></div>
+  <div class="wrap">
+    <!-- TO CHECK -->
+    <section data-page="check">
+      <div id="status" class="hero"></div>
+      <div id="tiles" class="tiles"></div>
+      <div id="helpbox" hidden><h2>Needs you</h2><div id="help"></div></div>
+      <div class="row" style="margin-top:24px"><h2 class="grow" style="margin:0">Messages to check</h2><span id="sendall"></span></div>
+      <div id="drafts"></div>
+    </section>
 
-  <p class="muted" id="ver"></p>
-  <details><summary>Technical details (for troubleshooting)</summary>
-    <h3>Health</h3><table id="health"></table>
-    <h3>Jobs</h3><table id="jobs"></table>
-    <h3>Delivery</h3><table id="outbox"></table>
-    <h3>New events</h3><table id="events"></table>
-    <h3>Skipped</h3><table id="skipped"></table>
-    <h3>Recovery decisions</h3><table id="recovery"></table>
-    <h3>Journal</h3><table id="journal"></table>
-    <div class="row"><button onclick="ctl('stop')">Stop worker</button><button onclick="ctl('clear-emergency-stop')">Clear emergency stop</button>
-      <button onclick="ctl('close-circuit')">Close circuit</button></div>
-  </details>
+    <!-- PEOPLE -->
+    <section data-page="people" hidden>
+      <h2>People you follow</h2>
+      <p class="muted" id="whohello"></p>
+      <div class="card">
+        <input id="fq" class="field" placeholder="Search a name" oninput="loadFollowing(0)">
+        <p class="muted" id="unf"></p>
+        <div id="flist"></div>
+        <div class="row" style="margin-top:10px">
+          <button id="fprev" class="btn" onclick="loadFollowing(FOFF - 50)">Previous</button>
+          <button id="fnext" class="btn" onclick="loadFollowing(FOFF + 50)">Next</button>
+          <span class="muted grow" id="fpage"></span>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn" onclick="unfollowSelected()">Unfollow ticked</button>
+        <span class="grow"></span>
+        <button class="btn danger" onclick="unfollowEveryone()">Unfollow everyone</button>
+      </div>
+      <p class="muted">Unfollowing happens slowly on purpose (at most 50 a day) because Instagram blocks accounts that unfollow lots at once. It also cancels hellos to those people that haven't gone out yet.</p>
+    </section>
+
+    <!-- SENT -->
+    <section data-page="sent" hidden>
+      <h2>Sent</h2>
+      <div id="sent"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section data-page="settings" hidden>
+      <h2>Replies in your style</h2>
+      <div class="card" id="ai"></div>
+
+      <h2>Instagram window</h2>
+      <div class="card">
+        <label class="switch"><input type="checkbox" id="tuck" onchange="setWindow(this.checked)">
+          <span><b>Tuck it away</b><br><span class="muted">Minimises the Instagram window to the Dock. It keeps working; you can use your Mac as normal.</span></span></label>
+        <p class="muted" style="margin-top:12px">You don't need this page open either. The app runs in the Terminal window, keeps your Mac awake while it's on, and sends a Mac notification when something needs you. Just don't close Terminal or let the lid shut.</p>
+      </div>
+
+      <h2>Reading</h2>
+      <div class="card">
+        <div class="row"><span class="grow">Text size</span>
+          <button class="btn" onclick="size(-1)" aria-label="Smaller text">A-</button>
+          <button class="btn" onclick="size(1)" aria-label="Bigger text">A+</button></div>
+        <label class="switch" style="margin-top:12px"><input type="checkbox" id="easy" onchange="setEasy(this.checked)">
+          <span><b>Easy-read font</b><br><span class="muted">Wider letters with more space between them.</span></span></label>
+      </div>
+
+      <h2>Limits</h2>
+      <div class="card" id="limits"></div>
+
+      <h2>Stop everything</h2>
+      <div class="card">
+        <p class="muted">Stops all sending and unfollowing straight away, and stays stopped (even after a restart) until you undo it here.</p>
+        <div class="row"><button class="btn danger" onclick="ctl('emergency-stop')">Emergency stop</button>
+          <button class="btn" onclick="ctl('clear-emergency-stop')">Undo emergency stop</button></div>
+      </div>
+      <p class="muted" id="ver"></p>
+    </section>
+
+    <!-- HELP -->
+    <section data-page="help" hidden>
+      <h2>How it works</h2>
+      <div class="card">
+        <p><b>Hellos.</b> The app reads the people you follow. Anyone you haven't talked to yet gets one hello from your own list of hellos. It skips anyone you already have a chat with, anyone on your never list, and anyone it thinks is under 19.</p>
+        <p><b>Replies.</b> When someone writes to you, the app reads the chat and writes a reply the way you write (if AI replies are on in Settings). Without AI it leaves the box empty for you.</p>
+        <p><b>Nothing goes out without you.</b> Every message waits under "To check" until you press Send. At most 25 a day.</p>
+      </div>
+      <h2>If it gets stuck</h2>
+      <div class="card">
+        <p>Instagram changes its website every so often. When the app can't find something, it stops that one person and tells you here, and nothing gets sent by mistake.</p>
+        <p>To check everything at once: press Control + C in Terminal, then type <b>bash check.sh</b>. It tries every step without sending anything or unfollowing anyone, then opens a folder. Send Claude the file <b>check.txt</b>.</p>
+      </div>
+      <details><summary>Technical details</summary>
+        <h3 style="margin-top:14px">Health</h3><table id="health"></table>
+        <h3>Jobs</h3><table id="jobs"></table>
+        <h3>Delivery</h3><table id="outbox"></table>
+        <h3>Recent activity</h3><table id="events"></table>
+        <h3>Skipped</h3><table id="skipped"></table>
+        <h3>Recovery decisions</h3><table id="recovery"></table>
+        <div class="row"><button class="btn" onclick="ctl('stop')">Stop worker</button><button class="btn" onclick="ctl('close-circuit')">Reset break</button></div>
+      </details>
+    </section>
+  </div>
 </div>
-</div>
+
 <script>
 // start.sh opens the page with #token=...; the fragment never reaches the server. Keep it for this tab only.
 if (location.hash.startsWith('#token=')) {
@@ -106,192 +228,254 @@ if (location.hash.startsWith('#token=')) {
   history.replaceState(null, '', location.pathname);
 }
 let TOKEN = sessionStorage.getItem('agentToken') || '';
-let S = null;
+let S = null, FOFF = 0;
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const at = iso => iso ? new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+const at = iso => iso ? new Date(iso).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}) : '';
+const day = iso => iso ? new Date(iso).toLocaleDateString([], {weekday: 'short', day: 'numeric', month: 'short'}) : '';
+const money = n => n < 0.01 && n > 0 ? 'under 1c' : '$' + (n || 0).toFixed(2);
+const initial = u => esc((u || '?').replace(/[^a-z0-9]/gi, '').slice(0, 1).toUpperCase() || '?');
+
 function saveToken() { TOKEN = document.getElementById('tok').value.trim(); sessionStorage.setItem('agentToken', TOKEN); boot(); }
 async function api(path, opts = {}) {
   const r = await fetch(path, {...opts, headers: {'X-Agent-Token': TOKEN, 'content-type': 'application/json', ...(opts.headers || {})}});
   if (r.status === 401) { sessionStorage.removeItem('agentToken'); show(false); throw new Error('unauthorized'); }
-  const j = await r.json(); if (!r.ok) { alert(j.detail || 'request failed'); throw new Error(j.detail); } return j;
+  const j = await r.json(); if (!r.ok) { alert(j.detail || 'Something went wrong'); throw new Error(j.detail); } return j;
 }
 function show(ok) { document.getElementById('login').hidden = ok; document.getElementById('app').hidden = !ok; }
-const table = (el, cols, data) => { document.getElementById(el).innerHTML =
-  '<tr>' + cols.map(c => `<th>${esc(c[0])}</th>`).join('') + '</tr>' +
-  (data.length ? data.map(r => '<tr>' + cols.map(c => `<td>${c[1](r)}</td>`).join('') + '</tr>').join('') : `<tr><td colspan="${cols.length}" class="muted">Nothing here</td></tr>`); };
-function size(d) { let v = parseInt(localStorage.getItem('agentSize') || '18') + d; v = Math.min(28, Math.max(14, v));
-  try { localStorage.setItem('agentSize', v); } catch (e) {} document.body.style.setProperty('--size', v + 'px'); }
-size(0);
+
+// tabs
+function openTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === name));
+  document.querySelectorAll('[data-page]').forEach(p => p.hidden = p.dataset.page !== name);
+  store.set('agentTab', name);
+  if (name === 'people') loadFollowing(FOFF);
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => openTab(t.dataset.tab)));
+
+// reading comfort
+function size(d) { let v = parseInt(store.get('agentSize', '18')) + d; v = Math.min(26, Math.max(14, v));
+  store.set('agentSize', v); document.documentElement.style.setProperty('--size', v + 'px'); }
+function setEasy(on) { document.documentElement.classList.toggle('easy', on); store.set('agentEasy', on ? '1' : ''); }
+size(0); setEasy(!!store.get('agentEasy', '')); document.getElementById('easy').checked = !!store.get('agentEasy', '');
+
+// read aloud: message text only ever lives in escaped data attributes, never in inline JS
 function speak(text, lang) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); if (lang) u.lang = lang; u.rate = 0.9; speechSynthesis.speak(u); }
-// One delegated handler: message text only ever lives in escaped data attributes, never in inline JS.
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-say], [data-say-from]'); if (!b) return;
-  const text = b.dataset.say ?? document.getElementById(b.dataset.sayFrom)?.value ?? '';
-  speak(text, b.dataset.lang || '');
+  speak(b.dataset.say ?? document.getElementById(b.dataset.sayFrom)?.value ?? '', b.dataset.lang || '');
 });
 const LANGS = {english:'en', spanish:'es', portuguese:'pt', french:'fr', german:'de', italian:'it', chinese:'zh', japanese:'ja', korean:'ko', dutch:'nl', turkish:'tr', russian:'ru', arabic:'ar', thai:'th', indonesian:'id'};
-// Plain-English versions of the error kinds the agent records.
 const PLAIN = {
   selector_drift: "couldn't find something it needed on the Instagram page",
   permission_restricted: "Instagram doesn't let you message this person",
-  ambiguous_state: "wasn't sure it had the right conversation open, so it stopped to be safe",
-  platform_unavailable: "Instagram didn't load",
-  transient: "a temporary hiccup",
-  authentication_required: "Instagram wants you to sign in again",
-  rate_limited: "Instagram asked it to slow down",
+  ambiguous_state: "wasn't sure it had the right chat open, so it stopped to be safe",
+  platform_unavailable: "Instagram didn't load", transient: "hit a small hiccup",
+  authentication_required: "Instagram wants you to sign in again", rate_limited: "Instagram asked it to slow down",
   model_failure: "couldn't write a draft",
 };
-async function ctl(a) { if (a === 'emergency-stop' && !confirm('Stop everything now? Nothing will be sent until you clear it.')) return;
-  await api('/api/control/' + a, {method:'POST'}); refresh(); }
+
+// actions
+async function ctl(a) { if (a === 'emergency-stop' && !confirm('Stop everything now? Nothing gets sent or unfollowed until you undo it.')) return;
+  await api('/api/control/' + a, {method: 'POST'}); refresh(); }
 function togglePause() { ctl(S && S.run_state === 'paused' ? 'resume' : 'pause'); }
-async function approve(id) { const text = document.getElementById('t_' + id).value; await api(`/api/drafts/${id}/approve`, {method:'POST', body: JSON.stringify({text})}); refresh(); }
+async function approve(id) { const text = document.getElementById('t_' + id).value;
+  await api(`/api/drafts/${id}/approve`, {method: 'POST', body: JSON.stringify({text})}); refresh(); }
+async function reject(id) { await api(`/api/drafts/${id}/reject`, {method: 'POST', body: '{}'}); refresh(); }
+async function resolve(id, delivered) { await api(`/api/outbox/${id}/resolve`, {method: 'POST', body: JSON.stringify({delivered})}); refresh(); }
+async function jobAct(id, a) { await api(`/api/jobs/${id}/${a}`, {method: 'POST'}); refresh(); }
+const isHelloAny = d => JSON.parse(d.context || '{}').kind === 'intro' ? 1 : 0;
+const isHello = d => d.job_state === 'awaiting_approval' && (JSON.parse(d.context || '{}').kind === 'intro');
 async function approveAll() {
   const ids = (S ? S.drafts : []).filter(isHello).map(d => d.id);
-  if (!ids.length || !confirm(`Send all ${ids.length} hellos shown on this page?`)) return;
-  // Edits typed into the boxes are not used here; edit a hello and press its own Send to change the words.
-  const r = await api('/api/drafts/approve-all', {method:'POST', body: JSON.stringify({ids})}); refresh();
-  if (r.refused) alert(`${r.approved} sent to the queue. ${r.refused} could not be approved; they stay on the page.`);
+  if (!ids.length || !confirm(`Send all ${ids.length} hellos as they are?`)) return;
+  const r = await api('/api/drafts/approve-all', {method: 'POST', body: JSON.stringify({ids})}); refresh();
+  if (r.refused) alert(`${r.approved} on their way. ${r.refused} couldn't be sent and are still on the page.`);
 }
-const isHello = d => d.job_state === 'awaiting_approval' && (JSON.parse(d.context || '{}').kind === 'intro');
-let FOFF = 0;
+async function saveKey() {
+  const key = document.getElementById('aikey').value.trim(); if (!key) return;
+  await api('/api/settings/ai-key', {method: 'POST', body: JSON.stringify({key})});
+  document.getElementById('ai').dataset.provider = ''; alert('Saved. New replies get written your way from now on.'); refresh();
+}
+async function setWindow(on) { await api('/api/settings/window', {method: 'POST', body: JSON.stringify({minimized: on})}); }
+
+// people
 async function loadFollowing(off) {
   FOFF = Math.max(0, off || 0);
   const q = encodeURIComponent(document.getElementById('fq').value || '');
   const r = await api(`/api/following?q=${q}&offset=${FOFF}`);
-  const label = it => it.unfollow === 'completed' ? '<span class="muted">unfollowed</span>' :
-    it.unfollow ? '<span class="muted">unfollow waiting</span>' :
-    it.intro_status === 'sent' ? '<span class="muted">hello sent</span>' : '';
+  const tag = it => it.unfollow === 'completed' ? 'unfollowed' : it.unfollow ? 'unfollow waiting' :
+    it.intro_status === 'sent' ? 'hello sent' : it.intro_status === 'pending' ? 'hello waiting for you' :
+    it.intro_status === 'skipped' ? 'no hello (skipped)' : '';
   document.getElementById('flist').innerHTML = r.items.length ? r.items.map(it =>
-    `<label class="row" style="margin:2px 0"><input type="checkbox" class="fsel" data-u="${esc(it.username)}"> @${esc(it.username)} ${label(it)}</label>`).join('')
-    : '<p class="muted">Nobody yet. The list fills in after the app reads your Following list.</p>';
-  document.getElementById('fpage').textContent = r.total ? `${FOFF + 1}–${Math.min(FOFF + 50, r.total)} of ${r.total}` : '';
+    `<label class="person"><input type="checkbox" class="fsel" data-u="${esc(it.username)}">
+      <span class="avatar">${initial(it.username)}</span>
+      <span class="grow"><span class="name">@${esc(it.username)}</span><br><span class="tag">${esc(tag(it))}</span></span></label>`).join('')
+    : `<div class="empty"><b>Nobody here yet</b>The list fills in once the app has read who you follow.</div>`;
+  document.getElementById('fpage').textContent = r.total ? `${FOFF + 1} to ${Math.min(FOFF + 50, r.total)} of ${r.total}` : '';
   document.getElementById('fprev').disabled = FOFF === 0; document.getElementById('fnext').disabled = FOFF + 50 >= r.total;
 }
 async function unfollowSelected() {
   const names = [...document.querySelectorAll('.fsel:checked')].map(e => e.dataset.u);
-  if (!names.length) return alert('Tick the people to unfollow first.');
-  if (!confirm(`Unfollow ${names.length} ${names.length === 1 ? 'person' : 'people'}? This can't be undone from here.`)) return;
-  const r = await api('/api/unfollow', {method:'POST', body: JSON.stringify({usernames: names})});
-  alert(`${r.queued} added to the unfollow queue.`); refresh(); loadFollowing(FOFF);
+  if (!names.length) return alert('Tick the people you want to unfollow first.');
+  if (!confirm(`Unfollow ${names.length} ${names.length === 1 ? 'person' : 'people'}? You'd have to follow them again by hand.`)) return;
+  const r = await api('/api/unfollow', {method: 'POST', body: JSON.stringify({usernames: names})});
+  alert(`${r.queued} added to the unfollow list.`); refresh(); loadFollowing(FOFF);
 }
 async function unfollowEveryone() {
-  const n = S ? S.summary.following : 0;
-  const typed = prompt(`This unfollows all ${n} people you follow (${S ? S.summary.daily_unfollow_limit : 50} a day, so Instagram doesn't block you). ` +
-                       `It can't be undone from here, and it also cancels hellos that haven't been sent.\n\nType UNFOLLOW EVERYONE to confirm:`);
+  const n = S ? S.summary.following : 0, lim = S ? S.summary.daily_unfollow_limit : 50;
+  const typed = prompt(`This unfollows all ${n} people you follow, ${lim} a day so Instagram doesn't block you. ` +
+                       `You'd have to follow them again by hand, and hellos that haven't gone out get cancelled.\n\nType UNFOLLOW EVERYONE to go ahead:`);
   if (typed === null) return;
-  const r = await api('/api/unfollow', {method:'POST', body: JSON.stringify({everyone: true, confirm: typed.trim()})});
-  alert(`${r.queued} added to the unfollow queue.`); refresh(); loadFollowing(FOFF);
+  const r = await api('/api/unfollow', {method: 'POST', body: JSON.stringify({everyone: true, confirm: typed.trim()})});
+  alert(`${r.queued} added to the unfollow list.`); refresh(); loadFollowing(FOFF);
 }
-async function saveKey() {
-  const key = document.getElementById('aikey').value.trim(); if (!key) return;
-  await api('/api/settings/ai-key', {method:'POST', body: JSON.stringify({key})});
-  document.getElementById('aikey').value = ''; alert('Saved. New replies will be written in your style.'); refresh();
-}
-async function reject(id) { await api(`/api/drafts/${id}/reject`, {method:'POST', body:'{}'}); refresh(); }
-async function resolve(id, delivered) { await api(`/api/outbox/${id}/resolve`, {method:'POST', body: JSON.stringify({delivered})}); refresh(); }
-async function jobAct(id, a) { await api(`/api/jobs/${id}/${a}`, {method:'POST'}); refresh(); }
 
+// rendering
 function statusBox(s) {
-  const el = document.getElementById('status'), sum = s.summary;
-  const list = sum.audience === 'following' ? 'people you follow' : 'your followers';
-  let cls = 'ok', text, why = '';
-  if (s.emergency_stop) { cls = 'bad'; text = '⛔ Emergency stop is on. Nothing will be sent.';
-    why = 'Open "Technical details" at the bottom and press "Clear emergency stop" when you want to carry on.'; }
-  else if (s.run_state === 'paused') { cls = 'warn'; text = '⏸ Paused.'; why = s.pause_reason ? 'Why: ' + s.pause_reason + '. Press Resume (top right) when it\'s sorted.' : 'Press Resume (top right) to carry on.'; }
-  else if (s.run_state === 'stopped') { cls = 'bad'; text = '⏹ Stopped.'; why = s.pause_reason || ''; }
-  else if (s.circuit.effective_state === 'open') { cls = 'warn'; text = '⏳ Taking a short break after several problems in a row.';
-    why = (s.circuit.reason ? 'Last problem: ' + s.circuit.reason + '. ' : '') + 'It tries again by itself.'; }
-  else { text = '✅ Running. Watching your messages and ' + list + '.';
-    why = (sum.list_checked_at ? 'List last checked at ' + at(sum.list_checked_at) + '. ' : 'Reading your list now. ') +
-          'Nothing is sent until you press Send.'; }
-  el.className = 'status ' + cls; el.innerHTML = esc(text) + (why ? `<small>${esc(why)}</small>` : '');
+  const el = document.getElementById('status'), sum = s.summary, chip = document.getElementById('chip');
+  const list = sum.audience === 'following' ? 'the people you follow' : 'your new followers';
+  let cls = '', title, sub = '', label = 'Running', chipCls = '';
+  if (s.emergency_stop) { cls = chipCls = 'bad'; label = 'Stopped'; title = 'Emergency stop is on';
+    sub = 'Nothing gets sent or unfollowed. Undo it in Settings when you want to carry on.'; }
+  else if (s.run_state === 'paused') { cls = chipCls = 'warn'; label = 'Paused'; title = 'Paused';
+    sub = s.pause_reason ? `Why: ${s.pause_reason}. Press Resume at the top when that's sorted.` : 'Press Resume at the top to carry on.'; }
+  else if (s.run_state === 'stopped') { cls = chipCls = 'bad'; label = 'Stopped'; title = 'Stopped'; sub = s.pause_reason || ''; }
+  else if (s.circuit.effective_state === 'open') { cls = chipCls = 'warn'; label = 'Short break'; title = 'Taking a short break';
+    sub = 'A few things went wrong in a row, so it is waiting a bit before trying again by itself.' +
+          (s.circuit.reason ? ` Last problem: ${s.circuit.reason}.` : ''); }
+  else { title = `Working through ${list}`;
+    sub = sum.list_checked_at ? `List last checked ${day(sum.list_checked_at)}, ${at(sum.list_checked_at)}. Nothing goes out until you press Send.`
+                              : 'Reading your list now, this can take a few minutes. Nothing goes out until you press Send.'; }
+  el.className = 'hero ' + cls; el.innerHTML = `<b>${esc(title)}</b><span class="muted">${esc(sub)}</span>`;
+  chip.className = 'chip ' + chipCls; chip.textContent = label;
   document.getElementById('pausebtn').textContent = s.run_state === 'paused' ? 'Resume' : 'Pause';
 }
 
 function draftCard(d) {
   const ctx = JSON.parse(d.context || '{}'), val = JSON.parse(d.validation || '{}');
   const lang = (ctx.language || '').toLowerCase(), code = LANGS[lang] || '';
-  const hello = (d.intent || '').includes('intro') || ctx.kind === 'intro';
-  const said = ctx.their_message_english ? `<div class="plain"><b>They said</b>${lang && lang !== 'english' ? ' (in ' + esc(ctx.language) + ')' : ''}:
-      ${esc(ctx.their_message_english)} <button data-say="${esc(ctx.their_message_english)}" data-lang="en" title="Read out">🔊</button>
-      ${ctx.reply_english && lang !== 'english' ? `<br><b>Your reply means</b>: ${esc(ctx.reply_english)}` : ''}</div>` : '';
-  const note = val.manual ? `<p class="muted">Type your reply in the box, then press Send. (Add an AI key to get suggestions.)</p>` :
-               d.job_state === 'needs_review' ? `<p class="bad">Check this one carefully: ${esc(d.rationale)}</p>` :
-               (val.problems || []).length ? `<p class="muted">Note: ${esc(val.problems.join(', '))}</p>` : '';
-  return `<div class="card"><div class="who">${hello ? 'Hello to' : 'Reply to'} @${esc(d.target)}</div>${note}${said}
-    <textarea id="t_${d.id}" rows="2">${esc(d.text)}</textarea>
-    <div class="row"><button class="go" onclick="approve('${d.id}')">Send</button><button onclick="reject('${d.id}')">Don't send</button>
-      <button data-say-from="t_${esc(d.id)}" data-lang="${esc(code)}">🔊 Read it out</button>
-      <span class="muted">You can change the words before pressing Send.</span></div></div>`;
+  const hello = ctx.kind === 'intro';
+  const said = ctx.their_message_english ? `<div class="bubble plain">${esc(ctx.their_message_english)}
+      <button class="say" data-say="${esc(ctx.their_message_english)}" data-lang="en" aria-label="Read what they said">🔊</button>
+      ${lang && lang !== 'english' ? `<div class="muted">They wrote in ${esc(ctx.language)}. This is it in English.</div>` : ''}</div>` : '';
+  const means = ctx.reply_english && lang && lang !== 'english' ? `<p class="muted">Your reply means: ${esc(ctx.reply_english)}</p>` : '';
+  const note = val.manual ? `<div class="note">Type your reply in the blue box. Turn on AI replies in Settings to get one written your way.</div>` :
+               d.job_state === 'needs_review' ? `<div class="note">Have a proper look at this one: ${esc(d.rationale)}</div>` : '';
+  return `<div class="card">
+    <div class="who"><span class="avatar">${initial(d.target)}</span>
+      <span class="grow"><span class="name">@${esc(d.target)}</span></span>
+      <span class="kind ${hello ? '' : 'reply'}">${hello ? 'Hello' : 'Reply'}</span></div>
+    ${note}${said}
+    <div class="bubble mine"><textarea id="t_${esc(d.id)}" rows="2" aria-label="Your message">${esc(d.text)}</textarea></div>${means}
+    <div class="row" style="margin-top:10px">
+      <button class="btn go" onclick="approve('${esc(d.id)}')">Send</button>
+      <button class="btn" onclick="reject('${esc(d.id)}')">Don't send</button>
+      <button class="btn quiet" data-say-from="t_${esc(d.id)}" data-lang="${esc(code)}">🔊 Read it out</button>
+    </div></div>`;
 }
 
 function helpCards(s) {
   const cards = [];
   for (const o of s.outbox.filter(o => o.state === 'unknown'))
-    cards.push(`<div class="card help"><div class="who">Was this sent to @${esc(o.target)}?</div>
-      <div class="plain">${esc(o.text)}</div><p class="muted">The app couldn't tell. Check the chat on Instagram, then tell it:</p>
-      <div class="row"><button onclick="resolve('${o.id}', true)">Yes, it was sent</button><button onclick="resolve('${o.id}', false)">No, it wasn't</button></div></div>`);
-  for (const j of s.active_jobs.filter(j => ['needs_review', 'blocked'].includes(j.state) && !s.drafts.some(d => d.target === j.subject_key))) {
+    cards.push(`<div class="card help"><h3>Did this go to @${esc(o.target)} ?</h3>
+      <div class="bubble mine">${esc(o.text)}</div>
+      <p class="muted">The app couldn't tell. Have a look at the chat on your phone, then:</p>
+      <div class="row"><button class="btn" onclick="resolve('${esc(o.id)}', true)">Yes, it's there</button>
+        <button class="btn" onclick="resolve('${esc(o.id)}', false)">No, it isn't</button></div></div>`);
+  for (const j of s.active_jobs.filter(j => ['needs_review', 'blocked'].includes(j.state) && j.kind !== 'unfollow'
+                                         && !s.drafts.some(d => d.target === j.subject_key))) {
     const what = j.kind === 'intro' ? 'the hello to' : 'the reply to';
-    const why = PLAIN[j.error_category] || (j.last_error || '').split(':').slice(-1)[0] || 'it needs a look';
-    cards.push(`<div class="card help"><div class="who">Stuck: ${what} @${esc(j.subject_key)}</div>
-      <p>The app ${esc(why)}.</p><p class="muted">${esc(j.last_error || '')}</p>
-      <div class="row"><button class="go" onclick="jobAct('${j.id}','retry')">Try again</button><button onclick="jobAct('${j.id}','skip')">Skip this person</button></div></div>`);
+    const why = PLAIN[j.error_category] || (j.last_error || '').split(':').slice(-1)[0].trim() || 'it needs a look';
+    cards.push(`<div class="card help"><h3>Stuck on ${what} @${esc(j.subject_key)}</h3>
+      <p>The app ${esc(why)}.</p>
+      <div class="row"><button class="btn primary" onclick="jobAct('${esc(j.id)}','retry')">Try again</button>
+        <button class="btn" onclick="jobAct('${esc(j.id)}','skip')">Skip this person</button></div></div>`);
   }
   document.getElementById('helpbox').hidden = !cards.length;
   document.getElementById('help').innerHTML = cards.join('');
 }
 
+function aiCard(s) {
+  const el = document.getElementById('ai');
+  if (el.dataset.provider === s.ai.provider) return;          // don't wipe a key being typed
+  el.dataset.provider = s.ai.provider;
+  const spend = s.summary.ai_spend || {};
+  el.innerHTML = s.ai.provider === 'anthropic'
+    ? `<p><b>On.</b> Replies get written the way you write: your voice guide, your rules, and how you write in your own chats. You still check every one.</p>
+       <p class="muted">Spent so far: ${money(spend.total)} on ${spend.drafts || 0} replies (${money(spend[s.summary.today])} today). Hellos cost nothing.</p>`
+    : `<p><b>Off.</b> Reply boxes stay empty for you to type. Hellos work either way, they come from your own list and cost nothing.</p>
+       <p>To turn it on, paste an Anthropic API key. It's saved only on this Mac.</p>
+       <div class="row"><input id="aikey" class="field grow" type="password" placeholder="sk-ant-..." autocomplete="off">
+         <button class="btn primary" onclick="saveKey()">Save</button></div>
+       <p class="muted">Get one at console.anthropic.com, then Settings, then API keys. Add a few dollars of credit first. Each reply costs about 1 to 3 cents.</p>`;
+}
+
+const table = (el, cols, data) => { document.getElementById(el).innerHTML =
+  '<tr>' + cols.map(c => `<th>${esc(c[0])}</th>`).join('') + '</tr>' +
+  (data.length ? data.map(r => '<tr>' + cols.map(c => `<td>${c[1](r)}</td>`).join('') + '</tr>').join('') : `<tr><td colspan="${cols.length}" class="muted">Nothing here</td></tr>`); };
+
 async function refresh() {
   const [s, h] = await Promise.all([api('/api/status'), api('/api/health')]);
   S = s; const sum = s.summary;
-  document.getElementById('ver').textContent = 'Version ' + s.version;
-  document.getElementById('unf').textContent = (sum.unfollowed_total || sum.unfollows_waiting) ?
-    `Unfollowed ${sum.unfollowed_total} so far (${sum.unfollowed_today} in the last 24 hours, limit ${sum.daily_unfollow_limit}). ${sum.unfollows_waiting} waiting their turn.` : '';
-  if (!document.getElementById('ai').dataset.done || document.getElementById('ai').dataset.provider !== s.ai.provider) {
-    const el = document.getElementById('ai'); el.dataset.done = '1'; el.dataset.provider = s.ai.provider;
-    el.innerHTML = s.ai.provider === 'anthropic'
-      ? '<p>✅ On. Replies are drafted by AI from your profile, your rules and the way you write in your chats. You still check each one.</p>'
-      : `<p>Off. Reply boxes are left empty for you to type. To get replies written the way you write, paste an Anthropic API key
-         (from console.anthropic.com → API keys). It's stored only on this Mac.</p>
-         <div class="row"><input id="aikey" type="password" placeholder="sk-ant-..." autocomplete="off"
-           style="flex:1;font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
-         <button class="go" onclick="saveKey()">Save key</button></div>`;
-  }
   statusBox(s);
-  const hellos = s.drafts.filter(isHello).length;
-  document.getElementById('drafts').innerHTML = s.drafts.length ?
-    (hellos > 1 ? `<div class="row" style="margin-bottom:10px"><button class="go" onclick="approveAll()">Send all ${hellos} hellos</button>
-       <span class="muted">Read them first. Replies always need their own Send.</span></div>` : '') + s.drafts.map(draftCard).join('')
-    : '<p class="muted">Nothing right now. New hellos and replies show up here for you to check.</p>';
-  helpCards(s);
-  const list = sum.audience === 'following' ? 'People you follow' : 'Followers seen';
-  document.getElementById('nums').innerHTML = [
-    [`${sum.sent_today} of ${sum.daily_limit}`, 'sent in the last 24 hours'],
-    [sum.hellos_waiting_turn, 'hellos waiting their turn'],
+  const waiting = s.drafts.length;
+  const badge = document.getElementById('nbadge'); badge.hidden = !waiting; badge.textContent = waiting;
+  document.getElementById('tiles').innerHTML = [
+    [`${sum.sent_today}/${sum.daily_limit}`, 'sent in the last 24 hours'],
+    [sum.hellos_waiting_turn, 'hellos lined up'],
     [sum.hellos_sent, 'hellos sent so far'],
-    [sum.audience === 'following' ? sum.following : sum.on_list, list.toLowerCase() + ' (read so far)'],
-  ].map(([n, l]) => `<div class="num"><b>${esc(n)}</b>${esc(l)}</div>`).join('');
-  const sent = s.outbox.filter(o => o.state === 'sent').slice(0, 10);
+  ].map(([n, l]) => `<div class="tile"><b>${esc(n)}</b><span>${esc(l)}</span></div>`).join('');
+  helpCards(s);
+  const hellos = s.drafts.filter(isHello).length;
+  document.getElementById('sendall').innerHTML = hellos > 1 ? `<button class="btn go" onclick="approveAll()">Send all ${hellos} hellos</button>` : '';
+  // Keep what's being typed: only redraw the cards when the set of drafts changes.
+  const key = s.drafts.map(d => d.id).join();
+  const box = document.getElementById('drafts');
+  if (box.dataset.key !== key) {
+    box.dataset.key = key;
+    // Replies first: someone is waiting on those. Then hellos.
+    const ordered = [...s.drafts].sort((a, b) => isHelloAny(a) - isHelloAny(b));
+    box.innerHTML = waiting ? ordered.map(draftCard).join('')
+      : `<div class="empty"><b>All caught up</b>New hellos and replies show up here for you to check.</div>`;
+  }
+  const sent = s.outbox.filter(o => o.state === 'sent').slice(0, 30);
   document.getElementById('sent').innerHTML = sent.length ? sent.map(o =>
-    `<div class="card"><span class="who">@${esc(o.target)}</span> <span class="muted">${esc(at(o.updated_at))}</span><div>${esc(o.text)}</div></div>`).join('')
-    : '<p class="muted">Nothing sent yet.</p>';
+    `<div class="card"><div class="who"><span class="avatar">${initial(o.target)}</span><span class="grow"><span class="name">@${esc(o.target)}</span><br>
+       <span class="muted">${esc(day(o.updated_at))}, ${esc(at(o.updated_at))}</span></span></div><div class="bubble mine">${esc(o.text)}</div></div>`).join('')
+    : `<div class="empty"><b>Nothing sent yet</b>Messages you send show up here.</div>`;
+  document.getElementById('whohello').textContent = sum.audience === 'following'
+    ? `Everyone here gets one hello unless you already talk to them. ${sum.following} read so far.`
+    : 'Only people who follow you after the first run get a hello.';
+  document.getElementById('unf').textContent = (sum.unfollowed_total || sum.unfollows_waiting) ?
+    `Unfollowed ${sum.unfollowed_total} so far, ${sum.unfollowed_today} in the last 24 hours. ${sum.unfollows_waiting} still to go.` : '';
+  aiCard(s);
+  document.getElementById('tuck').checked = !!s.window_minimized;
+  document.getElementById('limits').innerHTML = `<p>Up to <b>${sum.daily_limit}</b> messages a day, <b>${esc(s.summary.daily_unfollow_limit)}</b> unfollows a day,
+    and a few hellos ready at a time so this page doesn't flood.</p><p class="muted">These keep your account safe from Instagram's limits. They can be changed in the .env file in the app folder.</p>`;
+  document.getElementById('ver').textContent = 'Version ' + s.version;
 
-  table('health', [['Part', r => esc(r[0])], ['OK', r => r[1] === true ? '<b class="ok">yes</b>' : r[1] === false ? '<b class="bad">no</b>' : '?'], ['Detail', r => esc(r[2])]],
+  // technical details
+  table('health', [['Part', r => esc(r[0])], ['OK', r => r[1] === true ? 'yes' : r[1] === false ? '<b>no</b>' : '?'], ['Detail', r => esc(r[2])]],
     [['database', h.database.ok, h.database.error || ''], ['browser / platform', h.platform.ok, h.platform.state || h.platform.note || h.platform.adapter || ''],
      ['model', h.model.ok, h.model.provider], ['worker', h.worker.ok, h.worker.last_error || (h.worker.seconds_since_tick ?? '') + 's since tick'],
      ['mode', true, `${s.mode} on ${s.platform}; ${s.approval_required ? 'approval required' : 'autonomous (mock)'}; circuit ${s.circuit.effective_state}`]]);
-  table('jobs', [['Who', r => esc(r.subject_key)], ['Kind', r => esc(r.kind)], ['State', r => esc(r.state)], ['Tries', r => r.attempts],
+  table('jobs', [['Who', r => esc(r.subject_key)], ['Kind', r => esc(r.kind)], ['State', r => esc(r.state)], ['Tries', r => esc(r.attempts)],
     ['Last error', r => esc(r.last_error || '')]], s.active_jobs);
   table('outbox', [['To', r => esc(r.target)], ['State', r => esc(r.state)], ['Text', r => esc(r.text)]], s.outbox);
   table('events', [['Who', r => esc(r.username)], ['What', r => r.text !== undefined ? esc(r.text) : 'on your list (' + esc(r.source) + ')'], ['When', r => esc(at(r.observed_at))]],
     [...s.incoming, ...s.follower_events].sort((a, b) => (b.observed_at || '').localeCompare(a.observed_at || '')).slice(0, 20));
   table('skipped', [['Who', r => esc(r.subject_key)], ['State', r => esc(r.state)], ['Why', r => esc(r.reason)]], [...s.skipped, ...s.not_contacted]);
-  table('recovery', [['When', r => esc(at(r.at))], ['Scope', r => esc(r.scope)], ['Who', r => esc(r.subject || '')], ['Category', r => esc(r.category)],
+  table('recovery', [['When', r => esc(at(r.at))], ['Who', r => esc(r.subject || '')], ['Category', r => esc(r.category)],
     ['Decision', r => esc(r.decision)], ['Reason', r => esc((JSON.parse(r.detail || '{}')).reason || '')]], s.recovery);
-  table('journal', [['Who', r => esc(r.target || '')], ['Note', r => esc(r.observation)], ['Basis', r => esc(r.basis)]], s.journal);
 }
-async function boot() { if (!TOKEN) return show(false); try { await refresh(); show(true); loadFollowing(0); setInterval(refresh, 3000); } catch (e) { show(false); } }
+
+async function boot() {
+  if (!TOKEN) return show(false);
+  try { await refresh(); show(true); openTab(store.get('agentTab', 'check')); setInterval(() => refresh().catch(() => {}), 3000); }
+  catch (e) { show(false); }
+}
 boot();
 </script>
 </body>

@@ -52,9 +52,18 @@ sending anything or unfollowing anyone, and writes `data/diagnostics/check.txt` 
 UNFOLLOW EVERYONE to confirm). At most `AGENT_LIMITS__DAILY_UNFOLLOW_LIMIT` (50) per 24 hours; unsent hellos to
 those people are cancelled.
 
-**Replies in your style:** paste an Anthropic API key in the dashboard ("Replies in your style"). It's saved in
-`.env` on your Mac only. Replies then use your profile, your rules and what you've written in your own chats.
-Without a key, reply boxes are left empty for you to type.
+**Replies in your style:** paste an Anthropic API key in the dashboard (Settings, "Replies in your style"). It's
+saved in `.env` on your Mac only. Replies then follow the `voice` guide in `data/profile.json`, your rules, and what
+you've written in your own chats, and a final pass applies your punctuation (space before ?, no apostrophes, no !,
+no emoji). Without a key, reply boxes are left empty for you to type.
+
+**Cost:** hellos come from your own templates and cost nothing. A reply is one call to `claude-opus-5-5` at low
+effort: about 3,500 tokens in and 300 to 600 out, roughly 1 to 3 US cents, less once the fixed instructions are
+cached. The dashboard shows a running estimate. Set `AGENT_LLM__MODEL=claude-sonnet-5-5` in `.env` to halve it.
+
+**Not watching:** the dashboard doesn't need to be open. `start.sh` keeps the Mac awake (`caffeinate`), a Mac
+notification appears when messages are waiting or the app pauses, and Settings can tuck the Instagram window
+into the Dock; it keeps working there.
 
 **Everyday use:** `bash start.sh`. It starts the agent on Instagram and opens the dashboard, already logged in.
 Stop with Control + C.
@@ -87,7 +96,7 @@ immediately and survives restarts until you clear it.
 ## Test
 
 ```bash
-.venv/bin/python -m pytest                      # everything (about 2 minutes, 238 tests)
+.venv/bin/python -m pytest                      # everything (about 2 minutes, 244 tests)
 .venv/bin/python -m pytest -m "not browser"     # skip the real-Chromium tests
 CHAOS_SEEDS=300 .venv/bin/python -m pytest tests/test_chaos.py   # longer randomized fault run
 ```

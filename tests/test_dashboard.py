@@ -166,5 +166,5 @@ def test_ai_key_is_saved_locally_and_switches_replies_on(world, llm, db, tmp_pat
     env = (tmp_path / ".env")
     assert f"AGENT_LLM__API_KEY={key}" in env.read_text() and oct(env.stat().st_mode & 0o777) == "0o600"
     s = c.get("/api/status", headers=H).json()
-    assert s["ai"] == {"provider": "anthropic", "manual_replies": False}
+    assert s["ai"]["provider"] == "anthropic" and s["ai"]["manual_replies"] is False
     assert key not in c.get("/api/diagnostics", headers=H).text

@@ -81,6 +81,8 @@ def cmd_run(args) -> int:
     sched = Scheduler(app.engine, s.poll_interval_s)
     token = load_or_create_token(s.data_dir)
     sched.start()
+    from .notify import Notifier
+    notifier = Notifier(app.db, app.engine.controls).start()
     from . import __version__
     print(f"Conversation Agent {__version__} on {s.platform.value} ({s.mode.value}, list: {s.policy.audience})", file=sys.stderr)
     print(f"Dashboard: http://{s.dashboard.host}:{s.dashboard.port}/  (token in {s.data_dir / 'dashboard-token'})", file=sys.stderr)
@@ -94,6 +96,7 @@ def cmd_run(args) -> int:
     except KeyboardInterrupt:
         pass                       # Ctrl+C: shut down quietly; cleanup below always runs
     finally:
+        notifier.stop()
         clean = sched.stop(timeout_s=30)
         app.platform.close()
         if site_server:

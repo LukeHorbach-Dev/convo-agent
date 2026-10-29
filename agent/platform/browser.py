@@ -38,6 +38,7 @@ class BrowserSupervisor:
         self.restarts = 0
         self.last_error: str | None = None
         self._launcher = launcher
+        self.window_request: str | None = None   # set from other threads; applied on the browser's own thread
 
     # ---------------------------------------------------------------- lifecycle
     def _to(self, target: BrowserState) -> None:
@@ -61,7 +62,10 @@ class BrowserSupervisor:
                     kwargs = dict(headless=True, viewport={"width": 1400, "height": 900})
                 else:
                     # A visible window uses the real window size, opened full screen, so what you see is the page.
-                    kwargs = dict(headless=False, no_viewport=True, args=["--start-maximized"])
+                    # Keep pages running at full speed when the window is behind other apps or minimised.
+                    kwargs = dict(headless=False, no_viewport=True,
+                                  args=["--start-maximized", "--disable-backgrounding-occluded-windows",
+                                        "--disable-renderer-backgrounding", "--disable-background-timer-throttling"])
                 if self.cfg.executable_path:
                     kwargs["executable_path"] = self.cfg.executable_path
                 self.context = self._pw.chromium.launch_persistent_context(str(self.cfg.user_data_dir), **kwargs)
@@ -69,22 +73,26 @@ class BrowserSupervisor:
             self.context.set_default_navigation_timeout(self.cfg.navigation_timeout_ms)
             self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
             if not self.cfg.headless and not self._launcher:
-                self._maximize()
+                self.set_window("minimized" if self.cfg.start_minimized else "maximized")
             self.restarts += 1
             self._to(BrowserState.READY)
         except Exception as e:
             self._to(BrowserState.FAILED)
             raise PlatformUnavailable(f"browser failed to start: {e}") from e
 
-    def _maximize(self) -> None:
-        """--start-maximized is ignored on macOS, so ask Chromium directly. Cosmetic: failures are ignored."""
+    def set_window(self, state: str) -> bool:
+        """Maximise or minimise the visible window ('maximized' | 'minimized' | 'normal'). --start-maximized is
+        ignored on macOS, so this asks Chromium directly. Cosmetic: failures are ignored."""
         try:
             cdp = self.context.new_cdp_session(self.page)
             win = cdp.send("Browser.getWindowForTarget")["windowId"]
-            cdp.send("Browser.setWindowBounds", {"windowId": win, "bounds": {"windowState": "maximized"}})
+            if state != "normal":
+                cdp.send("Browser.setWindowBounds", {"windowId": win, "bounds": {"windowState": "normal"}})
+            cdp.send("Browser.setWindowBounds", {"windowId": win, "bounds": {"windowState": state}})
             cdp.detach()
+            return True
         except Exception:
-            pass
+            return False
 
     def stop(self) -> None:
         try:
@@ -102,6 +110,9 @@ class BrowserSupervisor:
             self.state = BrowserState.STOPPED
 
     def ensure_ready(self) -> None:
+        if self.window_request and self.state is BrowserState.READY and not self.cfg.headless:
+            self.set_window(self.window_request)
+            self.window_request = None
         if self.state is BrowserState.AUTH_REQUIRED:
             # Re-check: the user may have logged in by hand in the visible browser.
             self._to(BrowserState.READY)

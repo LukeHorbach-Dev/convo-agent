@@ -407,6 +407,7 @@ class Engine:
         memory = [f"{r['kind']}: {r['content']}" for r in self.db.all(
             "SELECT kind, content FROM memory WHERE target = ? ORDER BY created_at", (acct["username"],))]
         outcome = self.drafter.draft_reply(history, memory, self._own_messages())
+        self._record_ai_cost()
         self.jobs.heartbeat(job.id, self.owner)
         with self.db.transaction():
             self._remember(acct["username"], "their_statement", incoming, f"message:{target_id}", 1.0)
@@ -416,6 +417,19 @@ class Engine:
         self._decide_delivery(job, target=acct["username"], thread_key=thread_key, outcome=outcome,
                               context={"kind": "reply", "replying_to": target_id, "history_tail": history[-6:], **outcome.plain},
                               account_id=acct["id"], conv_id=conv["id"], message_id=target_id)
+
+    def _record_ai_cost(self) -> None:
+        """Keep a running estimate of what reply drafting has cost (shown on the dashboard)."""
+        cost = getattr(self.drafter.llm, "last_cost_usd", 0.0) or 0.0
+        if not cost:
+            return
+        day = iso()[:10]
+        with self.db.transaction():
+            spend = self.db.get_state("ai_spend", {}) or {}
+            spend["total"] = round(spend.get("total", 0.0) + cost, 6)
+            spend[day] = round(spend.get(day, 0.0) + cost, 6)
+            spend["drafts"] = spend.get("drafts", 0) + 1
+            self.db.set_state("ai_spend", {k: v for k, v in spend.items() if k in ("total", "drafts") or k >= iso(now() - timedelta(days=31))[:10]})
 
     def _own_messages(self, n: int = 40) -> list[str]:
         """What he wrote himself in his chats (not messages the agent sent), newest first: style examples."""
