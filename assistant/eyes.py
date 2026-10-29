@@ -317,6 +317,18 @@ IS_TYPING_BOX = """() => { const e = document.activeElement;
   return !!e && (e.isContentEditable || e.tagName === 'TEXTAREA') }"""
 BOX_TEXT = """() => { const e = document.activeElement;
   return e && (e.isContentEditable || e.tagName === 'TEXTAREA') ? (e.innerText ?? e.value ?? '') : null }"""
+# Focus the message box that's selected (or the one in the chat) and put the caret at its end.
+FOCUS_BOX = """() => { let e = document.activeElement;
+  if (!(e && (e.isContentEditable || e.tagName === 'TEXTAREA'))) e = document.querySelector('[role="main"] [contenteditable="true"], [contenteditable="true"][role="textbox"], textarea');
+  if (!e) return false; e.focus();
+  if (e.isContentEditable) { const r = document.createRange(); r.selectNodeContents(e); r.collapse(false);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); }
+  return true }"""
+CLEAR_BOX = """() => { const e = document.activeElement; if (!e) return;
+  if (e.tagName === 'TEXTAREA') { e.value = ''; e.dispatchEvent(new Event('input', {bubbles: true})); return; }
+  const r = document.createRange(); r.selectNodeContents(e); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  document.execCommand('delete') }"""
+EDIT_INSERT = """(t) => document.execCommand('insertText', false, t)"""
 HAS_PROFILE_LINK = """(u) => [...document.querySelectorAll('a[href]')].some(a => {
   try { return new URL(a.href, location.href).pathname.replace(/\\/+$/, '').toLowerCase() === '/' + u.toLowerCase() }
   catch (e) { return false } })"""
@@ -506,6 +518,61 @@ class Hands:
                     "cannot_continue with not_found.")
         return self._task(task, reports)
 
+    # Ways of putting text into the message box. Seen live (29 Oct): on Instagram the first one left the box empty,
+    # so each is tried in turn and checked letter for letter; the one that works is tried first next time.
+    TYPERS = ("insert", "keys", "edit")
+
+    def _focus_box(self) -> None:
+        """Bring the Instagram window's page to the front and put the caret at the end of the selected box."""
+        page = self.page
+        try:
+            page.bring_to_front()
+        except Exception:
+            pass
+        page.evaluate(FOCUS_BOX)
+
+    def _clear_box(self) -> None:
+        page = self.page
+        self._focus_box()
+        page.keyboard.press("ControlOrMeta+A")
+        page.keyboard.press("Backspace")
+        if (page.evaluate(BOX_TEXT) or "").strip():
+            page.evaluate(CLEAR_BOX)
+        page.wait_for_timeout(150)
+
+    def _type(self, how: str, text: str) -> None:
+        page = self.page
+        if how == "insert":
+            page.keyboard.insert_text(text)
+        elif how == "keys":
+            page.keyboard.type(text, delay=25)
+        else:
+            page.evaluate(EDIT_INSERT, text)
+
+    def _type_into_box(self, text: str) -> str:
+        """Type text into the selected message box and check it's exactly right. Returns how it was typed, or raises
+        AmbiguousState (with the box left empty) if no way works."""
+        page = self.page
+        if not page.evaluate(IS_TYPING_BOX):
+            raise AmbiguousState("the message box wasn't selected when it was time to type")
+        order = sorted(self.TYPERS, key=lambda h: h != getattr(self, "typer", None))
+        seen = []
+        for how in order:
+            self._clear_box()
+            try:
+                self._type(how, text)
+            except Exception as e:
+                seen.append(f"{how}: {type(e).__name__}")
+                continue
+            page.wait_for_timeout(400)
+            typed = page.evaluate(BOX_TEXT)
+            if typed is not None and _same(typed, text):
+                self.typer = how
+                return how
+            seen.append(f"{how}: {typed!r}"[:60])
+        self._clear_box()
+        raise AmbiguousState("the message box didn't take the text exactly (" + "; ".join(seen) + "), so nothing was sent")
+
     def send_here(self, text: str) -> None:
         """Type the approved message into the selected message box, check it's exactly right, then press Enter and
         confirm it went. Raises DeliveryUnknown if it can't confirm."""
@@ -513,17 +580,7 @@ class Hands:
         page = self.page
 
         def send():
-            if not page.evaluate(IS_TYPING_BOX):
-                raise AmbiguousState("the message box wasn't selected when it was time to type")
-            page.keyboard.press("ControlOrMeta+A")          # clear anything Instagram kept from before
-            page.keyboard.press("Backspace")
-            page.keyboard.insert_text(text)
-            page.wait_for_timeout(400)
-            typed = page.evaluate(BOX_TEXT)
-            if typed is None or not _same(typed, text):
-                page.keyboard.press("ControlOrMeta+A")
-                page.keyboard.press("Backspace")
-                raise AmbiguousState("the message box didn't take the text exactly, so nothing was sent")
+            self._type_into_box(text)
             page.keyboard.press("Enter")
             want = re.sub(r"\s+", " ", text)[:80]
             for _ in range(40):                             # up to about 10 seconds
@@ -535,27 +592,19 @@ class Hands:
             raise DeliveryUnknown("pressed Enter, but couldn't see the message in the chat afterwards")
         self.sup.run("send", send)
 
-    def try_typing(self) -> None:
-        """For the self-check: type a word into the selected message box, check it, and delete it. No Enter."""
+    def try_typing(self) -> str:
+        """For the self-check: type a word into the selected message box, check it, and delete it. No Enter.
+        Returns how it typed."""
         page = self.page
 
         def run():
-            if not page.evaluate(IS_TYPING_BOX):
-                raise AmbiguousState("the message box wasn't selected")
-            page.keyboard.press("ControlOrMeta+A")
-            page.keyboard.press("Backspace")
-            page.keyboard.insert_text("test")
-            page.wait_for_timeout(400)
-            typed = page.evaluate(BOX_TEXT)
-            page.keyboard.press("ControlOrMeta+A")
-            page.keyboard.press("Backspace")
-            page.wait_for_timeout(300)
-            if typed is None or not _same(typed, "test"):
-                raise AmbiguousState(f"the message box showed {typed!r} instead of 'test'")
+            how = self._type_into_box("test")
+            self._clear_box()
             left = page.evaluate(BOX_TEXT)
             if left and left.strip():
                 raise AmbiguousState("the word couldn't be deleted from the message box; delete it by hand")
-        self.sup.run("try typing", run)
+            return how
+        return self.sup.run("try typing", run)
 
     # ------------------------------------------------------------------ following
     def unfollow(self, username: str) -> str:

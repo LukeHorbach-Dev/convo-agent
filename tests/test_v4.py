@@ -435,3 +435,14 @@ def test_sign_in_and_check_run_on_the_sender_s_browser(app, tmp_path):
     assert c.post("/api/instagram/login", headers=H).json()["ok"] and web.opened
     assert c.post("/api/instagram/login/done", headers=H).json()["signed_in"] is True
     t.join()
+
+
+def test_saving_words_never_undoes_an_approval(app):
+    """Seen in the UI test: editing then pressing Approve sends "save" and "approve" at once; if "save" landed
+    last, the reply quietly went back to unapproved."""
+    c = TestClient(create_api(app, "tok"), base_url="http://127.0.0.1")
+    did = add_draft(app.store, "hello", "new.friend", "Hey :)", status="draft")
+    c.post(f"/api/drafts/{did}", headers=H, json={"action": "approve", "text": "hey there"})
+    c.post(f"/api/drafts/{did}", headers=H, json={"action": "save", "text": "hey there"})
+    d = app.store.one("SELECT status, text FROM drafts WHERE id = ?", (did,))
+    assert d == {"status": "approved", "text": "hey there"}

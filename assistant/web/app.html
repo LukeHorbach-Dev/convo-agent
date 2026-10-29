@@ -582,6 +582,9 @@ async function refreshLive() {
 }
 
 /* ============================================================== replies + hellos */
+const EDITS = {};             // what Luke typed in a reply or hello box, kept if the list redraws before it's saved
+document.addEventListener('input', e => { const m = e.target.id && e.target.id.match(/^t(\d+)$/); if (m) EDITS[m[1]] = e.target.value; });
+const textOf = d => d.id in EDITS ? EDITS[d.id] : d.text;
 const F = {reply: prefs.get('f-reply', 'draft'), hello: prefs.get('f-hello', 'draft'), people: 'following', sort: 'recent', q: ''};
 function draftsPage(kind) {
   const isReply = kind === 'reply';
@@ -645,7 +648,7 @@ function replyCard(d) {
       ${d.note ? `<div class="note" style="margin-top:8px">${icon('alert')}<span>${esc(d.note)}</span></div>` : ''}
       <div class="chat">${chat}</div>
       ${foreign && c.their_message_english ? `<p class="translate">In English: ${esc(c.their_message_english)}</p>` : ''}
-      <div class="draft"><label for="t${d.id}">Your reply</label><textarea id="t${d.id}" rows="2" ${editable ? '' : 'readonly'} placeholder="Type your reply" onchange="saveText(${d.id})">${esc(d.text)}</textarea></div>
+      <div class="draft"><label for="t${d.id}">Your reply</label><textarea id="t${d.id}" rows="2" ${editable ? '' : 'readonly'} placeholder="Type your reply" onchange="saveText(${d.id})">${esc(textOf(d))}</textarea></div>
       ${foreign && c.reply_english ? `<p class="translate">Your reply means: ${esc(c.reply_english)}</p>` : ''}
     </div>
     <div class="msg-foot">${draftButtons(d)}</div></article>`;
@@ -654,24 +657,29 @@ function helloCard(d) {
   return `<article class="card msg ${d.status === 'approved' ? 'approved' : ''}"><div class="msg-head">${avatar(d.username)}
     <div class="grow"><button class="btn ghost small" style="padding:2px 0;font-weight:650" onclick="openPerson('${esc(d.username)}')">@${esc(d.username)}</button></div></div>
     <div class="msg-body">${d.note ? `<div class="note">${icon('alert')}<span>${esc(d.note)}</span></div>` : ''}
-      <div class="draft"><label for="t${d.id}">Your hello</label><textarea id="t${d.id}" rows="1" ${d.status === 'sent' ? 'readonly' : ''} onchange="saveText(${d.id})">${esc(d.text)}</textarea></div></div>
+      <div class="draft"><label for="t${d.id}">Your hello</label><textarea id="t${d.id}" rows="1" ${d.status === 'sent' ? 'readonly' : ''} onchange="saveText(${d.id})">${esc(textOf(d))}</textarea></div></div>
     <div class="msg-foot">${draftButtons(d)}</div></article>`;
 }
 PAGES.replies = draftsPage('reply');
 PAGES.hellos = draftsPage('hello');
 async function act(id, action) {
-  const t = $('#t' + id);
+  const t = $('#t' + id), pg = PAGE;
   await api(`/api/drafts/${id}`, {method: 'POST', body: JSON.stringify({action, text: t ? t.value : null})});
-  await refresh(); PAGES[PAGE].load && PAGES[PAGE].load();
+  delete EDITS[id];
+  await refresh(); if (PAGE === pg && PAGES[pg].load) PAGES[pg].load();
 }
-async function saveText(id) { const t = $('#t' + id); await api(`/api/drafts/${id}`, {method: 'POST', body: JSON.stringify({action: 'save', text: t.value})}); toast('Saved'); }
+async function saveText(id) {
+  const t = $('#t' + id); await api(`/api/drafts/${id}`, {method: 'POST', body: JSON.stringify({action: 'save', text: t.value})});
+  if (EDITS[id] === t.value) delete EDITS[id];
+  toast('Saved');
+}
 async function approveAll(kind) {
   const n = kind === 'hello' ? S.counts.hellos_to_check : S.counts.replies_to_check - S.counts.replies_need_look;
   if (!n) return toast('Nothing ready to approve.');
   const extra = kind === 'reply' && S.counts.replies_need_look ? ` The ${S.counts.replies_need_look} that need a look stay for you.` : '';
   if (!await confirmBox({title: `Approve ${plural(n, kind === 'hello' ? 'hello' : 'reply', kind === 'hello' ? 'hellos' : 'replies')}?`, text: 'They go as they are when you press Send.' + extra, ok: 'Approve'})) return;
-  const r = await post('/api/drafts/all/' + kind); toast(`Approved ${r.approved}. Press Send on Today when you're ready.`);
-  PAGES[PAGE].load && PAGES[PAGE].load();
+  const pg = PAGE, r = await post('/api/drafts/all/' + kind); toast(`Approved ${r.approved}. Press Send on Today when you're ready.`);
+  if (PAGE === pg && PAGES[pg].load) PAGES[pg].load();
 }
 
 /* ============================================================== people */

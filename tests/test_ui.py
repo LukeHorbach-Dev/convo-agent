@@ -20,6 +20,16 @@ from assistant.store import Store
 pytestmark = pytest.mark.browser
 
 
+def until(check, timeout_s=8.0):
+    """Wait for the app to catch up (the page talks to it in the background)."""
+    end = time.time() + timeout_s
+    while time.time() < end:
+        if check():
+            return True
+        time.sleep(0.1)
+    return False
+
+
 @pytest.fixture
 def running(tmp_path):
     shutil.copy(Path(__file__).parent / "fixtures" / "profile.json", tmp_path / "profile.json")
@@ -67,8 +77,7 @@ def test_every_page_loads_and_the_main_buttons_work(running):
         page.wait_for_selector(".msg")
         page.click("text=Approve all ready")
         page.click("#okbtn")
-        page.wait_for_timeout(400)
-        assert a.store.scalar("SELECT COUNT(*) FROM drafts WHERE kind = 'hello' AND status = 'approved'") == 3
+        assert until(lambda: a.store.scalar("SELECT COUNT(*) FROM drafts WHERE kind = 'hello' AND status = 'approved'") == 3)
         # Edit and approve one reply
         page.click('#nav button[data-page="replies"]')
         page.wait_for_selector(".msg textarea")
@@ -76,8 +85,8 @@ def test_every_page_loads_and_the_main_buttons_work(running):
         first.fill("sounds good, see you then")
         first.dispatch_event("change")
         page.locator(".msg .btn.go").first.click()
-        page.wait_for_timeout(400)
-        assert a.store.one("SELECT text FROM drafts WHERE status = 'approved' AND kind = 'reply'")["text"] == "sounds good, see you then"
+        assert until(lambda: (a.store.one("SELECT text FROM drafts WHERE status = 'approved' AND kind = 'reply'") or {}).get("text")
+                     == "sounds good, see you then")
         # A person's panel
         page.click('#nav button[data-page="people"]')
         page.wait_for_selector(".prow")
@@ -94,15 +103,13 @@ def test_every_page_loads_and_the_main_buttons_work(running):
         page.keyboard.press("Escape")
         # Stop now
         page.click("#stopbtn")
-        page.wait_for_timeout(300)
-        assert a.sender.halt.is_set()
+        assert until(a.sender.halt.is_set)
         # Settings: quiet hours save
         page.click('#nav button[data-page="settings"]')
         page.fill("#qf", "23:00")
         page.fill("#qt", "08:00")
         page.click("#savesending")
-        page.wait_for_timeout(400)
-        assert a.s.quiet_from == "23:00" and a.s.quiet_to == "08:00"
+        assert until(lambda: a.s.quiet_from == "23:00" and a.s.quiet_to == "08:00")
         # Phone width: the bottom bar
         page.set_viewport_size({"width": 390, "height": 800})
         page.click('#nav button[data-page="today"]')

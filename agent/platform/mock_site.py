@@ -25,7 +25,8 @@ def page(world: MockWorld, body: str, title: str = "Mock") -> HTMLResponse:
 
 def create_site(world: MockWorld) -> FastAPI:
     app = FastAPI()
-    app.state.web = {"hang_paths": set(), "send_hang_s": 0.0, "drift": False, "no_expand": False, "swap_lists": False}
+    app.state.web = {"hang_paths": set(), "send_hang_s": 0.0, "drift": False, "no_expand": False, "swap_lists": False,
+                     "strict_editor": False}
 
     @app.middleware("http")
     async def faults(request: Request, call_next):
@@ -79,6 +80,12 @@ def create_site(world: MockWorld) -> FastAPI:
               const d = document.createElement('div'); d.dataset.testid = 'message'; d.dataset.direction = 'out';
               d.dataset.messageId = j.id; d.textContent = text; document.getElementById('msgs').appendChild(d); box.innerText = '';
             }}
+            // Like Instagram's editor (seen 29 Oct): text pasted in without key presses can be ignored.
+            {"" if not app.state.web["strict_editor"] else """
+            let lastKey = 0; const ed = document.querySelector('[role=textbox]');
+            ed.addEventListener('keydown', e => { if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) lastKey = Date.now(); }, true);
+            ed.addEventListener('beforeinput', e => { if (e.inputType === 'insertText' && Date.now() - lastKey > 200) e.preventDefault(); });
+            """}
             // Like Instagram: Enter in the message box sends.
             document.querySelector('[role=textbox]').addEventListener('keydown', e => {{
               if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); send(); }} }});

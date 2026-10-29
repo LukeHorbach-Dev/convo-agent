@@ -476,3 +476,16 @@ def test_dashboard_live_view_and_send_one(tmp_path):
     c.post("/api/send/start", headers=H, json={"just_one": True})
     assert a.sender.active and a.sender.just_one
     assert c.post("/api/settings", headers=H, json={"daily_ai_budget_usd": 0.1}).status_code == 400
+
+
+@pytest.mark.browser
+def test_typing_falls_back_when_the_message_box_ignores_pasted_text(site, tmp_path):
+    world, server, make_hands = site
+    server.app.state.web["strict_editor"] = True          # like Instagram's editor on Luke's Mac
+    world.new_follower("anna")
+    h = make_hands()
+    h.open_chat(username="anna")
+    assert h.try_typing() in ("keys", "edit")
+    h.send_here("Hey im Luke :)")
+    assert world.sent_log == [("anna", "Hey im Luke :)")]
+    assert h.typer in ("keys", "edit")                     # remembered: tried first next time

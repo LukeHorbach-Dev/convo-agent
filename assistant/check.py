@@ -59,8 +59,8 @@ def run_check(hands, store: Store | None) -> str:
     def typing():
         if "chat" not in ctx:
             raise RuntimeError("no chat open (step 3 didn't pass)")
-        hands.try_typing()
-        return "typed 'test' in the message box and deleted it; nothing was sent"
+        how = hands.try_typing()
+        return f"typed 'test' in the message box ({how}) and deleted it; nothing was sent"
     step("4 message box", typing)
 
     def by_name():

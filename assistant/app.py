@@ -523,8 +523,12 @@ def create_api(a: Assistant, token: str) -> FastAPI:
             raise HTTPException(400, "unknown action")
         if status == "approved" and not new_text:
             raise HTTPException(400, "Write something first")
+        if action == "save":                        # only the words: an approve arriving at the same moment stays
+            st.execute("UPDATE drafts SET text = ?, updated_at = ? WHERE id = ? AND status NOT IN ('sending', 'sent')",
+                       (new_text, now_iso(), draft_id))
+            return
         st.execute("UPDATE drafts SET text = ?, status = ?, updated_at = ?, note = CASE WHEN ? = 'approved' THEN NULL ELSE note END "
-                   "WHERE id = ?", (new_text, status, now_iso(), status, draft_id))
+                   "WHERE id = ? AND status NOT IN ('sending', 'sent')", (new_text, status, now_iso(), status, draft_id))
 
     @api.post("/api/drafts/{draft_id}", dependencies=[Depends(auth)])
     def change(draft_id: int, body: TextBody):
