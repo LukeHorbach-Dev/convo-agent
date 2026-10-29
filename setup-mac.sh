@@ -46,4 +46,4 @@ step "Running the tests (about a minute)"
 
 step "All done"
 [ -f data/profile.json ] || echo "Note: data/profile.json is missing. Copy it in, or start from data/profile.example.json."
-[ -d data/browser-profile ] || echo "Note: not signed in yet. Run: .venv/bin/python -m agent login"
+[ -d data/browser-profile ] || echo "Note: not signed in yet. Run: bash login.sh"

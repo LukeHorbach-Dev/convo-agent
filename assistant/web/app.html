@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instagram assistant</title>
+<style>
+  :root {
+    --bg:#f6f5f2; --surface:#fff; --sunk:#f0efeb; --ink:#16181d; --muted:#5d636e; --line:#e4e2dc;
+    --accent:#3b5bdb; --accent-soft:#e8ecfc; --go:#1d8a4c; --go-soft:#e3f3e9; --warn:#9a5b0a; --warn-soft:#fbf0dc;
+    --bad:#c22f2f; --bad-soft:#fbe6e6; --them:#efeeea; --me:#e3e9fd; --on-color:#fff;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --size: 18px; --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg:#121316; --surface:#1c1d21; --sunk:#25272c; --ink:#ececee; --muted:#a2a6af; --line:#2f3137;
+    --accent:#8ea2ff; --accent-soft:#252c47; --go:#4cc27e; --go-soft:#1a3326; --warn:#e3a54a; --warn-soft:#3a2d16;
+    --bad:#ff8080; --bad-soft:#3d1f22; --them:#2a2c31; --me:#262f4d; --on-color:#0d0f14; } }
+  :root.easy { --font: Verdana, Tahoma, sans-serif; letter-spacing: .02em; }
+  * { box-sizing: border-box; }
+  html { font-size: var(--size); }
+  body { margin: 0; font: 1rem/1.6 var(--font); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 0 16px 80px; }
+  .top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent);
+         backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .bar { max-width: 820px; margin: 0 auto; padding: 12px 16px 0; display: flex; align-items: center; gap: 12px; }
+  .brand { font-weight: 700; font-size: 1.05rem; flex: 1; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: .8rem;
+          font-weight: 600; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+  .chip.go { background: var(--go-soft); color: var(--go); } .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad { background: var(--bad-soft); color: var(--bad); }
+  .tabs { max-width: 820px; margin: 0 auto; padding: 6px 12px 0; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+  .tab { border: 0; background: none; padding: 10px 12px; border-bottom: 3px solid transparent; color: var(--muted);
+         font-weight: 600; cursor: pointer; white-space: nowrap; font-size: .92rem; }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .badge { display: inline-block; min-width: 1.5em; padding: 0 .45em; margin-left: 4px; border-radius: 999px;
+           background: var(--accent); color: var(--on-color); font-size: .72rem; line-height: 1.5em; text-align: center; }
+  h2 { font-size: 1.15rem; margin: 28px 0 10px; } h3 { font-size: 1rem; margin: 0 0 4px; } p { margin: 6px 0; }
+  .muted { color: var(--muted); font-size: .88rem; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin: 12px 0; }
+  .hero { border-radius: var(--radius); padding: 18px 20px; margin: 20px 0 8px; background: var(--sunk); }
+  .hero.go { background: var(--go-soft); } .hero.warn { background: var(--warn-soft); } .hero.bad { background: var(--bad-soft); }
+  .hero b { display: block; font-size: 1.15rem; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } .grow { flex: 1; min-width: 0; }
+  .btn { border: 1px solid var(--line); background: var(--surface); padding: 10px 16px; border-radius: 12px; cursor: pointer;
+         font-weight: 600; font-size: .92rem; }
+  .btn:hover { border-color: var(--muted); } .btn:disabled { opacity: .45; cursor: default; }
+  .btn.go { background: var(--go); border-color: var(--go); color: var(--on-color); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-color); }
+  .btn.danger { background: var(--bad); border-color: var(--bad); color: var(--on-color); }
+  .btn.quiet { background: none; border-color: transparent; color: var(--muted); padding: 10px 8px; }
+  .btn.big { padding: 14px 22px; font-size: 1rem; }
+  .field { width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--sunk); }
+  .field:focus, .btn:focus-visible, .tab:focus-visible { outline: 3px solid var(--accent-soft); border-color: var(--accent); }
+  .step { display: grid; grid-template-columns: 42px 1fr; gap: 14px; }
+  .num { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+         background: var(--accent-soft); color: var(--accent); }
+  .num.done { background: var(--go-soft); color: var(--go); }
+  .bar-p { height: 8px; border-radius: 99px; background: var(--sunk); overflow: hidden; margin: 8px 0; }
+  .bar-p > i { display: block; height: 100%; background: var(--accent); }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+  @media (max-width: 560px) { .tiles { grid-template-columns: 1fr 1fr; } }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+  .tile b { display: block; font-size: 1.45rem; line-height: 1.2; } .tile span { color: var(--muted); font-size: .85rem; }
+  .who { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+            background: var(--accent-soft); color: var(--accent); flex: none; }
+  .name { font-weight: 700; }
+  .flag { font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--sunk); color: var(--muted); }
+  .flag.star { background: var(--go-soft); color: var(--go); } .flag.bad { background: var(--bad-soft); color: var(--bad); }
+  .flag.warn { background: var(--warn-soft); color: var(--warn); }
+  .chat { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+  .bubble { border-radius: 18px; padding: 8px 13px; max-width: 85%; }
+  .bubble.them { background: var(--them); align-self: flex-start; border-bottom-left-radius: 6px; }
+  .bubble.me { background: var(--me); align-self: flex-end; border-bottom-right-radius: 6px; }
+  .draftbox { background: var(--me); border-radius: 18px; padding: 10px 14px; margin-top: 8px; border: 2px dashed var(--accent); }
+  .draftbox textarea { width: 100%; border: 0; background: transparent; resize: vertical; min-height: 2.8em; outline: none; padding: 0; }
+  .note { font-size: .88rem; padding: 8px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); margin: 8px 0; }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 4px; }
+  .pill { border: 1px solid var(--line); background: var(--surface); padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: .85rem; font-weight: 600; }
+  .pill[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .person { display: flex; gap: 12px; padding: 12px 4px; border-top: 1px solid var(--line); align-items: flex-start; }
+  .person:first-child { border-top: 0; }
+  .person input[type=checkbox] { width: 20px; height: 20px; margin-top: 10px; accent-color: var(--accent); }
+  .feed div { padding: 6px 0; border-top: 1px solid var(--line); font-size: .9rem; }
+  .feed .good::before { content: "✓ "; color: var(--go); } .feed .warn::before { content: "! "; color: var(--warn); font-weight: 700; }
+  .feed .problem::before { content: "✕ "; color: var(--bad); font-weight: 700; }
+  .fact { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; margin: 6px 0; }
+  .switch { display: flex; align-items: center; gap: 12px; cursor: pointer; } .switch input { width: 22px; height: 22px; accent-color: var(--accent); }
+  .empty { text-align: center; padding: 34px 16px; color: var(--muted); } .empty b { display: block; color: var(--ink); font-size: 1.05rem; }
+  #login { max-width: 440px; margin: 12vh auto; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="login" class="card" hidden>
+  <h3>Instagram assistant</h3>
+  <p class="muted">Start it with <b>bash start.sh</b> and this page logs in by itself. Or paste the password from <code>data/dashboard-token</code>.</p>
+  <input id="tok" class="field" type="password" autocomplete="off" placeholder="Password">
+  <p><button class="btn primary" onclick="saveToken()">Open</button></p>
+</div>
+
+<div id="app" hidden>
+<div class="top">
+  <div class="bar"><div class="brand">Instagram assistant</div><span id="chip" class="chip">Ready</span></div>
+  <nav class="tabs">
+    <button class="tab" data-tab="today">Today</button>
+    <button class="tab" data-tab="replies">Replies<span id="b-replies" class="badge" hidden></span></button>
+    <button class="tab" data-tab="hellos">Hellos<span id="b-hellos" class="badge" hidden></span></button>
+    <button class="tab" data-tab="people">People</button>
+    <button class="tab" data-tab="about">About me</button>
+    <button class="tab" data-tab="settings">Settings</button>
+    <button class="tab" data-tab="help">Help</button>
+  </nav>
+</div>
+<div class="wrap">
+
+<!-- TODAY -->
+<section data-page="today">
+  <div id="hero" class="hero"></div>
+  <div class="card step"><span id="n1" class="num">1</span><div>
+    <h3>Load today's Instagram download</h3>
+    <p class="muted" id="s1"></p>
+    <div class="row"><button class="btn primary" id="loadbtn" onclick="loadDownload()">Load from Downloads</button></div></div></div>
+  <div class="card step"><span id="n2" class="num">2</span><div>
+    <h3>Replies get written</h3>
+    <p class="muted" id="s2"></p>
+    <div id="jobbar"></div>
+    <div class="row"><button class="btn" id="thinkbtn" onclick="writeReplies()">Write replies now</button>
+      <button class="btn quiet" id="stopjob" onclick="post('/api/job/stop')" hidden>Stop</button></div></div></div>
+  <div class="card step"><span id="n3" class="num">3</span><div>
+    <h3>Check, then send</h3>
+    <p class="muted" id="s3"></p>
+    <div class="row">
+      <button class="btn" onclick="openTab('replies')">Check replies</button>
+      <button class="btn" onclick="openTab('hellos')">Check hellos</button></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn go big" id="sendbtn" onclick="startSending()">Send everything I approved</button>
+      <button class="btn" id="pausebtn" onclick="post('/api/send/pause')">Pause</button></div>
+    <p class="muted" id="sendstatus"></p></div></div>
+  <div class="tiles" id="tiles"></div>
+  <h2>What's been happening</h2>
+  <div class="card feed" id="feed"></div>
+</section>
+
+<!-- REPLIES -->
+<section data-page="replies" hidden>
+  <div class="row" style="margin-top:20px"><h2 class="grow" style="margin:0">Replies</h2>
+    <button class="btn go" onclick="approveAll('reply')">Approve all ready ones</button></div>
+  <p class="muted">Each one is a chat where they wrote last. Change the words if you like, then Approve. Ones marked "have a look" need you to approve them one by one.</p>
+  <div class="filters" id="rfilters"></div>
+  <div id="rlist"></div>
+  <div class="row"><button class="btn" id="rmore" onclick="loadReplies(true)" hidden>Show more</button></div>
+</section>
+
+<!-- HELLOS -->
+<section data-page="hellos" hidden>
+  <div class="row" style="margin-top:20px"><h2 class="grow" style="margin:0">Hellos</h2>
+    <button class="btn go" onclick="approveAll('hello')">Approve all hellos</button></div>
+  <p class="muted">People you follow who you've never messaged. Each gets one of your own hellos. Right before sending, the app checks the chat is still empty.</p>
+  <div class="filters" id="hfilters"></div>
+  <div id="hlist"></div>
+  <div class="row"><button class="btn" id="hmore" onclick="loadHellos(true)" hidden>Show more</button></div>
+</section>
+
+<!-- PEOPLE -->
+<section data-page="people" hidden>
+  <h2>People</h2>
+  <div class="filters" id="pfilters"></div>
+  <div class="card">
+    <input id="pq" class="field" placeholder="Search a name" oninput="loadPeople(0)">
+    <div id="plist" style="margin-top:6px"></div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="pprev" onclick="loadPeople(POFF - 50)">Previous</button>
+      <button class="btn" id="pnext" onclick="loadPeople(POFF + 50)">Next</button><span class="muted grow" id="ppage"></span></div>
+  </div>
+  <div class="row"><button class="btn" onclick="unfollowTicked()">Unfollow ticked</button><span class="grow"></span>
+    <button class="btn quiet" onclick="cancelUnfollows()">Cancel unfollows not done yet</button>
+    <button class="btn danger" onclick="unfollowEveryone()">Unfollow everyone</button></div>
+  <p class="muted" id="unfinfo"></p>
+</section>
+
+<!-- ABOUT ME -->
+<section data-page="about" hidden>
+  <h2>About me</h2>
+  <p class="muted">What the AI knows about you. It only ever mentions things on this list, and never the ones marked private.</p>
+  <div class="card"><div id="facts"></div>
+    <div class="row" style="margin-top:8px"><input id="newfact" class="field grow" placeholder="Add something, e.g. I've started playing football">
+      <button class="btn" onclick="addFact()">Add</button></div></div>
+  <h2>Your hellos</h2>
+  <p class="muted">One of these goes to each new person. One per line.</p>
+  <div class="card"><textarea id="hellos" class="field" rows="4"></textarea></div>
+  <h2>How you write</h2>
+  <p class="muted">The AI copies this, plus how you write in your own chats.</p>
+  <div class="card"><textarea id="voice" class="field" rows="8"></textarea></div>
+  <h2>Never message</h2>
+  <p class="muted">One username per line. No hello, no reply, ever.</p>
+  <div class="card"><textarea id="never" class="field" rows="4"></textarea></div>
+  <div class="row"><button class="btn primary big" onclick="saveAbout()">Save About me</button></div>
+</section>
+
+<!-- SETTINGS -->
+<section data-page="settings" hidden>
+  <h2>AI replies</h2><div class="card" id="ai"></div>
+  <h2>Pace and daily limits</h2>
+  <div class="card">
+    <div class="row"><span class="grow">Messages a day (max 300)</span><input id="dm" class="field" style="width:110px" type="number" min="0" max="300"></div>
+    <div class="row" style="margin-top:8px"><span class="grow">Seconds between messages</span><input id="gm" class="field" style="width:110px" type="number" min="0" max="600"></div>
+    <div class="row" style="margin-top:8px"><span class="grow">Unfollows a day (max 300)</span><input id="du" class="field" style="width:110px" type="number" min="0" max="300"></div>
+    <div class="row" style="margin-top:8px"><span class="grow">Seconds between unfollows</span><input id="gu" class="field" style="width:110px" type="number" min="0" max="600"></div>
+    <div class="row" style="margin-top:8px"><span class="grow">Reply to chats from the last how many days</span><input id="rw" class="field" style="width:110px" type="number" min="1"></div>
+    <p class="muted">Instagram blocks accounts that send or unfollow too much in one day, so these stay numbers. When today's number is reached, the rest go tomorrow by themselves.</p>
+    <button class="btn primary" onclick="saveSettings()">Save</button>
+  </div>
+  <h2>Instagram window</h2>
+  <div class="card"><label class="switch"><input type="checkbox" id="tuck" onchange="post('/api/settings', {tuck_window: this.checked})">
+    <span><b>Tuck it away</b><br><span class="muted">Minimises the Instagram window to the Dock. It keeps working while you use your laptop.</span></span></label></div>
+  <h2>Reading</h2>
+  <div class="card"><div class="row"><span class="grow">Text size</span><button class="btn" onclick="size(-1)">A-</button><button class="btn" onclick="size(1)">A+</button></div>
+    <label class="switch" style="margin-top:12px"><input type="checkbox" id="easy" onchange="setEasy(this.checked)"><span><b>Easy-read font</b></span></label></div>
+  <p class="muted" id="ver"></p>
+</section>
+
+<!-- HELP -->
+<section data-page="help" hidden>
+  <h2>Your daily routine</h2>
+  <div class="card">
+    <p><b>Evening.</b> Request your download in Instagram (Accounts Center, Your information and permissions, Download your information: Messages and Followers and following, JSON, All time). When the email comes, download the file into Downloads, then press <b>Load from Downloads</b>. The app reads it and writes replies by itself.</p>
+    <p><b>Morning.</b> Open Replies and Hellos, change anything you want, approve, then press <b>Send everything I approved</b>. It sends one at a time at a steady pace and you can carry on using your laptop.</p>
+  </div>
+  <h2>When something goes wrong</h2>
+  <div class="card">
+    <p>The app sorts every problem into one of four kinds and tells you on the Today page:</p>
+    <p><b>Try again later</b>: Instagram didn't load. It waits 10 minutes and carries on.</p>
+    <p><b>Skip this person</b>: their account is private, gone, or doesn't take messages. Everyone else carries on.</p>
+    <p><b>Take a break</b>: Instagram showed "try again later". It stops for 6 hours, then carries on by itself.</p>
+    <p><b>Stop and tell you</b>: Instagram wants you to sign in again, or its pages looked different three times in a row. You get a Mac notification. Run <b>bash check.sh</b> and send Claude the check.txt.</p>
+  </div>
+</section>
+</div>
+</div>
+
+<script>
+if (location.hash.startsWith('#token=')) { sessionStorage.setItem('tok', decodeURIComponent(location.hash.slice(7))); history.replaceState(null, '', location.pathname); }
+let TOKEN = sessionStorage.getItem('tok') || '', S = null, POFF = 0;
+const F = {replies: 'draft', hellos: 'draft', people: 'following', sort: 'recent'};
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const when = iso => iso ? new Date(iso).toLocaleString([], {weekday: 'short', hour: 'numeric', minute: '2-digit'}) : '';
+const money = n => !n ? '$0.00' : n < 0.01 ? 'under 1c' : '$' + n.toFixed(2);
+const initial = s => esc(((s || '?').replace(/[^\p{L}\p{N}]/gu, '')[0] || '?').toUpperCase());
+function saveToken() { TOKEN = document.getElementById('tok').value.trim(); sessionStorage.setItem('tok', TOKEN); boot(); }
+async function api(path, opts = {}) {
+  const r = await fetch(path, {...opts, headers: {'X-Agent-Token': TOKEN, 'content-type': 'application/json'}});
+  if (r.status === 401) { sessionStorage.removeItem('tok'); show(false); throw new Error('auth'); }
+  const j = await r.json(); if (!r.ok) { alert(j.detail || 'Something went wrong'); throw new Error(j.detail); } return j;
+}
+const post = (path, body) => api(path, {method: 'POST', body: JSON.stringify(body || {})}).then(r => { refresh(); return r; });
+function show(ok) { document.getElementById('login').hidden = ok; document.getElementById('app').hidden = !ok; }
+function size(d) { let v = Math.min(26, Math.max(14, parseInt(store.get('sz', '18')) + d)); store.set('sz', v); document.documentElement.style.setProperty('--size', v + 'px'); }
+function setEasy(on) { document.documentElement.classList.toggle('easy', on); store.set('easy', on ? '1' : ''); }
+size(0); setEasy(!!store.get('easy', '')); document.getElementById('easy').checked = !!store.get('easy', '');
+
+function openTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === name));
+  document.querySelectorAll('[data-page]').forEach(p => p.hidden = p.dataset.page !== name);
+  store.set('tab', name);
+  ({replies: () => loadReplies(), hellos: () => loadHellos(), people: () => loadPeople(0), about: loadAbout})[name]?.();
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => openTab(t.dataset.tab)));
+function pills(id, key, opts, reload) {
+  document.getElementById(id).innerHTML = opts.map(([v, label]) => `<button class="pill" aria-pressed="${F[key] === v}" data-v="${v}">${esc(label)}</button>`).join('');
+  document.getElementById(id).onclick = e => { const b = e.target.closest('.pill'); if (!b) return; F[key] = b.dataset.v; pills(id, key, opts, reload); reload(); };
+}
+
+// ---------------------------------------------------------------- today
+async function loadDownload() { await post('/api/import', {}); }
+async function writeReplies() { await post('/api/think'); }
+async function startSending() {
+  if (!S.counts.approved) return alert('Nothing approved yet. Check your replies and hellos first.');
+  await post('/api/send/start');
+}
+function renderToday(s) {
+  const c = s.counts, li = s.last_import, job = s.job, snd = s.sender;
+  let cls = 'go', title = 'All good', sub = '';
+  if (snd.status.startsWith('Stopped')) { cls = 'bad'; title = 'Sending stopped'; sub = snd.status.replace('Stopped: ', ''); }
+  else if (snd.waiting_until) { cls = 'warn'; title = 'Taking a break'; sub = snd.status; }
+  else if (job.name) { title = job.name[0].toUpperCase() + job.name.slice(1) + '...'; sub = 'You can close this page; it keeps going.'; cls = ''; }
+  else if (snd.active) { title = 'Sending'; sub = snd.status; }
+  else if (c.replies_to_check + c.hellos_to_check) { cls = ''; title = 'Ready for you to check'; sub = `${c.replies_to_check} replies and ${c.hellos_to_check} hellos waiting.`; }
+  else if (!li) { cls = ''; title = 'Start with your Instagram download'; sub = 'Step 1 below.'; }
+  else { sub = 'Nothing waiting on you right now.'; }
+  const hero = document.getElementById('hero'); hero.className = 'hero ' + cls; hero.innerHTML = `<b>${esc(title)}</b><span class="muted">${esc(sub)}</span>`;
+  const chip = document.getElementById('chip');
+  chip.className = 'chip ' + (cls === 'bad' ? 'bad' : cls === 'warn' ? 'warn' : snd.active || job.name ? 'go' : '');
+  chip.textContent = snd.active ? 'Sending' : job.name ? 'Working' : cls === 'bad' ? 'Stopped' : 'Ready';
+  document.getElementById('n1').className = 'num' + (li ? ' done' : '');
+  document.getElementById('s1').textContent = li ? `Last loaded ${when(li.at)}: ${li.following ?? '?'} people you follow, ${li.conversations} chats, ${li.new_messages} new messages.`
+    : 'When Instagram emails you, download the file into your Downloads folder, then press the button.';
+  const writing = job.name === 'writing replies';
+  document.getElementById('n2').className = 'num' + (!writing && li && !c.replies_to_check && !job.name ? '' : '') + (c.replies_to_check && !writing ? ' done' : '');
+  document.getElementById('s2').textContent = s.ai.on ? 'Happens by itself after loading. About 1 to 3 cents a reply.' :
+    'AI replies are off, so reply boxes are left empty for you (turn them on in Settings).';
+  document.getElementById('jobbar').innerHTML = job.name ? `<div class="bar-p"><i style="width:${job.total ? Math.round(100 * job.done / job.total) : 5}%"></i></div>
+    <p class="muted">${esc(job.name)}${job.total ? `: ${job.done} of ${job.total}` : ''}</p>` : (job.error ? `<div class="note">${esc(job.error)}</div>` : '');
+  ['loadbtn', 'thinkbtn'].forEach(id => document.getElementById(id).disabled = !!job.name);
+  document.getElementById('stopjob').hidden = !writing;
+  document.getElementById('s3').textContent = `${c.replies_to_check} replies to check${c.replies_need_look ? ` (${c.replies_need_look} need a proper look)` : ''}, ${c.hellos_to_check} hellos to check, ${c.approved} approved and ready to send.`;
+  document.getElementById('sendbtn').textContent = c.approved ? `Send everything I approved (${c.approved})` : 'Send everything I approved';
+  document.getElementById('pausebtn').hidden = !snd.active;
+  document.getElementById('sendstatus').textContent = snd.active || snd.waiting_until ? snd.status : '';
+  document.getElementById('tiles').innerHTML = [
+    [`${c.sent_today}/${s.settings.daily_messages}`, 'sent in the last 24 hours'], [c.sent_total, 'sent in total'],
+    [c.unfollow_queued, 'still to unfollow'], [c.interesting, 'people you\'d probably click with'],
+    [c.concerning, 'chats worth a closer look'], [money(s.ai.spend_today), 'AI cost today']]
+    .map(([n, l]) => `<div class="tile"><b>${esc(n)}</b><span>${esc(l)}</span></div>`).join('');
+  document.getElementById('feed').innerHTML = s.activity.length ? s.activity.slice(0, 25).map(a =>
+    `<div class="${esc(a.kind)}"><span class="muted">${esc(when(a.at))}</span> ${esc(a.text)}</div>`).join('') : '<p class="muted">Nothing yet.</p>';
+  const b1 = document.getElementById('b-replies'); b1.hidden = !c.replies_to_check; b1.textContent = c.replies_to_check;
+  const b2 = document.getElementById('b-hellos'); b2.hidden = !c.hellos_to_check; b2.textContent = c.hellos_to_check;
+}
+
+// ---------------------------------------------------------------- replies
+let RITEMS = [];
+async function loadReplies(more) {
+  pills('rfilters', 'replies', [['draft', 'All to check'], ['look', 'Needs a look'], ['interesting', 'Interesting'], ['approved', 'Approved'], ['sent', 'Sent'], ['other', 'Skipped / not sure']], () => loadReplies());
+  const status = {look: 'draft', interesting: 'draft', draft: 'draft', approved: 'approved', sent: 'sent'}[F.replies] || 'other';
+  const only = {look: 'look', interesting: 'interesting'}[F.replies] || '';
+  const r = await api(`/api/drafts?kind=reply&status=${status}&only=${only}&offset=${more ? RITEMS.length : 0}&limit=60`);
+  const items = RITEMS = more ? RITEMS.concat(r.items) : r.items;
+  const shown = items;
+  document.getElementById('rlist').innerHTML = shown.length ? shown.map(replyCard).join('') :
+    `<div class="empty"><b>Nothing here</b>${F.replies === 'look' ? 'No replies need a special look.' : 'Load a download and replies appear here.'}</div>`;
+  document.getElementById('rmore').hidden = items.length >= r.total;
+}
+function replyCard(d) {
+  const c = d.context || {}, name = d.username ? '@' + d.username : (d.other_name || 'Someone');
+  const interest = c.interest ?? d.interest, concern = c.concern ?? d.concern;
+  const flags = [interest >= 3 ? '<span class="flag star">You\'d click</span>' : interest === 2 ? '<span class="flag star">Interesting</span>' : '',
+    concern === 'high' ? '<span class="flag bad">Careful</span>' : concern === 'low' ? '<span class="flag warn">Have a look</span>' : ''].join(' ');
+  const chat = (d.recent || []).map(m => `<div class="bubble ${m.from_me ? 'me' : 'them'}">${esc(m.text)}</div>`).join('');
+  const english = c.their_message_english && c.language && c.language.toLowerCase() !== 'english' ? `<p class="muted">In English: ${esc(c.their_message_english)}</p>` : '';
+  const editable = ['draft', 'approved', 'skipped', 'unsure', 'failed'].includes(d.status) && d.status !== 'sent';
+  const buttons = d.status === 'draft' ? `<button class="btn go" onclick="act(${d.id}, 'approve')">Approve</button><button class="btn" onclick="act(${d.id}, 'skip')">Skip</button>`
+    : d.status === 'approved' ? `<button class="btn" onclick="act(${d.id}, 'unapprove')">Unapprove</button>`
+    : d.status === 'sent' ? `<span class="muted">Sent ${esc(when(d.sent_at))}</span>`
+    : `<button class="btn" onclick="act(${d.id}, 'restore')">Back to check</button>`;
+  return `<div class="card"><div class="who"><span class="avatar">${initial(d.other_name || d.username)}</span>
+      <span class="grow"><span class="name">${esc(d.other_name || name)}</span> <span class="muted">${esc(d.username ? '@' + d.username : '')}</span></span>${flags}</div>
+    ${c.summary ? `<p class="muted">${esc(c.summary)}${c.interest_why ? ' · ' + esc(c.interest_why) : ''}</p>` : ''}
+    ${d.note ? `<div class="note">${esc(d.note)}</div>` : ''}${concern === 'high' && c.concern_why ? `<div class="note">${esc(c.concern_why)}</div>` : ''}
+    <div class="chat">${chat}</div>${english}
+    <div class="draftbox"><textarea id="t${d.id}" rows="2" ${editable ? '' : 'readonly'} placeholder="Type your reply" onchange="saveText(${d.id})">${esc(d.text)}</textarea></div>
+    ${c.reply_english && c.language && c.language.toLowerCase() !== 'english' ? `<p class="muted">Your reply means: ${esc(c.reply_english)}</p>` : ''}
+    <div class="row" style="margin-top:10px">${buttons}</div></div>`;
+}
+async function act(id, action) {
+  const t = document.getElementById('t' + id);
+  await api(`/api/drafts/${id}`, {method: 'POST', body: JSON.stringify({action, text: t ? t.value : null})});
+  refresh(); const tab = store.get('tab'); tab === 'hellos' ? loadHellos() : loadReplies();
+}
+async function saveText(id) { const t = document.getElementById('t' + id); await api(`/api/drafts/${id}`, {method: 'POST', body: JSON.stringify({action: 'save', text: t.value})}); }
+async function approveAll(kind) {
+  const n = kind === 'hello' ? S.counts.hellos_to_check : S.counts.replies_to_check - S.counts.replies_need_look;
+  if (!n) return alert('Nothing ready to approve.');
+  if (!confirm(`Approve ${n} ${kind === 'hello' ? 'hellos' : 'replies'} as they are?` + (kind === 'reply' && S.counts.replies_need_look ? ` The ${S.counts.replies_need_look} that need a look stay for you to do one by one.` : ''))) return;
+  const r = await post('/api/drafts/all/' + kind); alert(`Approved ${r.approved}. Press Send on the Today page when you're ready.`);
+  kind === 'hello' ? loadHellos() : loadReplies();
+}
+
+// ---------------------------------------------------------------- hellos
+let HITEMS = [];
+async function loadHellos(more) {
+  pills('hfilters', 'hellos', [['draft', 'To check'], ['approved', 'Approved'], ['sent', 'Sent'], ['skipped', 'Skipped']], () => loadHellos());
+  const r = await api(`/api/drafts?kind=hello&status=${F.hellos}&offset=${more ? HITEMS.length : 0}&limit=100`);
+  HITEMS = more ? HITEMS.concat(r.items) : r.items;
+  document.getElementById('hlist').innerHTML = HITEMS.length ? '<div class="card">' + HITEMS.map(d => `
+    <div class="person"><span class="avatar">${initial(d.username)}</span><div class="grow"><span class="name">@${esc(d.username)}</span>
+      ${d.note ? `<div class="note">${esc(d.note)}</div>` : ''}
+      <div class="draftbox"><textarea id="t${d.id}" rows="1" ${d.status === 'sent' ? 'readonly' : ''} onchange="saveText(${d.id})">${esc(d.text)}</textarea></div>
+      <div class="row" style="margin-top:6px">${d.status === 'draft' ? `<button class="btn go" onclick="act(${d.id}, 'approve')">Approve</button><button class="btn quiet" onclick="act(${d.id}, 'skip')">Skip</button>`
+        : d.status === 'approved' ? `<button class="btn quiet" onclick="act(${d.id}, 'unapprove')">Unapprove</button>`
+        : d.status === 'sent' ? `<span class="muted">Sent ${esc(when(d.sent_at))}</span>` : `<button class="btn quiet" onclick="act(${d.id}, 'restore')">Back to check</button>`}</div></div></div>`).join('') + '</div>'
+    : `<div class="empty"><b>Nothing here</b>Hellos appear after you load a download.</div>`;
+  document.getElementById('hmore').hidden = HITEMS.length >= r.total;
+}
+
+// ---------------------------------------------------------------- people
+async function loadPeople(off) {
+  pills('pfilters', 'people', [['following', 'Following'], ['followers', 'Followers'], ['chats', 'You\'ve chatted'], ['interesting', 'Interesting'], ['concerning', 'Worth a closer look']], () => loadPeople(0));
+  POFF = Math.max(0, off || 0);
+  const sort = F.people === 'interesting' ? 'interest' : 'recent';
+  const r = await api(`/api/people?show=${F.people}&sort=${sort}&q=${encodeURIComponent(document.getElementById('pq').value)}&offset=${POFF}`);
+  document.getElementById('plist').innerHTML = r.items.length ? r.items.map(p => {
+    const tags = [p.interest >= 3 ? '<span class="flag star">You\'d click</span>' : p.interest === 2 ? '<span class="flag star">Interesting</span>' : '',
+      p.concern === 'high' ? '<span class="flag bad">Careful</span>' : p.concern === 'low' ? '<span class="flag warn">Have a look</span>' : '',
+      p.unfollow === 'done' ? '<span class="flag">Unfollowed</span>' : p.unfollow ? '<span class="flag">Unfollow waiting</span>' : '',
+      p.hello === 'sent' ? '<span class="flag">Hello sent</span>' : ''].join(' ');
+    return `<div class="person"><input type="checkbox" class="psel" data-u="${esc(p.username)}"><span class="avatar">${initial(p.display_name || p.username)}</span>
+      <div class="grow"><span class="name">@${esc(p.username)}</span> ${tags}
+        ${p.summary ? `<p class="muted">${esc(p.summary)}${p.interest_why ? ' · ' + esc(p.interest_why) : ''}</p>` : ''}
+        ${p.concern_why && p.concern !== 'none' ? `<div class="note">${esc(p.concern_why)}</div>` : ''}
+        ${p.memory.length ? `<p class="muted">Remembers: ${esc(p.memory.slice(-3).join(' · '))}</p>` : ''}
+        <input class="field" style="margin-top:6px" placeholder="Your note about them" value="${esc(p.note || '')}" onchange="noteFor('${esc(p.username)}', this.value)"></div></div>`; }).join('')
+    : `<div class="empty"><b>Nobody here</b>Load a download first.</div>`;
+  document.getElementById('ppage').textContent = r.total ? `${POFF + 1} to ${Math.min(POFF + 50, r.total)} of ${r.total}` : '';
+  document.getElementById('pprev').disabled = POFF === 0; document.getElementById('pnext').disabled = POFF + 50 >= r.total;
+}
+async function noteFor(u, note) { await api(`/api/people/${encodeURIComponent(u)}/note`, {method: 'POST', body: JSON.stringify({note})}); }
+async function unfollowTicked() {
+  const names = [...document.querySelectorAll('.psel:checked')].map(e => e.dataset.u);
+  if (!names.length) return alert('Tick some people first.');
+  if (!confirm(`Unfollow ${names.length}? You'd have to follow them again by hand.`)) return;
+  const r = await post('/api/unfollow', {usernames: names}); alert(`${r.queued} added. Press Send on the Today page to start.`); loadPeople(POFF);
+}
+async function unfollowEveryone() {
+  const typed = prompt(`This unfollows all ${S.counts.following} people you follow, ${S.settings.daily_unfollows} a day. You'd have to follow them again by hand, and hellos that haven't gone out are cancelled.\n\nType UNFOLLOW EVERYONE to go ahead:`);
+  if (typed === null) return;
+  const r = await post('/api/unfollow', {everyone: true, confirm: typed}); alert(`${r.queued} added. Press Send on the Today page to start.`); loadPeople(POFF);
+}
+async function cancelUnfollows() { const r = await post('/api/unfollow/cancel'); alert(`Cancelled ${r.cancelled}.`); loadPeople(POFF); }
+
+// ---------------------------------------------------------------- about me
+let FACTS = [];
+async function loadAbout() {
+  const a = await api('/api/about'); FACTS = a.facts;
+  renderFacts();
+  document.getElementById('hellos').value = a.hellos.join('\n');
+  document.getElementById('voice').value = a.voice; document.getElementById('never').value = a.never;
+}
+function renderFacts() {
+  document.getElementById('facts').innerHTML = FACTS.map((f, i) => `<div class="fact">
+    <input class="field" value="${esc(f.text)}" onchange="FACTS[${i}].text = this.value">
+    <label class="switch muted"><input type="checkbox" ${f.private ? 'checked' : ''} onchange="FACTS[${i}].private = this.checked"> private</label>
+    <button class="btn quiet" onclick="FACTS.splice(${i}, 1); renderFacts()">Remove</button></div>`).join('');
+}
+function addFact() { const v = document.getElementById('newfact').value.trim(); if (!v) return; FACTS.push({text: v, private: false}); document.getElementById('newfact').value = ''; renderFacts(); }
+async function saveAbout() {
+  await post('/api/about', {facts: FACTS, hellos: document.getElementById('hellos').value.split('\n'),
+    voice: document.getElementById('voice').value, never: document.getElementById('never').value});
+  alert('Saved.'); loadAbout();
+}
+
+// ---------------------------------------------------------------- settings
+function renderSettings(s) {
+  const ai = document.getElementById('ai');
+  if (ai.dataset.on !== String(s.ai.on)) {
+    ai.dataset.on = String(s.ai.on);
+    ai.innerHTML = s.ai.on ? `<p><b>On.</b> Replies are written from your About me, your writing style, and how you write in your chats.</p>
+        <p class="muted">Spent so far: ${money(s.ai.spend_total)} on ${s.ai.drafts} replies. Hellos cost nothing.</p>`
+      : `<p><b>Off.</b> Paste your Anthropic API key to have replies written for you. It stays on this Mac.</p>
+        <div class="row"><input id="aikey" class="field grow" type="password" placeholder="sk-ant-api03-..." autocomplete="off">
+        <button class="btn primary" onclick="post('/api/settings', {ai_key: document.getElementById('aikey').value}).then(() => alert('AI replies are on.'))">Save</button></div>`;
+  }
+  const set = (id, v) => { const e = document.getElementById(id); if (document.activeElement !== e) e.value = v; };
+  set('dm', s.settings.daily_messages); set('gm', s.settings.message_gap_s); set('du', s.settings.daily_unfollows);
+  set('gu', s.settings.unfollow_gap_s); set('rw', s.settings.reply_window_days);
+  document.getElementById('tuck').checked = !!s.settings.tuck_window;
+  document.getElementById('ver').textContent = `Version ${s.version}, set up for @${s.you}`;
+}
+async function saveSettings() {
+  const n = id => Number(document.getElementById(id).value);
+  await post('/api/settings', {daily_messages: n('dm'), message_gap_s: n('gm'), daily_unfollows: n('du'), unfollow_gap_s: n('gu'), reply_window_days: n('rw')});
+  alert('Saved.');
+}
+
+async function refresh() { S = await api('/api/state'); renderToday(S); renderSettings(S); }
+async function boot() {
+  if (!TOKEN) return show(false);
+  try { await refresh(); show(true); openTab(store.get('tab', 'today')); setInterval(() => refresh().catch(() => {}), 3000); } catch (e) { show(false); }
+}
+boot();
+</script>
+</body>
+</html>

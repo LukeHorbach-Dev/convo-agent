@@ -23,14 +23,14 @@ unzip -q "$ZIP" -d "$TMP"
 NEW="$TMP/convo-agent"
 [ -f "$NEW/agent/__init__.py" ] || { echo "$ZIP doesn't look like a convo-agent zip."; exit 1; }
 
-ver() { sed -n 's/^__version__ = "\(.*\)"/\1/p' "$1/agent/__init__.py"; }
+ver() { sed -n 's/^__version__ = "\(.*\)"/\1/p' "$1/assistant/__init__.py" 2>/dev/null || true; }
 OLD_V="$(ver "$HERE" 2>/dev/null || echo unknown)"
 NEW_V="$(ver "$NEW")"
 echo "Updating from version ${OLD_V:-unknown} to $NEW_V (from $(basename "$ZIP"))"
 
 # Code and docs are replaced; data/ is left alone except the example profile.
-for d in agent tests docs; do rm -rf "$HERE/$d"; cp -R "$NEW/$d" "$HERE/$d"; done
-for f in pyproject.toml requirements.lock README.md REPORT.md .env.example .gitignore setup-mac.sh start.sh update.sh check.sh; do
+for d in agent assistant tests docs; do rm -rf "$HERE/$d"; cp -R "$NEW/$d" "$HERE/$d"; done
+for f in pyproject.toml requirements.lock README.md REPORT.md .env.example .gitignore setup-mac.sh start.sh update.sh check.sh login.sh; do
   [ -f "$NEW/$f" ] && cp "$NEW/$f" "$HERE/$f"
 done
 mkdir -p "$HERE/data"
@@ -50,4 +50,4 @@ done < .env.example
 uv pip install -q -p .venv/bin/python -r requirements.lock
 uv pip install -q -p .venv/bin/python -e . --no-deps
 echo
-echo "Done: $(.venv/bin/python -m agent --version). Start it with: bash start.sh"
+echo "Done: $(.venv/bin/python -m assistant --version). Start it with: bash start.sh"

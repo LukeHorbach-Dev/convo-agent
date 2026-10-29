@@ -1,3 +1,48 @@
+# Instagram assistant (version 2)
+
+Version 2 reads **Instagram's own data download** instead of reading the website, so it always knows exactly who
+you follow, who follows you, and every conversation. The AI (Claude, with your API key) writes hellos and replies
+in your voice, sorts chats into "you'd click", "worth a closer look" and the rest, and remembers what people told
+you. The website is only used for the two things that need it: **sending what you approved** and **unfollowing**.
+
+**Nothing is sent until you approve it.** Approving can be one tap for a whole batch ("Approve all ready ones",
+"Approve all hellos"); replies the AI flags still need you one by one.
+
+## Daily routine
+
+1. **Evening:** request your download in Instagram (Accounts Center → Your information and permissions → Download
+   your information → Messages + Followers and following, **JSON**, **All time**). When it arrives, save it to
+   Downloads and press **Load from Downloads** on the dashboard. Replies are written by themselves.
+2. **Morning:** check **Replies** and **Hellos**, change anything, approve, then **Send everything I approved**.
+   It goes one at a time at a steady pace in the background; you can use your laptop meanwhile.
+
+## Commands
+
+```bash
+bash setup-mac.sh     # install (copies your sign-in from ../convo-agent-old if present)
+bash login.sh         # sign in to Instagram in the assistant's browser
+bash check.sh         # try every website step without sending anything; send Claude data/diagnostics/check.txt
+bash start.sh         # start the assistant and open the dashboard
+bash update.sh        # install a newer zip from Downloads, keeping your data
+```
+
+## How problems are handled
+
+Each problem is sorted into: **try later** (Instagram didn't load: waits 10 minutes), **skip this person** (private,
+gone, can't be messaged), **take a break** (Instagram said "try again later": 6 hours), or **stop and tell you**
+(sign in again, or the page looked different three times in a row). Before every reply it checks it's the right
+chat, that they haven't written again since the download, and that you haven't already answered; before every
+hello it checks the chat is empty. Daily numbers (messages, unfollows) and the gaps between them are in Settings.
+
+## Costs
+
+Hellos use your own wording and cost nothing. Each reply is one AI call: about 1 to 3 US cents.
+
+---
+
+The rest of this file describes version 1 (`agent/`), which version 2 reuses for the browser, the voice rules and
+the AI connection.
+
 # Conversation Agent
 
 A local, single-user conversation agent. It notices new followers and incoming messages, drafts replies in your
