@@ -20,6 +20,7 @@ a fix is ever undone.
 | 12 | One account: no Message after 25 s | Deleted/renamed account ("Sorry, this page isn't available") | Treated as "can't message": skipped, doesn't trip the page-changed alarm | `test_unavailable_profile_is_skipped_not_treated_as_a_broken_page` |
 | 13 | Fix for #11 "didn't work" | The update never got installed (no DONE), so the old version ran | `update.sh` installs from the zip in one step; the version is printed at startup and shown on the dashboard | `update.sh` tested on an old install with personal data |
 | 14 | Canned "Sounds interesting…" replies | No AI key: the test model was writing replies | On Instagram without a key, reply boxes are left empty for you to type | `test_without_an_ai_key_real_replies_are_left_for_you_to_write` |
+| 15 | Self-check steps 5 and 7: no Message / Following button found | That profile had no `<header>` element; the buttons were found by header and role | Profile buttons found by exact visible text inside `<main>`; unfollow is confirmed by "Following" disappearing (suggested accounts have their own Follow buttons) | mock profiles have no header, role-less buttons and a suggestions strip |
 
 ## Self-check
 

@@ -13,6 +13,15 @@ from .inspect_page import _report
 from .web import WebPlatform, username_from_href
 
 
+# Leaf texts up to 25 characters inside <main>: shows what the page's buttons actually say when a step fails.
+SHORT_TEXTS_JS = """() => { const main = document.querySelector('main'); if (!main) return [];
+  const seen = new Set();
+  for (const e of main.querySelectorAll('*')) {
+    if (e.children.length || !(e.checkVisibility ? e.checkVisibility() : e.offsetParent)) continue;
+    const t = (e.innerText || '').trim(); if (t && t.length <= 25) seen.add(t); if (seen.size >= 60) break; }
+  return [...seen]; }"""
+
+
 def self_check(web: WebPlatform, settle_ms: int = 3000) -> str:
     site, me = web.site, web.me
     results: list[tuple[str, bool, str]] = []
@@ -29,6 +38,7 @@ def self_check(web: WebPlatform, settle_ms: int = 3000) -> str:
             web.sup.save_screenshot("check-" + re.sub(r"\W+", "-", name.lower()).strip("-"))
             try:
                 details.extend(_report(web, f"FAILED {name}", structure or [], settle_ms))
+                details.append("short texts in <main> (buttons and labels): " + ", ".join(repr(t) for t in web.page.evaluate(SHORT_TEXTS_JS)))
             except Exception:
                 details.append(f"== FAILED {name}: no page report ({traceback.format_exc(limit=1).splitlines()[-1]})")
 

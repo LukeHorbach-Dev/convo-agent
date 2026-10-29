@@ -154,15 +154,15 @@ def create_site(world: MockWorld) -> FastAPI:
                 expand = ("" if app.state.web["no_expand"] else
                           f'<div role="button" onclick="location.href=\'/direct/t/{key}/\'">'
                           f'<svg aria-label="Expand" width="16" height="16"><rect width="16" height="16"/></svg></div>')
-                btn = (f'<div role="button" data-testid="message-button" onclick="document.getElementById(\'chat\').hidden=false">Message</div>'
+                btn = (f'<div data-testid="message-button" onclick="document.getElementById(\'chat\').hidden=false">Message</div>'
                        f'<aside id="chat" hidden><b>{E(username)}</b>{expand}'
                        f'<div data-testid="popup-composer" contenteditable="true">Message...</div></aside>')
             script = ""
             if username in world.unfollowed:
-                follow = '<div role="button">Follow</div>'
+                follow = '<div>Follow</div>'
             else:
                 # Like Instagram: "Following" opens a menu whose "Unfollow" item unfollows; the button then says Follow.
-                follow = ('<div role="button" id="fb" onclick="document.getElementById(\'menu\').hidden=false">Following</div>'
+                follow = ('<div id="fb" onclick="document.getElementById(\'menu\').hidden=false">Following</div>'
                           '<div role="dialog" id="menu" hidden><div role="button" onclick="unf()">Unfollow</div>'
                           '<div role="button" onclick="this.parentElement.hidden=true">Cancel</div></div>')
                 script = (f'<script>async function unf() {{ await fetch("/api/unfollow", {{method: "POST", headers: {{"content-type": "application/json"}}, '
@@ -171,9 +171,13 @@ def create_site(world: MockWorld) -> FastAPI:
         # Like Instagram: the header (and its Message button) renders a moment after the page loads.
         # Like Instagram, the counts are buttons too ("following" in a count must not be mistaken for the
         # Following button).
-        header = (f'<header><h1 data-testid="profile-username">{E(username)}</h1><p>{E(acct.bio)}</p>'
+        # Like the live site (seen 29 Oct): no <header> element, buttons without roles, and a "suggested for you"
+        # strip whose own Follow buttons must not be mistaken for this profile's.
+        header = (f'<section><h1 data-testid="profile-username">{E(username)}</h1><p>{E(acct.bio)}</p>'
                   '<div role="button">12 followers</div><div role="button">34 following</div>'
-                  f'{follow}{btn}</header>')
+                  f'{follow}{btn}</section>'
+                  '<section><h2>Suggested for you</h2><div>anna.k <div role="button">Follow</div></div>'
+                  '<div>ben.m <div role="button">Follow</div></div></section>')
         return page(world, f'{script}<div id="app"></div><template id="h">{header}</template><script>setTimeout(() => '
                            f'document.getElementById("app").replaceWith(document.getElementById("h").content), 400)</script>')
 

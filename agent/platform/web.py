@@ -56,7 +56,7 @@ class WebPlatform:
 
     def whoami(self) -> str:
         if (marker := self.site.own_profile_marker()) is not None:
-            self.sup.goto(self.site.url(self.site.profile_path(self.me)), expect=re.escape(f"/{self.me}/"), ready="header")
+            self.sup.goto(self.site.url(self.site.profile_path(self.me)), expect=re.escape(f"/{self.me}/"), ready="main")
             def check():
                 if self._visible(marker).count() == 0:
                     self.sup.save_screenshot("identity")
@@ -208,9 +208,7 @@ class WebPlatform:
             n = btn.count()
             if n == 0:
                 raise SelectorDrift(f"{username}: no Message control found on the profile")
-            if n > 1:
-                raise AmbiguousState(f"{username}: {n} Message controls found")
-            btn.first.click()
+            btn.first.click()                         # the first one is the profile's own button
             return self._wait_for_conversation(username)
         key = self.sup.run(f"open dm {username}", click)
         if key is None and (url := self.site.dm_url(username)):
@@ -247,7 +245,8 @@ class WebPlatform:
         self.sup.goto(self.site.url(self.site.profile_path(username)), expect=re.escape(f"/{username}"), ready="body")
         timeout = self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms
         def act():
-            either = ", ".join([self.site.following_button(), self.site.follow_button(), *self.site.restricted_markers()])
+            # Wait for the profile's own controls; Follow buttons can also belong to suggested accounts.
+            either = ", ".join([self.site.following_button(), self.site.message_button(), *self.site.restricted_markers()])
             try:
                 self._visible(either).first.wait_for(state="visible", timeout=timeout)
             except Exception:
@@ -271,11 +270,14 @@ class WebPlatform:
                 confirm.first.click()
             except Exception:
                 pass
-            try:
-                self._visible(self.site.follow_button()).first.wait_for(state="visible", timeout=timeout)
-            except Exception:
-                self.sup.save_screenshot("selector-drift-unfollow")
-                raise AmbiguousState(f"{username}: pressed Unfollow, but the profile doesn't show Follow yet")
+            # Done when the profile no longer says Following (Follow buttons elsewhere on the page, like
+            # suggested accounts, prove nothing).
+            deadline = time.monotonic() + timeout / 1000
+            while self._visible(self.site.following_button()).count():
+                if time.monotonic() > deadline:
+                    self.sup.save_screenshot("selector-drift-unfollow")
+                    raise AmbiguousState(f"{username}: pressed Unfollow, but the profile still says Following")
+                self.page.wait_for_timeout(250)
             return "unfollowed"
         return self.sup.run(f"unfollow {username}", act)
 

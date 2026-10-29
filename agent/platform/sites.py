@@ -63,13 +63,14 @@ class SiteProfile:
     # On someone's profile: the button showing you follow them, the one showing you don't, and the menu item that
     # unfollows (Instagram: "Following" opens a menu; private accounts ask again in a second dialog).
     def following_button(self) -> str:
-        # Exact text: the "228 following" count in the same header is also a button on Instagram.
-        return 'main header [role="button"]:text-is("Following"), main header button:text-is("Following")'
+        # By exact visible text inside <main>, not by header or role: live profiles don't always have a <header>,
+        # and the "1,764 following" count is a different text.
+        return 'main :text-is("Following")'
     def follow_button(self) -> str:
-        return ", ".join(f'main header {t}:text-is("{x}")' for t in ('[role="button"]', "button") for x in ("Follow", "Follow Back"))
+        return 'main :text-is("Follow"), main :text-is("Follow Back")'
     def unfollow_confirm(self) -> str:
-        return ('[role="dialog"] [role="button"]:text-is("Unfollow"), [role="dialog"] button:text-is("Unfollow"), '
-                '[role="menuitem"]:text-is("Unfollow")')
+        return ('[role="dialog"] :text-is("Unfollow"), [role="menuitem"]:text-is("Unfollow"), '
+                '[role="menu"] :text-is("Unfollow")')
     def read_messages_js(self) -> str: raise NotImplementedError
 
 
@@ -109,7 +110,7 @@ class InstagramProfile(SiteProfile):
     def own_profile_marker(self):
         # The sidebar collapses to icons on some pages, so identity is checked on the profile page instead: only
         # the signed-in account sees "Edit profile" there.
-        return 'header a[href="/accounts/edit/"], header a:has-text("Edit profile")'
+        return 'main a[href="/accounts/edit/"], main :text-is("Edit profile")'
 
     def follower_links(self):
         return 'div[role="dialog"] a[href^="/"]'
@@ -137,10 +138,9 @@ class InstagramProfile(SiteProfile):
         return '[role="main"] header a[href^="/"], [role="main"] a[href^="/"][role="link"]'
 
     def message_button(self):
-        # Seen live: a div[role=button] reading "Message" in the profile header. Kept to <main> so the sidebar's
-        # "Messages" link never matches (text-is is exact).
-        return ('main header [role="button"]:text-is("Message"), main header button:text-is("Message"), '
-                'main [role="button"]:text-is("Message")')
+        # Seen live: a button reading "Message" on the profile, sometimes inside <header>, sometimes with no
+        # header element at all. Exact text inside <main>, so the sidebar's "Messages" never matches.
+        return 'main :text-is("Message")'
 
     def composer(self):
         return '[role="textbox"][contenteditable="true"]'
@@ -157,7 +157,7 @@ class InstagramProfile(SiteProfile):
         return '[aria-label*="xpand" i], [aria-label*="full screen" i], [aria-label*="Open in" i]'
 
     def restricted_markers(self):
-        return [':text("Sorry, this page isn\'t available")', ':text("User not found")', 'main header :text-is("Requested")', 'main :text("This account is private")']
+        return [':text("Sorry, this page isn\'t available")', ':text("User not found")', 'main :text-is("Requested")', 'main :text("This account is private")']
 
     def read_messages_js(self) -> str:
         # No stable ids or roles for bubbles: read innermost dir=auto text in the conversation pane. The pane is the
