@@ -257,12 +257,4 @@ def _remember(store: Store, username: str | None, notes: list[str]) -> None:
 
 
 def _record_cost(store: Store, llm) -> None:
-    cost = getattr(llm, "last_cost_usd", 0.0) or 0.0
-    if not cost:
-        return
-    spend = store.get("ai_spend", {}) or {}
-    day = now_iso()[:10]
-    spend["total"] = round(spend.get("total", 0.0) + cost, 6)
-    spend[day] = round(spend.get(day, 0.0) + cost, 6)
-    spend["drafts"] = spend.get("drafts", 0) + 1
-    store.set("ai_spend", {k: v for k, v in spend.items() if k in ("total", "drafts") or k >= iso_ago(days=31)[:10]})
+    store.add_spend(getattr(llm, "last_cost_usd", 0.0) or 0.0, "drafts")

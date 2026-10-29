@@ -214,7 +214,7 @@
   </div>
   <h2>Instagram window</h2>
   <div class="card"><label class="switch"><input type="checkbox" id="tuck" onchange="post('/api/settings', {tuck_window: this.checked})">
-    <span><b>Tuck it away</b><br><span class="muted">Minimises the Instagram window to the Dock. It keeps working while you use your laptop.</span></span></label></div>
+    <span><b>Tuck it away</b><br><span class="muted">Minimises the Instagram window to the Dock. It keeps working while you use your laptop. If sending ever seems stuck while it's tucked away, turn this off.</span></span></label></div>
   <h2>Reading</h2>
   <div class="card"><div class="row"><span class="grow">Text size</span><button class="btn" onclick="size(-1)">A-</button><button class="btn" onclick="size(1)">A+</button></div>
     <label class="switch" style="margin-top:12px"><input type="checkbox" id="easy" onchange="setEasy(this.checked)"><span><b>Easy-read font</b></span></label></div>
@@ -234,7 +234,12 @@
     <p><b>Try again later</b>: Instagram didn't load. It waits 10 minutes and carries on.</p>
     <p><b>Skip this person</b>: their account is private, gone, or doesn't take messages. Everyone else carries on.</p>
     <p><b>Take a break</b>: Instagram showed "try again later". It stops for 6 hours, then carries on by itself.</p>
-    <p><b>Stop and tell you</b>: Instagram wants you to sign in again, or its pages looked different three times in a row. You get a Mac notification. Run <b>bash check.sh</b> and send Claude the check.txt.</p>
+    <p><b>Stop and tell you</b>: Instagram wants you to sign in again, the AI key or credit needs looking at, or Claude couldn't finish three times in a row. You get a Mac notification. Run <b>bash check.sh</b> and send Claude the check.txt.</p>
+  </div>
+  <h2>How sending works</h2>
+  <div class="card">
+    <p>For each message, Claude looks at the Instagram page and clicks through to the chat, like you would. It checks it's the right person, that a hello goes into an empty chat, and that they haven't written again since your download.</p>
+    <p>Claude can't type. The app types the exact message you approved, checks it letter for letter in the message box, then presses Enter and checks it appeared in the chat.</p>
   </div>
 </section>
 </div>
@@ -299,7 +304,7 @@ function renderToday(s) {
     : 'When Instagram emails you, download the file into your Downloads folder, then press the button.';
   const writing = job.name === 'writing replies';
   document.getElementById('n2').className = 'num' + (!writing && li && !c.replies_to_check && !job.name ? '' : '') + (c.replies_to_check && !writing ? ' done' : '');
-  document.getElementById('s2').textContent = s.ai.on ? 'Happens by itself after loading. About 1 to 3 cents a reply.' :
+  document.getElementById('s2').textContent = s.ai.on ? 'Happens by itself after loading. About 1 to 3 cents to write a reply, and about 1 cent to send each message.' :
     'AI replies are off, so reply boxes are left empty for you (turn them on in Settings).';
   document.getElementById('jobbar').innerHTML = job.name ? `<div class="bar-p"><i style="width:${job.total ? Math.round(100 * job.done / job.total) : 5}%"></i></div>
     <p class="muted">${esc(job.name)}${job.total ? `: ${job.done} of ${job.total}` : ''}</p>` : (job.error ? `<div class="note">${esc(job.error)}</div>` : '');
@@ -447,11 +452,20 @@ function renderSettings(s) {
   if (ai.dataset.on !== String(s.ai.on)) {
     ai.dataset.on = String(s.ai.on);
     ai.innerHTML = s.ai.on ? `<p><b>On.</b> Replies are written from your About me, your writing style, and how you write in your chats.</p>
-        <p class="muted">Spent so far: ${money(s.ai.spend_total)} on ${s.ai.drafts} replies. Hellos cost nothing.</p>`
+        <p class="muted" id="spent"></p>
+        <p style="margin-top:12px"><b>How Claude uses Instagram</b><br><span class="muted">Claude looks at the Instagram page and clicks, like you would. It never types: the app types only the message you approved.</span></p>
+        <div class="row"><select id="eyes" class="field grow" onchange="post('/api/settings', {eyes_model: this.value})">
+          <option value="claude-haiku-5-5">Haiku: about 1 cent per message or unfollow (recommended)</option>
+          <option value="claude-sonnet-5-5">Sonnet: steadier on unusual pages, about 10 to 20 cents each</option></select></div>`
       : `<p><b>Off.</b> Paste your Anthropic API key to have replies written for you. It stays on this Mac.</p>
         <div class="row"><input id="aikey" class="field grow" type="password" placeholder="sk-ant-api03-..." autocomplete="off">
         <button class="btn primary" onclick="post('/api/settings', {ai_key: document.getElementById('aikey').value}).then(() => alert('AI replies are on.'))">Save</button></div>`;
   }
+  const sp = document.getElementById('spent');
+  if (sp) sp.textContent = `Spent so far: ${money(s.ai.spend_total)}. Writing ${s.ai.drafts} replies: ${money(s.ai.drafts_usd)}. ` +
+    `Using Instagram (${s.ai.web_steps} looks): ${money(s.ai.web_usd)}. Hellos are written from your own wording and cost nothing to write.`;
+  const ey = document.getElementById('eyes');
+  if (ey && document.activeElement !== ey) ey.value = s.settings.eyes_model;
   const set = (id, v) => { const e = document.getElementById(id); if (document.activeElement !== e) e.value = v; };
   set('dm', s.settings.daily_messages); set('gm', s.settings.message_gap_s); set('du', s.settings.daily_unfollows);
   set('gu', s.settings.unfollow_gap_s); set('rw', s.settings.reply_window_days);

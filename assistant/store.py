@@ -156,6 +156,20 @@ class Store:
         self.execute("INSERT INTO activity(at, kind, text) VALUES (?, ?, ?)", (now_iso(), kind, text))
         self.execute("DELETE FROM activity WHERE id < (SELECT MAX(id) - 2000 FROM activity)")
 
+    def add_spend(self, usd: float, counter: str) -> None:
+        """Add to the AI spend shown on the dashboard: total, per day (31 days), and how many drafts / website steps."""
+        if not usd:
+            return
+        with self.transaction():
+            spend = self.get("ai_spend", {}) or {}
+            day = now_iso()[:10]
+            spend["total"] = round(spend.get("total", 0.0) + usd, 6)
+            spend[day] = round(spend.get(day, 0.0) + usd, 6)
+            spend[counter] = spend.get(counter, 0) + 1
+            spend[counter + "_usd"] = round(spend.get(counter + "_usd", 0.0) + usd, 6)
+            keep = ("total", "drafts", "drafts_usd", "web", "web_usd")
+            self.set("ai_spend", {k: v for k, v in spend.items() if k in keep or k >= iso_ago(days=31)[:10]})
+
     # ---------------------------------------------------------------- counts used in several places
     def sent_today(self) -> int:
         return self.scalar("SELECT COUNT(*) FROM drafts WHERE status = 'sent' AND sent_at >= ?", (iso_ago(days=1),))

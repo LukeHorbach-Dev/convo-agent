@@ -3,7 +3,6 @@ unfollowing, and the dashboard API."""
 from __future__ import annotations
 
 import json
-import socket
 import time
 import zipfile
 from pathlib import Path
@@ -11,20 +10,14 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from agent.core.config import BrowserConfig
 from agent.core.errors import (AuthenticationRequired, PermissionRestricted, PlatformUnavailable, RateLimited,
                                SelectorDrift)
 from agent.intel.llm import FakeLLM
-from agent.platform.browser import BrowserSupervisor
-from agent.platform.mock import MockWorld
-from agent.platform.mock_site import SiteServer
-from agent.platform.sites import mock_site_profile
-from agent.platform.web import WebPlatform
 from assistant.app import Assistant, create_api
 from assistant.brain import chats_waiting, prepare_hellos, think
 from assistant.config import AssistantSettings
 from assistant.export import ExportError, apply_export, find_downloads, fix_text, read_export
-from assistant.sender import Sender, classify
+from assistant.sender import classify
 from assistant.store import Store
 
 ME = "LukeHorbach2"
@@ -219,117 +212,12 @@ def test_problems_are_sorted_into_what_to_do():
     assert classify(PlatformUnavailable("x"))[0] == "later"
 
 
-# ------------------------------------------------------------------------------------------------ sending (real Chromium)
-def free_port() -> int:
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-@pytest.fixture
-def site(tmp_path):
-    world = MockWorld("lukehorbach2")
-    server = SiteServer(world, free_port()).start()
-    prof = mock_site_profile(server.url)
-    cfg = BrowserConfig(headless=True, user_data_dir=tmp_path / "browser", navigation_timeout_ms=4000,
-                        action_timeout_ms=2000, health_check_timeout_ms=2000, max_recoveries_per_run=2)
-    webs = []
-
-    def make_web():
-        w = WebPlatform(BrowserSupervisor(cfg, prof), prof, "lukehorbach2")
-        w.batch_wait_s = 0.5
-        webs.append(w)
-        return w
-    yield world, server, make_web
-    for w in webs:
-        w.close()
-    server.stop()
-
-
+# Sending and the self-check are tested in test_eyes.py (version 3's website layer).
 def settings_for(tmp_path) -> AssistantSettings:
     s = AssistantSettings(_env_file=None, data_dir=tmp_path, profile_path=tmp_path / "profile.json",
                           never_list_path=tmp_path / "never.txt", downloads_dir=tmp_path)
     s.pace.message_gap_s = s.pace.unfollow_gap_s = 0
     return s
-
-
-def add_draft(store, kind, username, text, replying_to=None, status="approved"):
-    store.execute("INSERT INTO drafts(kind, username, thread_id, other_name, replying_to, replying_at, text, status, created_at, updated_at) "
-                  "VALUES (?, ?, ?, ?, ?, 1, ?, ?, 'x', 'x')", (kind, username, f"t_{username}" if kind == "reply" else None,
-                                                              username, replying_to, text, status))
-    return store.scalar("SELECT MAX(id) FROM drafts")
-
-
-def run_sender(sender, steps=8):
-    sender.go()
-    for _ in range(steps):
-        if not sender.active:
-            break
-        sender.step()
-
-
-@pytest.mark.browser
-def test_sender_sends_hellos_and_replies_and_checks_each_chat_first(site, store, tmp_path):
-    world, _, make_web = site
-    for u in ("new.friend", "old.friend", "anna", "busy"):
-        world.new_follower(u)
-    world.incoming("old.friend", "we already talk")             # a hello must not go into an existing chat
-    world.incoming("anna", "what do you do for fun?")
-    world.incoming("busy", "first"); world.incoming("busy", "second message")
-    h1 = add_draft(store, "hello", "new.friend", "Hey im trying to branch out a little im Luke :)")
-    h2 = add_draft(store, "hello", "old.friend", "Hey, hows your week going ?")
-    r1 = add_draft(store, "reply", "anna", "Not much, pottery mostly. You ?", replying_to="what do you do for fun?")
-    r2 = add_draft(store, "reply", "busy", "ok", replying_to="first")       # they wrote again since
-    banners = []
-    sender = Sender(store, settings_for(tmp_path), make_web, notify=lambda t, x: banners.append(x), sleep=lambda s: None)
-    run_sender(sender)
-    st = {d["id"]: d for d in store.all("SELECT * FROM drafts")}
-    assert st[h1]["status"] == "sent" and st[r1]["status"] == "sent"
-    assert st[h2]["status"] == "skipped" and "already have a chat" in st[h2]["note"]
-    assert st[r2]["status"] == "draft" and "written again" in st[r2]["note"]
-    assert ("new.friend", "Hey im trying to branch out a little im Luke :)") in world.sent_log
-    assert ("anna", "Not much, pottery mostly. You ?") in world.sent_log
-    assert not any(u in ("old.friend", "busy") for u, _ in world.sent_log)
-    assert sender.active is False and banners[-1].startswith("All done")
-
-
-@pytest.mark.browser
-def test_sender_unfollows_and_respects_the_daily_number(site, store, tmp_path):
-    world, _, make_web = site
-    for u in ("a.one", "b.two", "c.three"):
-        world.new_follower(u)
-        store.execute("INSERT INTO unfollows(username, queued_at) VALUES (?, 'x')", (u,))
-    s = settings_for(tmp_path); s.pace.daily_unfollows = 2
-    sender = Sender(store, s, make_web, notify=lambda *a: None, sleep=lambda s: None)
-    run_sender(sender)
-    assert len(world.unfollowed) == 2
-    assert store.scalar("SELECT COUNT(*) FROM unfollows WHERE status = 'queued'") == 1
-
-
-@pytest.mark.browser
-def test_sender_stops_and_says_why_when_the_page_keeps_looking_different(site, store, tmp_path):
-    world, server, make_web = site
-    server.app.state.web["drift"] = True                          # every Message button changed
-    for u in ("p1", "p2", "p3"):
-        world.new_follower(u)
-        add_draft(store, "hello", u, "Hey, hows your week going ?")
-    banners = []
-    sender = Sender(store, settings_for(tmp_path), make_web, notify=lambda t, x: banners.append(x), sleep=lambda s: None)
-    run_sender(sender, steps=10)
-    assert sender.active is False and sender.status.startswith("Stopped")
-    assert "check.sh" in banners[-1] and world.sent_log == []
-
-
-@pytest.mark.browser
-def test_sender_takes_a_break_when_instagram_says_try_again_later(site, store, tmp_path, monkeypatch):
-    world, _, make_web = site
-    world.new_follower("x.one")
-    add_draft(store, "hello", "x.one", "Hey, hows your week going ?")
-    sender = Sender(store, settings_for(tmp_path), make_web, notify=lambda *a: None, sleep=lambda s: None)
-    monkeypatch.setattr(Sender, "_check_blocked", lambda self: (_ for _ in ()).throw(RateLimited("try again later")))
-    run_sender(sender, steps=2)
-    assert sender.wait_until > time.time() + 5 * 3600
-    assert store.one("SELECT status FROM drafts")["status"] == "approved" and world.sent_log == []
 
 
 # ------------------------------------------------------------------------------------------------ dashboard
@@ -407,18 +295,6 @@ def test_settings_save_the_ai_key_locally(client, monkeypatch):
     assert f"AGENT_LLM__API_KEY={key}" in (a.s.data_dir / ".env").read_text()
     s = c.get("/api/state", headers=H).json()
     assert s["ai"]["on"] is True and s["settings"]["daily_messages"] == 80
-
-
-@pytest.mark.browser
-def test_self_check_passes_on_the_mock_site_and_changes_nothing(site, store):
-    from assistant.check import run_check
-    world, _, make_web = site
-    world.new_follower("anna"); world.incoming("anna", "hey")
-    store.execute("INSERT INTO people(username, i_follow) VALUES ('anna', 1)")
-    store.execute("INSERT INTO threads(id, username, last_at) VALUES ('anna_1', 'anna', 1)")
-    report = run_check(make_web(), store, settle_ms=0)
-    assert report.startswith("Self-check: 6 of 6 steps passed"), report
-    assert world.sent_log == [] and world.unfollowed == set()
 
 
 def test_username_from_profile_links():

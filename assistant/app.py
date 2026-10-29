@@ -59,12 +59,21 @@ class Assistant:
         self._job_lock = threading.Lock()
         self._stop_job = threading.Event()
 
-    def _instagram(self):
+    def _instagram(self, site=None):
+        """The website, used through Claude's eyes (eyes.Hands). Needs the AI key: without it nothing can be sent."""
+        from agent.core.errors import InterventionRequired
         from agent.platform.browser import BrowserSupervisor
         from agent.platform.sites import INSTAGRAM
-        from agent.platform.web import WebPlatform
-        sup = BrowserSupervisor(self.s.browser, INSTAGRAM)
-        return WebPlatform(sup, INSTAGRAM, self.s.account_username)
+        from .eyes import Hands
+        if self.s.llm.provider != "anthropic" or not self.s.llm.api_key:
+            raise InterventionRequired("Sending needs your AI key, because Claude looks at Instagram's page to do it. "
+                                       "Add the key in Settings, then press Send again.")
+        import anthropic
+        site = site or INSTAGRAM
+        client = anthropic.Anthropic(api_key=self.s.llm.api_key.get_secret_value(), timeout=60, max_retries=2)
+        return Hands(BrowserSupervisor(self.s.browser, site), site, self.s.account_username, client,
+                     model=self.s.eyes.model, effort=self.s.eyes.effort,
+                     on_cost=lambda usd: self.store.add_spend(usd, "web"))
 
     @property
     def manual(self) -> bool:
@@ -163,6 +172,7 @@ class SettingsBody(BaseModel):
     reply_window_days: int | None = None
     ai_key: str | None = None
     tuck_window: bool | None = None
+    eyes_model: str | None = None
 
 
 def policy_problems(text: str) -> list[str]:
@@ -218,9 +228,11 @@ def create_api(a: Assistant, token: str) -> FastAPI:
                 "concerning": c("SELECT COUNT(*) FROM people WHERE concern = 'high'"),
             },
             "settings": {**a.s.pace.model_dump(), "reply_window_days": a.s.reply_window_days,
-                         "tuck_window": a.s.browser.start_minimized},
+                         "tuck_window": a.s.browser.start_minimized, "eyes_model": a.s.eyes.model},
             "ai": {"on": not a.manual, "model": a.s.llm.model, "spend_total": spend.get("total", 0.0),
-                   "spend_today": spend.get(now_iso()[:10], 0.0), "drafts": spend.get("drafts", 0)},
+                   "spend_today": spend.get(now_iso()[:10], 0.0), "drafts": spend.get("drafts", 0),
+                   "drafts_usd": spend.get("drafts_usd", 0.0), "web_steps": spend.get("web", 0),
+                   "web_usd": spend.get("web_usd", 0.0), "eyes_model": a.s.eyes.model},
             "activity": st.all("SELECT at, kind, text FROM activity ORDER BY id DESC LIMIT 60"),
         }
 
@@ -429,7 +441,7 @@ def create_api(a: Assistant, token: str) -> FastAPI:
             a.s.browser.start_minimized = body.tuck_window
             env["AGENT_BROWSER__START_MINIMIZED"] = "true" if body.tuck_window else "false"
             web = a.sender.web
-            if web is not None:
+            if web is not None and hasattr(web, "sup"):
                 web.sup.window_request = "minimized" if body.tuck_window else "maximized"
         if body.ai_key is not None:
             key = body.ai_key.strip()
@@ -438,7 +450,14 @@ def create_api(a: Assistant, token: str) -> FastAPI:
             a.s.llm.provider, a.s.llm.api_key = "anthropic", SecretStr(key)
             a.llm = build_provider(a.s.llm)
             env.update({"AGENT_LLM__PROVIDER": "anthropic", "AGENT_LLM__API_KEY": key})
+            a.sender.reset_browser()                  # the next send opens Instagram with the new key
             st.log("good", "AI replies are on.")
+        if body.eyes_model is not None:
+            if body.eyes_model not in ("claude-haiku-5-5", "claude-sonnet-5-5"):
+                raise HTTPException(400, "eyes_model must be claude-haiku-5-5 or claude-sonnet-5-5")
+            a.s.eyes.model = body.eyes_model
+            env["AGENT_EYES__MODEL"] = body.eyes_model
+            a.sender.reset_browser()
         if env:
             save_env(env)
         return {"ok": True}

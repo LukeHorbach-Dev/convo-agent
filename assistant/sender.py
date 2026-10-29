@@ -1,7 +1,7 @@
-"""The only part that uses Instagram's website. It works through what Luke approved, one at a time, at a steady pace:
-open the chat, check it's the right one and nothing changed, send, confirm. It also works through the unfollow
-list. When something goes wrong it decides, and says in plain words, whether to try again later, skip that person,
-or stop and wait for Luke.
+"""Works through what Luke approved, one at a time, at a steady pace: open the chat, check it's the right one and
+nothing changed, send, confirm. It also works through the unfollow list. The website itself is handled by
+eyes.Hands (Claude looks at the page and clicks; the app types only the approved text). When something goes wrong
+it decides, and says in plain words, whether to try again later, skip that person, or stop and wait for Luke.
 """
 from __future__ import annotations
 
@@ -10,7 +10,8 @@ import re
 import threading
 import time
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from difflib import SequenceMatcher
 
 from agent.core.errors import (AmbiguousState, AuthenticationRequired, BrowserCrashed, DeliveryUnknown, InterventionRequired,
                                OperatorStop, PermissionRestricted, PlatformUnavailable, RateLimited, SelectorDrift,
@@ -26,8 +27,18 @@ BLOCKED = re.compile(r"try again later|we restrict certain activity|we limit how
                      r"temporarily blocked|unusual activity|you can't (send|use) .* right now", re.I)
 
 
-def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "").strip().lower())
+def _letters(s: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", (s or "").lower())).strip()
+
+
+def similar(a: str, b: str) -> bool:
+    """Same message, allowing for how Claude copies it off the screen (emoji, punctuation, a slip of a letter)."""
+    la, lb = _letters(a), _letters(b)
+    if not la or not lb:
+        return re.sub(r"\s+", "", a or "") == re.sub(r"\s+", "", b or "") or (not la and not lb and bool(a) and bool(b))
+    if la == lb or SequenceMatcher(None, la, lb).ratio() >= 0.8:
+        return True
+    return min(len(la), len(lb)) >= 20 and (la in lb or lb in la)    # one shown cut short
 
 
 def classify(e: Exception) -> tuple[str, str, float]:
@@ -44,8 +55,10 @@ def classify(e: Exception) -> tuple[str, str, float]:
         return "skip", str(e).split(": ", 1)[-1], 0
     if isinstance(e, (SelectorDrift, AmbiguousState)):
         return "page", str(e).split(": ", 1)[-1], 0
-    if isinstance(e, (PlatformUnavailable, TransientError, BrowserCrashed)):
+    if isinstance(e, (PlatformUnavailable, BrowserCrashed)):
         return "later", "Instagram didn't load properly. Trying again in 10 minutes.", 600
+    if isinstance(e, TransientError):
+        return "later", f"Couldn't carry on ({e}). Trying again in 10 minutes.", 600
     return "page", f"something unexpected happened ({type(e).__name__})", 0
 
 
@@ -64,6 +77,7 @@ class Sender:
         self._sleep = sleep or (lambda s: self._stop.wait(s))
         self._thread: threading.Thread | None = None
         self.identity_ok = False
+        self._reset = False
 
     # ------------------------------------------------------------------ control
     def start(self) -> "Sender":
@@ -78,6 +92,10 @@ class Sender:
     def pause(self, why: str = "Paused") -> None:
         self.active = False
         self.status = why
+
+    def reset_browser(self) -> None:
+        """Open the browser afresh before the next send (e.g. after a new AI key); done on the sender's own thread."""
+        self._reset = True
 
     def shutdown(self) -> None:
         self._stop.set()
@@ -140,6 +158,14 @@ class Sender:
     def _ready(self) -> bool:
         """Open the browser and check it's signed in as Luke, once per session."""
         try:
+            if self._reset:
+                self._reset = False
+                if self.web is not None:
+                    try:
+                        self.web.close()
+                    except Exception:
+                        pass
+                self.web, self.identity_ok = None, False
             if self.web is None:
                 self.web = self.make_web()
             if not self.identity_ok:
@@ -159,19 +185,17 @@ class Sender:
                                (now_iso(), d["id"]))
         who = ("@" + d["username"]) if d["username"] else d["other_name"]
         try:
-            snap = self._open_chat(d)
+            chat = self._open_chat(d)
             if d["kind"] == "hello":
-                if snap.messages:
+                if not chat.empty:
                     return self._set(d, "skipped", "you already have a chat with them, so no hello", "info")
             else:
-                verdict = self._still_current(d, snap)
+                verdict = self._still_current(d, chat)
                 if verdict:
                     return self._set(d, *verdict)
             self._check_blocked()
-            result = self.web.send(snap.thread_key, d["text"], f"draft-{d['id']}")
+            self.web.send_here(d["text"])
             self._check_blocked()
-            if result.status != "sent":
-                raise DeliveryUnknown(result.detail or "Instagram didn't confirm the message")
             with self.store.transaction():
                 self.store.execute("UPDATE drafts SET status = 'sent', sent_at = ?, updated_at = ?, note = NULL WHERE id = ?",
                                    (now_iso(), now_iso(), d["id"]))
@@ -187,52 +211,27 @@ class Sender:
 
     def _open_chat(self, d: dict):
         if d["username"]:
-            return self.web.open_dm(d["username"])
-        snap = self._open_by_name(d["other_name"])
+            return self.web.open_chat(username=d["username"])
+        chat = self.web.open_chat(name=d["other_name"])
         # Learn their username from the chat, so next time the chat opens directly.
-        if snap.username:
+        if chat.username and re.fullmatch(r"[A-Za-z0-9._]{1,30}", chat.username):
             with self.store.transaction():
-                self.store.execute("UPDATE drafts SET username = ? WHERE id = ?", (snap.username, d["id"]))
+                self.store.execute("UPDATE drafts SET username = ? WHERE id = ?", (chat.username, d["id"]))
                 if d["thread_id"]:
-                    self.store.execute("UPDATE threads SET username = ? WHERE id = ?", (snap.username, d["thread_id"]))
-        return snap
+                    self.store.execute("UPDATE threads SET username = ? WHERE id = ?", (chat.username, d["thread_id"]))
+        return chat
 
-    def _open_by_name(self, name: str):
-        """Chats whose username the download didn't give: find the row with their name in your inbox."""
-        web = self.web
-        site = web.site
-        web._open_inbox()
-
-        def find():
-            target = _norm(name)
-            for _ in range(6):
-                rows = web._visible(site.thread_rows())
-                for r in rows.all()[:60]:
-                    if _norm(r.evaluate(web.ROW_TEXT_JS)).startswith(target):
-                        r.click()
-                        web._pause()
-                        web.page.wait_for_url(re.compile(r"/direct/t/[^/]+"), timeout=web.sup.cfg.action_timeout_ms)
-                        return re.search(r"/direct/t/([^/]+)", web.page.url).group(1)
-                if rows.count():
-                    rows.last.hover()
-                    web.page.mouse.wheel(0, 2000)
-                    web.page.wait_for_timeout(1500)
-            raise PermissionRestricted(f"{name}: couldn't find this chat in your inbox (it may be old or a message request)")
-        key = web.sup.run(f"find chat {name}", find)
-        return web._read_open_thread(key)
-
-    def _still_current(self, d: dict, snap) -> tuple | None:
+    def _still_current(self, d: dict, chat) -> tuple | None:
         """None if it's fine to send the reply; otherwise (status, note, log kind)."""
-        if snap.messages and snap.messages[-1].direction == "out":
+        if chat.last_is_mine:
             return "skipped", "you've replied to them since the download", "info"
-        incoming = [m.text for m in snap.messages if m.direction == "in"]
-        if not incoming:
-            return "draft", "couldn't read their messages on the page, so it didn't send; have a look", "warn"
+        if chat.empty or not (chat.their_last or chat.their_recent):
+            return "draft", "couldn't see their messages in the chat, so it didn't send; have a look", "warn"
         if d["replying_to"].startswith("["):         # a photo or post: no text to compare, the side is enough
             return None
-        if _norm(incoming[-1]) == _norm(d["replying_to"]):
+        if similar(chat.their_last, d["replying_to"]):
             return None
-        if any(_norm(t) == _norm(d["replying_to"]) for t in incoming):
+        if any(similar(t, d["replying_to"]) for t in chat.their_recent):
             return "draft", "they've written again since the download; check the reply still fits", "info"
         return "draft", "their last message on Instagram doesn't match the download, so it didn't send; have a look", "warn"
 
@@ -296,7 +295,7 @@ class Sender:
         tries = (draft or unfollow or {}).get("tries", 1)
         shot = "data/diagnostics"
         try:
-            self.web.sup.save_screenshot("sender-problem")
+            self.web.save_screenshot("sender-problem")
         except Exception:
             pass
         if tries >= 2:

@@ -79,6 +79,9 @@ def create_site(world: MockWorld) -> FastAPI:
               const d = document.createElement('div'); d.dataset.testid = 'message'; d.dataset.direction = 'out';
               d.dataset.messageId = j.id; d.textContent = text; document.getElementById('msgs').appendChild(d); box.innerText = '';
             }}
+            // Like Instagram: Enter in the message box sends.
+            document.querySelector('[role=textbox]').addEventListener('keydown', e => {{
+              if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); send(); }} }});
             </script>""", "Thread")
 
     @app.post("/api/unfollow")

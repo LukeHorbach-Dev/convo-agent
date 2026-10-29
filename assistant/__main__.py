@@ -75,15 +75,19 @@ def cmd_check(args) -> int:
     from .store import Store
     s = AssistantSettings()
     store = Store(s.db_path)
-    web = Assistant(s, store=store, notify=lambda *a: None)._instagram()
     try:
-        report = run_check(web, store)
+        hands = Assistant(s, store=store, notify=lambda *a: None)._instagram()
+    except Exception as e:
+        print(e)
+        return 1
+    try:
+        report = run_check(hands, store)
     finally:
-        web.close()
+        hands.close()
     out = s.data_dir / "diagnostics" / "check.txt"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(report + "\n")
-    print(report.split("\n\n== ")[0])
+    print(report.split("\n== ")[0].rstrip())
     print(f"\nFull report: {out}")
     return 0 if "FAIL" not in report else 1
 

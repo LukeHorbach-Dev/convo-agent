@@ -19,6 +19,13 @@ class Pace(BaseModel):
     daily_unfollows: int = Field(60, ge=0, le=300)
 
 
+class Eyes(BaseModel):
+    # The model that looks at Instagram's page and clicks. Haiku keeps it to about a cent per message or unfollow;
+    # Sonnet is steadier on odd pages and costs roughly twenty times as much.
+    model: str = Field("claude-haiku-5-5", pattern=r"^claude-(haiku|sonnet|opus)-[0-9-]+$")
+    effort: str = Field("medium", pattern="^(low|medium|high)$")
+
+
 class AssistantSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AGENT_", env_nested_delimiter="__", env_file=".env", extra="ignore")
 
@@ -30,6 +37,7 @@ class AssistantSettings(BaseSettings):
     llm: LLMConfig = LLMConfig()
     browser: BrowserConfig = BrowserConfig()
     pace: Pace = Pace()
+    eyes: Eyes = Eyes()
     reply_window_days: int = Field(90, ge=1)     # only draft replies for chats where they wrote in this window
     min_age: int = 19
     dashboard_port: int = 8765

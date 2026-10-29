@@ -26,6 +26,15 @@ a fix is ever undone.
 | 18 | Check step 2: "1,765 following" not found | The number and the word are separate pieces of the page, so no single link or label reads "1,765 following" | A small page script finds the number followed by the word, however it is split (also with a non-breaking space), and clicks its clickable parent | mock splits the count into pieces; a test on the live shape |
 | 19 | v2 check step 3: chat opened, but "0" other people found | The address changes before the conversation pane draws its profile links; the app read the pane too early | Reading a chat now waits (up to the page-ready time) until the pane names exactly one other person; profile links are matched with any ?query removed, plus the pane's "Open the profile page of" links. The unfollow check now says "skipped" when you don't follow the person it borrowed from step 3 | test for profile links with a query |
 
+## Version 3: why the website part was rebuilt
+
+Issues 1 to 19 all have the same cause: the app found buttons, lists and chats by Instagram's hidden page code,
+which differs from the practice site and changes without notice. Version 3 stops depending on it. Claude looks at
+a picture of the page and clicks (assistant/eyes.py), so a moved or renamed button is just a different place to
+click. The app keeps the parts that need to be exact: it opens addresses itself, checks that a reported chat is
+really a chat page and has the selected message box, types only the approved text, checks it letter for letter,
+presses Enter, and checks the message appeared. Claude's own tools have no typing and no Enter.
+
 ## Self-check
 
 `bash check.sh` (or `python -m agent check --platform instagram`) runs every step above on the live account:

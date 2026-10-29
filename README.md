@@ -1,9 +1,15 @@
-# Instagram assistant (version 2)
+# Instagram assistant (version 3)
 
-Version 2 reads **Instagram's own data download** instead of reading the website, so it always knows exactly who
-you follow, who follows you, and every conversation. The AI (Claude, with your API key) writes hellos and replies
-in your voice, sorts chats into "you'd click", "worth a closer look" and the rest, and remembers what people told
-you. The website is only used for the two things that need it: **sending what you approved** and **unfollowing**.
+The assistant reads **Instagram's own data download** to know exactly who you follow, who follows you, and every
+conversation. The AI (Claude, with your API key) writes hellos and replies in your voice, sorts chats into "you'd
+click", "worth a closer look" and the rest, and remembers what people told you.
+
+**New in version 3: Claude uses the website the way you do.** Earlier versions clicked Instagram's pages by their
+hidden code, which broke whenever Instagram changed it. Now, for each message or unfollow, Claude looks at a picture
+of the page and clicks (assistant/eyes.py). Claude can't type and never presses Enter: the app types the exact
+message you approved, checks it letter for letter in the message box, and only then sends it and checks it
+appeared. This costs about 1 US cent per message or unfollow with Claude Haiku (Settings can switch to Sonnet:
+steadier on unusual pages, about 10 to 20 cents each).
 
 **Nothing is sent until you approve it.** Approving can be one tap for a whole batch ("Approve all ready ones",
 "Approve all hellos"); replies the AI flags still need you one by one.
@@ -21,7 +27,8 @@ you. The website is only used for the two things that need it: **sending what yo
 ```bash
 bash setup-mac.sh     # install (copies your sign-in from ../convo-agent-old if present)
 bash login.sh         # sign in to Instagram in the assistant's browser
-bash check.sh         # try every website step without sending anything; send Claude data/diagnostics/check.txt
+bash check.sh         # Claude tries every website step without sending anything (about 5 cents);
+                      # send Claude data/diagnostics/check.txt
 bash start.sh         # start the assistant and open the dashboard
 bash update.sh        # install a newer zip from Downloads, keeping your data
 ```
@@ -30,13 +37,14 @@ bash update.sh        # install a newer zip from Downloads, keeping your data
 
 Each problem is sorted into: **try later** (Instagram didn't load: waits 10 minutes), **skip this person** (private,
 gone, can't be messaged), **take a break** (Instagram said "try again later": 6 hours), or **stop and tell you**
-(sign in again, or the page looked different three times in a row). Before every reply it checks it's the right
+(sign in again, the AI key or credit needs looking at, or Claude couldn't finish three times in a row). Before every reply it checks it's the right
 chat, that they haven't written again since the download, and that you haven't already answered; before every
 hello it checks the chat is empty. Daily numbers (messages, unfollows) and the gaps between them are in Settings.
 
 ## Costs
 
-Hellos use your own wording and cost nothing. Each reply is one AI call: about 1 to 3 US cents.
+Hellos use your own wording and cost nothing to write. Writing each reply is one AI call: about 1 to 3 US cents.
+Sending each message or unfollowing someone: about 1 cent (Claude looking at the page and clicking).
 
 ---
 
