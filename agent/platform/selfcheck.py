@@ -64,6 +64,8 @@ def self_check(web: WebPlatform, settle_ms: int = 3000) -> str:
         snap = web._read_open_thread(key)
         web._visible(site.composer()).first.wait_for(state="visible", timeout=web.sup.cfg.action_timeout_ms)
         ins = sum(m.direction == "in" for m in snap.messages)
+        # A chat from the inbox has messages; reading none would mean hellos could go into existing chats.
+        assert snap.messages, "this chat has messages but the app read none"
         return f"with @{snap.username}: {ins} from them, {len(snap.messages) - ins} from you; message box found"
     step("4 open a conversation", conversation, [site.thread_ready(), site.thread_username(), site.composer()])
 

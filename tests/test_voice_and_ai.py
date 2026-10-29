@@ -74,3 +74,20 @@ def test_notifier_announces_new_waiting_messages_once(world, db, llm):
     app.engine.controls.pause("Instagram wants you to sign in again", "system")
     n.check()
     assert banners[-1] == "Paused: Instagram wants you to sign in again"
+
+
+def test_waiting_banner_is_not_repeated_while_hellos_are_prepared(world, db, llm):
+    from agent.app import build_app
+    from agent.core.config import Mode
+    from agent.notify import Notifier
+    from agent.platform.mock import MockPlatform
+    from .conftest import make_settings
+
+    class Realish(MockPlatform):
+        is_real = True
+    app = build_app(make_settings(mode=Mode.EXECUTE), db=db, platform=Realish(world), world=world, llm=llm)
+    banners = []
+    n = Notifier(app.db, app.engine.controls, send=lambda t, x: banners.append(x))
+    for name in ("a1", "b2", "c3"):
+        world.new_follower(name); app.engine.run_once(); n.check()
+    assert banners == ["1 message waiting for your OK"]

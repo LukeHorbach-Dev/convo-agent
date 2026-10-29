@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 
 log = logging.getLogger("notify")
 
@@ -30,14 +31,18 @@ class Notifier:
         self.db, self.controls, self.every_s, self.send = db, controls, every_s, send
         self._stop = threading.Event()
         self._last = {"waiting": 0, "stuck": 0, "paused": False}
+        self._waiting_told_at = 0.0
+        self.quiet_s = 30 * 60          # at most one "waiting" banner per half hour, unless the list was empty
 
     def check(self) -> None:
         waiting = self.db.scalar("SELECT COUNT(*) FROM jobs WHERE state IN ('awaiting_approval', 'needs_review') "
                                  "AND kind IN ('intro', 'reply')")
         stuck = self.db.scalar("SELECT COUNT(*) FROM outbox WHERE state = 'unknown'")
         paused = self.controls.run_state.value != "running" or self.controls.emergency_stopped
-        if waiting > self._last["waiting"]:
+        now = time.monotonic()
+        if waiting > self._last["waiting"] and (self._last["waiting"] == 0 or now - self._waiting_told_at > self.quiet_s):
             self.send("Conversation Agent", f"{waiting} message{'s' if waiting != 1 else ''} waiting for your OK")
+            self._waiting_told_at = now
         if stuck > self._last["stuck"]:
             self.send("Conversation Agent", "Not sure if a message went through, have a look")
         if paused and not self._last["paused"]:

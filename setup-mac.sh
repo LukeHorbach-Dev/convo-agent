@@ -14,8 +14,11 @@ command -v uv >/dev/null || { echo "uv is not installed or not on PATH. Open a n
 if [ -d "$OLD" ]; then
   step "Copying your personal files from $OLD"
   mkdir -p data
+  # Files that came in the new zip are newer (e.g. the voice profile); only fill in what's missing.
   for f in data/profile.json data/never.txt data/intro-list.txt data/dashboard-token; do
-    if [ -f "$OLD/$f" ]; then cp -p "$OLD/$f" "$f"; echo "  copied $f"; else echo "  (no $f in the old folder)"; fi
+    if [ -f "$f" ]; then echo "  kept the new $f"
+    elif [ -f "$OLD/$f" ]; then cp -p "$OLD/$f" "$f"; echo "  copied $f"
+    else echo "  (no $f in the old folder)"; fi
   done
   if [ -d "$OLD/data/browser-profile" ]; then
     cp -R "$OLD/data/browser-profile" data/browser-profile

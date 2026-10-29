@@ -58,7 +58,7 @@ class LimitsConfig(BaseModel):
     queue_capacity: int = Field(5_000, ge=1)
     consecutive_account_failures: int = Field(2, ge=1)  # per-account, before skipping
     daily_send_limit: int = Field(25, ge=0)
-    max_waiting_intros: int = Field(10, ge=1)   # hellos prepared ahead of your approval; the rest wait their turn
+    max_waiting_intros: int = Field(25, ge=1)   # hellos prepared ahead of your approval; the rest wait their turn
     # Unfollows you ask for are carried out at most this many per 24 hours; the rest wait their turn. Instagram
     # blocks accounts that unfollow too many people at once.
     daily_unfollow_limit: int = Field(50, ge=0)
