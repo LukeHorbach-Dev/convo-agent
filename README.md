@@ -45,6 +45,17 @@ and `data/intro-list.txt` (people to introduce yourself to) are personal and git
 It keeps your sign-in, lists, history and settings, and prints the new version. Problems found on the live account
 and how each is guarded against: [docs/LIVE_ISSUES.md](docs/LIVE_ISSUES.md).
 
+**If something gets stuck:** stop the app and run `bash check.sh`. It tries every step on your account without
+sending anything or unfollowing anyone, and writes `data/diagnostics/check.txt` to send to Claude.
+
+**Unfollowing:** the dashboard's "People you follow" list has Unfollow selected and Unfollow everyone (type
+UNFOLLOW EVERYONE to confirm). At most `AGENT_LIMITS__DAILY_UNFOLLOW_LIMIT` (50) per 24 hours; unsent hellos to
+those people are cancelled.
+
+**Replies in your style:** paste an Anthropic API key in the dashboard ("Replies in your style"). It's saved in
+`.env` on your Mac only. Replies then use your profile, your rules and what you've written in your own chats.
+Without a key, reply boxes are left empty for you to type.
+
 **Everyday use:** `bash start.sh`. It starts the agent on Instagram and opens the dashboard, already logged in.
 Stop with Control + C.
 
@@ -76,7 +87,7 @@ immediately and survives restarts until you clear it.
 ## Test
 
 ```bash
-.venv/bin/python -m pytest                      # everything (about 2 minutes, 232 tests)
+.venv/bin/python -m pytest                      # everything (about 2 minutes, 238 tests)
 .venv/bin/python -m pytest -m "not browser"     # skip the real-Chromium tests
 CHAOS_SEEDS=300 .venv/bin/python -m pytest tests/test_chaos.py   # longer randomized fault run
 ```

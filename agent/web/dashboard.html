@@ -71,6 +71,20 @@
   <h2>Recently sent</h2>
   <div id="sent"></div>
 
+  <h2>People you follow</h2>
+  <div class="card">
+    <div class="row"><input id="fq" placeholder="Search a name" oninput="loadFollowing(0)" style="flex:1;font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
+      <button onclick="unfollowSelected()">Unfollow selected</button>
+      <button class="danger" onclick="unfollowEveryone()">Unfollow everyone</button></div>
+    <p class="muted" id="unf"></p>
+    <div id="flist"></div>
+    <div class="row"><button id="fprev" onclick="loadFollowing(FOFF - 50)">Previous</button><button id="fnext" onclick="loadFollowing(FOFF + 50)">Next</button>
+      <span class="muted" id="fpage"></span></div>
+  </div>
+
+  <h2>Replies in your style</h2>
+  <div class="card" id="ai"></div>
+
   <p class="muted" id="ver"></p>
   <details><summary>Technical details (for troubleshooting)</summary>
     <h3>Health</h3><table id="health"></table>
@@ -139,6 +153,40 @@ async function approveAll() {
   if (r.refused) alert(`${r.approved} sent to the queue. ${r.refused} could not be approved; they stay on the page.`);
 }
 const isHello = d => d.job_state === 'awaiting_approval' && (JSON.parse(d.context || '{}').kind === 'intro');
+let FOFF = 0;
+async function loadFollowing(off) {
+  FOFF = Math.max(0, off || 0);
+  const q = encodeURIComponent(document.getElementById('fq').value || '');
+  const r = await api(`/api/following?q=${q}&offset=${FOFF}`);
+  const label = it => it.unfollow === 'completed' ? '<span class="muted">unfollowed</span>' :
+    it.unfollow ? '<span class="muted">unfollow waiting</span>' :
+    it.intro_status === 'sent' ? '<span class="muted">hello sent</span>' : '';
+  document.getElementById('flist').innerHTML = r.items.length ? r.items.map(it =>
+    `<label class="row" style="margin:2px 0"><input type="checkbox" class="fsel" data-u="${esc(it.username)}"> @${esc(it.username)} ${label(it)}</label>`).join('')
+    : '<p class="muted">Nobody yet. The list fills in after the app reads your Following list.</p>';
+  document.getElementById('fpage').textContent = r.total ? `${FOFF + 1}–${Math.min(FOFF + 50, r.total)} of ${r.total}` : '';
+  document.getElementById('fprev').disabled = FOFF === 0; document.getElementById('fnext').disabled = FOFF + 50 >= r.total;
+}
+async function unfollowSelected() {
+  const names = [...document.querySelectorAll('.fsel:checked')].map(e => e.dataset.u);
+  if (!names.length) return alert('Tick the people to unfollow first.');
+  if (!confirm(`Unfollow ${names.length} ${names.length === 1 ? 'person' : 'people'}? This can't be undone from here.`)) return;
+  const r = await api('/api/unfollow', {method:'POST', body: JSON.stringify({usernames: names})});
+  alert(`${r.queued} added to the unfollow queue.`); refresh(); loadFollowing(FOFF);
+}
+async function unfollowEveryone() {
+  const n = S ? S.summary.following : 0;
+  const typed = prompt(`This unfollows all ${n} people you follow (${S ? S.summary.daily_unfollow_limit : 50} a day, so Instagram doesn't block you). ` +
+                       `It can't be undone from here, and it also cancels hellos that haven't been sent.\n\nType UNFOLLOW EVERYONE to confirm:`);
+  if (typed === null) return;
+  const r = await api('/api/unfollow', {method:'POST', body: JSON.stringify({everyone: true, confirm: typed.trim()})});
+  alert(`${r.queued} added to the unfollow queue.`); refresh(); loadFollowing(FOFF);
+}
+async function saveKey() {
+  const key = document.getElementById('aikey').value.trim(); if (!key) return;
+  await api('/api/settings/ai-key', {method:'POST', body: JSON.stringify({key})});
+  document.getElementById('aikey').value = ''; alert('Saved. New replies will be written in your style.'); refresh();
+}
 async function reject(id) { await api(`/api/drafts/${id}/reject`, {method:'POST', body:'{}'}); refresh(); }
 async function resolve(id, delivered) { await api(`/api/outbox/${id}/resolve`, {method:'POST', body: JSON.stringify({delivered})}); refresh(); }
 async function jobAct(id, a) { await api(`/api/jobs/${id}/${a}`, {method:'POST'}); refresh(); }
@@ -198,6 +246,18 @@ async function refresh() {
   const [s, h] = await Promise.all([api('/api/status'), api('/api/health')]);
   S = s; const sum = s.summary;
   document.getElementById('ver').textContent = 'Version ' + s.version;
+  document.getElementById('unf').textContent = (sum.unfollowed_total || sum.unfollows_waiting) ?
+    `Unfollowed ${sum.unfollowed_total} so far (${sum.unfollowed_today} in the last 24 hours, limit ${sum.daily_unfollow_limit}). ${sum.unfollows_waiting} waiting their turn.` : '';
+  if (!document.getElementById('ai').dataset.done || document.getElementById('ai').dataset.provider !== s.ai.provider) {
+    const el = document.getElementById('ai'); el.dataset.done = '1'; el.dataset.provider = s.ai.provider;
+    el.innerHTML = s.ai.provider === 'anthropic'
+      ? '<p>✅ On. Replies are drafted by AI from your profile, your rules and the way you write in your chats. You still check each one.</p>'
+      : `<p>Off. Reply boxes are left empty for you to type. To get replies written the way you write, paste an Anthropic API key
+         (from console.anthropic.com → API keys). It's stored only on this Mac.</p>
+         <div class="row"><input id="aikey" type="password" placeholder="sk-ant-..." autocomplete="off"
+           style="flex:1;font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
+         <button class="go" onclick="saveKey()">Save key</button></div>`;
+  }
   statusBox(s);
   const hellos = s.drafts.filter(isHello).length;
   document.getElementById('drafts').innerHTML = s.drafts.length ?
@@ -210,7 +270,7 @@ async function refresh() {
     [`${sum.sent_today} of ${sum.daily_limit}`, 'sent in the last 24 hours'],
     [sum.hellos_waiting_turn, 'hellos waiting their turn'],
     [sum.hellos_sent, 'hellos sent so far'],
-    [sum.on_list, list.toLowerCase() + ' (read so far)'],
+    [sum.audience === 'following' ? sum.following : sum.on_list, list.toLowerCase() + ' (read so far)'],
   ].map(([n, l]) => `<div class="num"><b>${esc(n)}</b>${esc(l)}</div>`).join('');
   const sent = s.outbox.filter(o => o.state === 'sent').slice(0, 10);
   document.getElementById('sent').innerHTML = sent.length ? sent.map(o =>
@@ -231,7 +291,7 @@ async function refresh() {
     ['Decision', r => esc(r.decision)], ['Reason', r => esc((JSON.parse(r.detail || '{}')).reason || '')]], s.recovery);
   table('journal', [['Who', r => esc(r.target || '')], ['Note', r => esc(r.observation)], ['Basis', r => esc(r.basis)]], s.journal);
 }
-async function boot() { if (!TOKEN) return show(false); try { await refresh(); show(true); setInterval(refresh, 3000); } catch (e) { show(false); } }
+async function boot() { if (!TOKEN) return show(false); try { await refresh(); show(true); loadFollowing(0); setInterval(refresh, 3000); } catch (e) { show(false); } }
 boot();
 </script>
 </body>

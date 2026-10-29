@@ -50,6 +50,7 @@ class MockWorld:
         self._ids = itertools.count(1)
         self.lock = threading.RLock()
         self.sent_log: list[tuple[str, str]] = []   # ground truth of every delivered outbound message
+        self.unfollowed: set[str] = set()           # accounts the operator had the agent unfollow
 
     def next_id(self, prefix: str) -> str:
         return f"{prefix}{next(self._ids)}"
@@ -189,6 +190,14 @@ class MockPlatform:
         with self.w.lock:
             msgs = self.w.threads.get(thread_key, {}).get("messages", [])
             return "found" if any(m["dir"] == "out" and m["text"] == text and m["at"] >= since_iso for m in msgs) else "absent"
+
+    def unfollow(self, username: str) -> str:
+        self._gate()
+        with self.w.lock:
+            if username in self.w.unfollowed:
+                return "not_following"
+            self.w.unfollowed.add(username)
+            return "unfollowed"
 
     def close(self) -> None:
         pass

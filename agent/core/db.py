@@ -73,6 +73,11 @@ class Database:
                 self.before_write(sql)
             return self._conn.execute(sql, params)
 
+    def executemany(self, sql: str, rows: list) -> sqlite3.Cursor:
+        with self._lock:
+            self.before_write(sql)
+            return self._conn.executemany(sql, rows)
+
     def one(self, sql: str, params: tuple | dict = ()) -> sqlite3.Row | None:
         return self.execute(sql, params).fetchone()
 

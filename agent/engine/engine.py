@@ -128,6 +128,10 @@ class Engine:
         # An inferred list is newest first, so new followers come before everyone already known. Unknown names
         # further down are older followers that scrolled into view (e.g. after an unfollow), not new ones.
         past_known = False
+        if self.s.policy.audience == "following":
+            with self.db.transaction():
+                self.db.executemany("UPDATE accounts SET i_follow = 'yes' WHERE username = ? AND unfollowed_at IS NULL",
+                                    [(o.username,) for o in observations])
         for obs in observations:
             dedup = f"event:{obs.event_id}" if obs.event_id else f"{obs.source}:{obs.username}"
             with self.db.transaction():
@@ -139,6 +143,8 @@ class Engine:
                     past_known = True
                     continue
                 acct = self._upsert_account(obs.username, obs.display_name, obs.platform_id, follower_source=obs.source)
+                if self.s.policy.audience == "following":
+                    self.db.execute("UPDATE accounts SET i_follow = 'yes' WHERE id = ?", (acct["id"],))
                 n += 1
                 if baseline or (by_followers and past_known and obs.source == "inferred"):
                     self.db.execute("UPDATE accounts SET intro_status = CASE WHEN intro_status = 'none' THEN 'skipped' ELSE intro_status END, "
@@ -297,6 +303,8 @@ class Engine:
                 self._handle_intro(job)
             elif job.kind == "reply":
                 self._handle_reply(job)
+            elif job.kind == "unfollow":
+                self._handle_unfollow(job)
             else:
                 raise DataIntegrityError(f"unknown job kind {job.kind}")
             self.circuit.record_success()
@@ -398,7 +406,7 @@ class Engine:
             "SELECT direction, text FROM messages WHERE conversation_id = ? ORDER BY rowid", (conv["id"],))]
         memory = [f"{r['kind']}: {r['content']}" for r in self.db.all(
             "SELECT kind, content FROM memory WHERE target = ? ORDER BY created_at", (acct["username"],))]
-        outcome = self.drafter.draft_reply(history, memory)
+        outcome = self.drafter.draft_reply(history, memory, self._own_messages())
         self.jobs.heartbeat(job.id, self.owner)
         with self.db.transaction():
             self._remember(acct["username"], "their_statement", incoming, f"message:{target_id}", 1.0)
@@ -408,6 +416,12 @@ class Engine:
         self._decide_delivery(job, target=acct["username"], thread_key=thread_key, outcome=outcome,
                               context={"kind": "reply", "replying_to": target_id, "history_tail": history[-6:], **outcome.plain},
                               account_id=acct["id"], conv_id=conv["id"], message_id=target_id)
+
+    def _own_messages(self, n: int = 40) -> list[str]:
+        """What he wrote himself in his chats (not messages the agent sent), newest first: style examples."""
+        return [r["text"] for r in self.db.all(
+            "SELECT text FROM messages WHERE direction = 'out' AND text NOT IN (SELECT text FROM outbox) "
+            "ORDER BY observed_at DESC, rowid DESC LIMIT ?", (n,))]
 
     def _finish_without_reply(self, job: Job, conv, message_id: str, reason: str) -> None:
         with self.db.transaction():
@@ -839,6 +853,53 @@ class Engine:
             if job.kind == "intro":
                 self._mark_intro(job, "pending")
             self.db.audit(actor, "approve_draft", {"draft": draft_id, "edited": text is not None and final != d["text"]})
+
+    # ------------------------------------------------------------------ unfollowing
+    def request_unfollow(self, usernames: list[str], actor: str = "operator") -> dict:
+        """Queue unfollows you asked for. They run at most limits.daily_unfollow_limit per 24 hours, and any hello
+        to those people that hasn't been sent yet is cancelled."""
+        out = {"queued": 0, "already_queued": 0, "unknown": 0}
+        for u in usernames:
+            acct = self.db.one("SELECT * FROM accounts WHERE username = ?", (u.strip().lstrip("@").lower(),))
+            if acct is None or acct["i_follow"] == "no":
+                out["unknown"] += 1
+                continue
+            if self.jobs.enqueue("unfollow", acct["username"], f"unfollow:{acct['id']}", {"account_id": acct["id"]}) is None:
+                out["already_queued"] += 1
+                continue
+            out["queued"] += 1
+            self._cancel_hello(acct, "you asked to unfollow this person")
+        self.db.audit(actor, "request_unfollow", out)
+        return out
+
+    def _cancel_hello(self, acct, reason: str) -> None:
+        """Cancel a hello to this account that hasn't been attempted (queued, waiting for you, or parked)."""
+        for job in self.db.all("SELECT id, state FROM jobs WHERE kind = 'intro' AND subject_key = ? AND state IN "
+                               "('queued', 'awaiting_approval', 'needs_review', 'blocked', 'retry_scheduled')", (acct["username"],)):
+            with self.db.transaction():
+                ob = self._existing_outbox(job["id"])
+                if ob and ob["state"] == OutboxState.PENDING.value:
+                    self._outbox_state(ob["id"], OutboxState.CANCELLED)
+                self.db.execute("UPDATE drafts SET status = 'superseded' WHERE job_id = ? AND status = 'pending'", (job["id"],))
+                self.jobs.transition(job["id"], J.CANCELLED, reason)
+                self.db.execute("UPDATE accounts SET intro_status = 'skipped', updated_at = ? WHERE id = ?", (iso(), acct["id"]))
+
+    def _handle_unfollow(self, job: Job) -> None:
+        acct = self.db.one("SELECT * FROM accounts WHERE id = ?", (job.payload["account_id"],))
+        done_today = self.db.scalar("SELECT COUNT(*) FROM accounts WHERE unfollowed_at >= ?", (iso(now() - timedelta(days=1)),))
+        if done_today >= self.s.limits.daily_unfollow_limit:
+            self._step(job, J.BLOCKED, f"daily unfollow limit ({self.s.limits.daily_unfollow_limit}) reached; continues later",
+                       run_after=iso(now() + timedelta(hours=6)))
+            return
+        self._step(job, J.INSPECTING, "unfollowing")
+        self.controls.guard("unfollow")
+        self._verify_identity()
+        result = self.platform.unfollow(acct["username"])
+        with self.db.transaction():
+            self.db.execute("UPDATE accounts SET i_follow = 'no', unfollowed_at = ?, updated_at = ? WHERE id = ?",
+                            (iso(), iso(), acct["id"]))
+            self._step(job, J.COMPLETED, "unfollowed" if result == "unfollowed" else "you already weren't following them")
+            self.db.audit("system", "unfollowed", {"account": acct["id"], "result": result})
 
     def reject_draft(self, draft_id: str, actor: str = "operator") -> None:
         with self.db.transaction():

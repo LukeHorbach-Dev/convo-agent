@@ -138,3 +138,33 @@ def test_send_all_hellos_approves_only_the_hellos_shown(world, llm, db):
     assert (r["approved"], r["refused"]) == (2, 1)
     settle(app.engine, 3)
     assert sorted(u for u, _ in world.sent_log) == ["mia", "noah"]          # zoe wasn't shown/approved
+
+
+def test_unfollow_everyone_needs_the_typed_confirmation(world, llm, db):
+    s = make_settings(mode=Mode.EXECUTE); s.policy.audience = "following"
+    app = build_app(s, db=db, platform=RealishPlatform(world), world=world, llm=llm)
+    c = TestClient(create_dashboard(app, TOKEN), base_url="http://127.0.0.1")
+    for n in ("mia", "noah"):
+        world.new_follower(n)
+    app.engine.run_once()
+    assert c.get("/api/following?q=mi", headers=H).json()["total"] == 1
+    assert c.post("/api/unfollow", headers=H, json={"everyone": True, "confirm": "yes"}).status_code == 400
+    r = c.post("/api/unfollow", headers=H, json={"everyone": True, "confirm": "UNFOLLOW EVERYONE"}).json()
+    assert r["queued"] == 2
+    # their hellos that weren't sent are cancelled, never sent afterwards
+    settle(app.engine, 3)
+    assert world.sent_log == [] and world.unfollowed == {"mia", "noah"}
+
+
+def test_ai_key_is_saved_locally_and_switches_replies_on(world, llm, db, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    app = build_app(make_settings(mode=Mode.EXECUTE), db=db, platform=RealishPlatform(world), world=world, llm=llm)
+    c = TestClient(create_dashboard(app, TOKEN), base_url="http://127.0.0.1")
+    assert c.post("/api/settings/ai-key", headers=H, json={"key": "not-a-key"}).status_code == 400
+    key = "sk-ant-api03-" + "x" * 40
+    assert c.post("/api/settings/ai-key", headers=H, json={"key": key}).status_code == 200
+    env = (tmp_path / ".env")
+    assert f"AGENT_LLM__API_KEY={key}" in env.read_text() and oct(env.stat().st_mode & 0o777) == "0o600"
+    s = c.get("/api/status", headers=H).json()
+    assert s["ai"] == {"provider": "anthropic", "manual_replies": False}
+    assert key not in c.get("/api/diagnostics", headers=H).text

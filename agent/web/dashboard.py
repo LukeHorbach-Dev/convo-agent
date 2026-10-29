@@ -10,6 +10,7 @@ from __future__ import annotations
 import hmac
 import json
 import platform as pyplatform
+import re
 import secrets
 import time
 from datetime import timedelta
@@ -18,7 +19,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 
 from .. import __version__
 from ..app import App
@@ -46,6 +47,16 @@ class ApproveAllBody(BaseModel):
 
 class ApproveBody(BaseModel):
     text: str | None = None
+
+
+class UnfollowBody(BaseModel):
+    usernames: list[str] = []
+    everyone: bool = False
+    confirm: str = ""
+
+
+class KeyBody(BaseModel):
+    key: str
 
 
 class ResolveBody(BaseModel):
@@ -139,7 +150,13 @@ def create_dashboard(app: App, token: str, scheduler=None) -> FastAPI:
             "journal": rows(db, "SELECT target, observation, basis, uncertainty, created_at FROM journal ORDER BY created_at DESC LIMIT 30"),
             "metrics": metrics.snapshot(),
             "version": __version__,
-            "summary": {
+            "summary": summary(),
+            "ai": {"provider": getattr(engine.drafter.llm, "name", "?"), "manual_replies": engine.drafter.manual_replies},
+        }
+
+    def summary() -> dict:
+        lim = app.settings.limits
+        return {
                 "audience": app.settings.policy.audience,
                 "sent_today": db.scalar("SELECT COUNT(*) FROM outbox WHERE state = 'sent' AND updated_at >= ?",
                                         (iso(now() - timedelta(days=1)),)),
@@ -148,8 +165,54 @@ def create_dashboard(app: App, token: str, scheduler=None) -> FastAPI:
                 "hellos_waiting_turn": db.scalar("SELECT COUNT(*) FROM jobs WHERE kind = 'intro' AND state = 'queued'"),
                 "hellos_sent": db.scalar("SELECT COUNT(*) FROM accounts WHERE intro_status = 'sent'"),
                 "list_checked_at": db.get_state("list_checked_at"),
-            },
+                "following": db.scalar("SELECT COUNT(*) FROM accounts WHERE i_follow = 'yes'"),
+                "unfollowed_today": db.scalar("SELECT COUNT(*) FROM accounts WHERE unfollowed_at >= ?", (iso(now() - timedelta(days=1)),)),
+                "unfollows_waiting": db.scalar("SELECT COUNT(*) FROM jobs WHERE kind = 'unfollow' AND state IN ('queued', 'blocked', 'retry_scheduled')"),
+                "unfollowed_total": db.scalar("SELECT COUNT(*) FROM accounts WHERE unfollowed_at IS NOT NULL"),
+                "daily_unfollow_limit": lim.daily_unfollow_limit,
         }
+
+    @api.get("/api/following", dependencies=[Depends(auth)])
+    def following(q: str = "", offset: int = 0, limit: int = 50):
+        """People you follow, as read from your Following list (newest first), with any hello or unfollow state."""
+        like = f"%{q.strip().lstrip('@').lower()}%"
+        where = "a.i_follow = 'yes' AND a.username LIKE ?"
+        total = db.scalar(f"SELECT COUNT(*) FROM accounts a WHERE {where}", (like,))
+        items = rows(db, f"""SELECT a.username, a.display_name, a.intro_status,
+                (SELECT state FROM jobs j WHERE j.kind = 'unfollow' AND j.subject_key = a.username ORDER BY created_at DESC LIMIT 1) unfollow
+                FROM accounts a WHERE {where} ORDER BY a.first_seen_at, a.rowid LIMIT ? OFFSET ?""", (like, min(limit, 200), max(offset, 0)))
+        return {"total": total, "items": items}
+
+    @api.post("/api/unfollow", dependencies=[Depends(auth)])
+    def unfollow(body: UnfollowBody):
+        if body.everyone:
+            if body.confirm != "UNFOLLOW EVERYONE":
+                raise HTTPException(400, 'type UNFOLLOW EVERYONE to confirm')
+            names = [r["username"] for r in db.all("SELECT username FROM accounts WHERE i_follow = 'yes'")]
+        else:
+            names = body.usernames
+        out = engine.request_unfollow(names)
+        wake()
+        return out
+
+    @api.post("/api/settings/ai-key", dependencies=[Depends(auth)])
+    def set_ai_key(body: KeyBody):
+        """Save an Anthropic API key in .env (local, owner-only) and switch replies to the model right away."""
+        key = body.key.strip()
+        if not re.fullmatch(r"sk-ant-[A-Za-z0-9_\-]{20,}", key):
+            raise HTTPException(400, "that doesn't look like an Anthropic API key (it starts with sk-ant-)")
+        from ..intel.llm import build_provider
+        env = Path(".env")
+        lines = [l for l in (env.read_text().splitlines() if env.exists() else [])
+                 if not l.startswith(("AGENT_LLM__PROVIDER=", "AGENT_LLM__API_KEY="))]
+        env.write_text("\n".join(lines + ["AGENT_LLM__PROVIDER=anthropic", f"AGENT_LLM__API_KEY={key}"]) + "\n")
+        env.chmod(0o600)
+        app.settings.llm.provider = "anthropic"
+        app.settings.llm.api_key = SecretStr(key)
+        engine.drafter.llm = build_provider(app.settings.llm)
+        engine.drafter.manual_replies = False
+        db.audit("operator", "ai_key_set", {})
+        return {"ok": True}
 
     @api.post("/api/control/{action}", dependencies=[Depends(auth)])
     def control(action: str):
@@ -246,16 +309,6 @@ def create_dashboard(app: App, token: str, scheduler=None) -> FastAPI:
             "recovery": rows(db, "SELECT * FROM recovery_events ORDER BY id DESC LIMIT 100"),
             "metrics": metrics.snapshot(),
             "version": __version__,
-            "summary": {
-                "audience": app.settings.policy.audience,
-                "sent_today": db.scalar("SELECT COUNT(*) FROM outbox WHERE state = 'sent' AND updated_at >= ?",
-                                        (iso(now() - timedelta(days=1)),)),
-                "daily_limit": app.settings.limits.daily_send_limit,
-                "on_list": db.scalar("SELECT COUNT(*) FROM accounts WHERE follower_source IS NOT NULL"),
-                "hellos_waiting_turn": db.scalar("SELECT COUNT(*) FROM jobs WHERE kind = 'intro' AND state = 'queued'"),
-                "hellos_sent": db.scalar("SELECT COUNT(*) FROM accounts WHERE intro_status = 'sent'"),
-                "list_checked_at": db.get_state("list_checked_at"),
-            },
         }
 
     return api

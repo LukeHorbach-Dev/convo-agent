@@ -21,11 +21,20 @@ a fix is ever undone.
 | 13 | Fix for #11 "didn't work" | The update never got installed (no DONE), so the old version ran | `update.sh` installs from the zip in one step; the version is printed at startup and shown on the dashboard | `update.sh` tested on an old install with personal data |
 | 14 | Canned "Sounds interesting…" replies | No AI key: the test model was writing replies | On Instagram without a key, reply boxes are left empty for you to type | `test_without_an_ai_key_real_replies_are_left_for_you_to_write` |
 
+## Self-check
+
+`bash check.sh` (or `python -m agent check --platform instagram`) runs every step above on the live account:
+signed in, following list, messages page, open a conversation, Message button to a conversation, send control,
+and the unfollow menu. It sends nothing and unfollows nobody (the Unfollow item is found but never pressed). Each
+failed step gets a page-structure report and a screenshot in `data/diagnostics/`, so one run is enough to fix it.
+
 ## Not yet seen running on the live account
 
 * Typing and sending a message, and confirming it appeared (#7).
 * Whether the chat pop-up's expand icon has the label the app looks for (#11); the `ig.me` fallback covers it if not.
 * Reading a full following list of 1,465 (#9).
+* Unfollowing (Following → Unfollow, a second "Unfollow?" for private accounts).
+* Replies drafted by the model in his style (needs an API key; his own chat messages are used as style examples).
 
 When any of these fails, the app stops that person safely, saves a picture in `data/diagnostics/`, and
 `python -m agent inspect --platform instagram [--dm USER]` reports the page structure without sending anything.

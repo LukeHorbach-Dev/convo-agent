@@ -30,7 +30,7 @@ echo "Updating from version ${OLD_V:-unknown} to $NEW_V (from $(basename "$ZIP")
 
 # Code and docs are replaced; data/ is left alone except the example profile.
 for d in agent tests docs; do rm -rf "$HERE/$d"; cp -R "$NEW/$d" "$HERE/$d"; done
-for f in pyproject.toml requirements.lock README.md REPORT.md .env.example .gitignore setup-mac.sh start.sh update.sh; do
+for f in pyproject.toml requirements.lock README.md REPORT.md .env.example .gitignore setup-mac.sh start.sh update.sh check.sh; do
   [ -f "$NEW/$f" ] && cp "$NEW/$f" "$HERE/$f"
 done
 mkdir -p "$HERE/data"

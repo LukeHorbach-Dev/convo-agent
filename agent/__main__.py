@@ -7,6 +7,7 @@
   python -m agent migrate                   apply database migrations
   python -m agent diagnose                  print a sanitized diagnostic bundle
   python -m agent import-list FILE          queue introductions for usernames in FILE (still policy-checked and approved)
+  python -m agent check                     try every live step (sends nothing, unfollows nobody), PASS/FAIL report
   python -m agent inspect                   report the structure of your profile and inbox pages (for fixing locators)
 """
 from __future__ import annotations
@@ -145,6 +146,25 @@ def cmd_inspect(args) -> int:
     return 0
 
 
+def cmd_check(args) -> int:
+    from .app import build_platform
+    from .platform.selfcheck import self_check
+    s = _settings(args)
+    if s.platform is PlatformKind.MOCK:
+        raise SystemExit("check needs a browser platform: add --platform instagram (or mock_web)")
+    web, _ = build_platform(s)
+    try:
+        report = self_check(web)
+    finally:
+        web.close()
+    out = s.data_dir / "diagnostics" / "check.txt"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(report + "\n")
+    print(report.split("\n\n== ")[0])
+    print(f"\nFull report: {out}")
+    return 0 if " 0 of " not in report and "FAIL" not in report else 1
+
+
 def cmd_migrate(args) -> int:
     from .core.db import Database
     s = _settings(args)
@@ -168,7 +188,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="agent")
     ap.add_argument("--version", action="version", version=f"Conversation Agent {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("demo", "run", "login", "migrate", "diagnose", "import-list", "inspect"):
+    for name in ("demo", "run", "login", "migrate", "diagnose", "import-list", "inspect", "check"):
         p = sub.add_parser(name)
         if name == "import-list":
             p.add_argument("file", help="text file, one username per line")
@@ -182,7 +202,7 @@ def main(argv=None) -> int:
         p.add_argument("--log-file", action="store_true")
     args = ap.parse_args(argv)
     return {"demo": cmd_demo, "run": cmd_run, "login": cmd_login, "migrate": cmd_migrate, "diagnose": cmd_diagnose,
-            "import-list": cmd_import_list, "inspect": cmd_inspect}[args.cmd](args)
+            "import-list": cmd_import_list, "inspect": cmd_inspect, "check": cmd_check}[args.cmd](args)
 
 
 if __name__ == "__main__":

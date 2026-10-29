@@ -60,6 +60,16 @@ class SiteProfile:
     def restricted_markers(self) -> list[str]: return []
     def dm_expand(self) -> str: return '[aria-label="Expand"]'   # on a chat pop-up: opens the full conversation
     def dm_url(self, username: str) -> str | None: return None    # an address that opens a conversation, if any
+    # On someone's profile: the button showing you follow them, the one showing you don't, and the menu item that
+    # unfollows (Instagram: "Following" opens a menu; private accounts ask again in a second dialog).
+    def following_button(self) -> str:
+        # Exact text: the "228 following" count in the same header is also a button on Instagram.
+        return 'main header [role="button"]:text-is("Following"), main header button:text-is("Following")'
+    def follow_button(self) -> str:
+        return ", ".join(f'main header {t}:text-is("{x}")' for t in ('[role="button"]', "button") for x in ("Follow", "Follow Back"))
+    def unfollow_confirm(self) -> str:
+        return ('[role="dialog"] [role="button"]:text-is("Unfollow"), [role="dialog"] button:text-is("Unfollow"), '
+                '[role="menuitem"]:text-is("Unfollow")')
     def read_messages_js(self) -> str: raise NotImplementedError
 
 

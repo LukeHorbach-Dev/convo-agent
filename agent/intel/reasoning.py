@@ -96,10 +96,15 @@ class Drafter:
         # a reply; leave the box empty for them to write it.
         self.manual_replies = manual_replies
 
-    def system_prompt(self, facts: list[Fact]) -> str:
+    def system_prompt(self, facts: list[Fact], own_messages: list[str] | None = None) -> str:
         p = self.profile
         fact_lines = "\n".join(f"[{f.id}] {f.text}" for f in facts) or "(none relevant)"
-        samples = "\n".join(f"- {s}" for s in p.writing_samples[:15])
+        # His real messages from his chats first (the best evidence of how he writes), then the profile samples.
+        seen, picked = set(), []
+        for t in [*(own_messages or []), *p.writing_samples]:
+            if t and t not in seen and len(t) <= 200:
+                seen.add(t); picked.append(t)
+        samples = "\n".join(f"- {s}" for s in picked[:30])
         return f"""You draft Instagram replies for {p.name}. A human may review them. Write as {p.name}, in first person.
 
 STYLE: {p.style.summary}
@@ -126,8 +131,9 @@ Do not create artificial intimacy, pressure, or flattery. Ask at most one natura
 memory_notes: record only what they explicitly said (their_statement), your interpretations (interpretation,
 with confidence), and questions of theirs still unanswered (open_question)."""
 
-    def draft_reply(self, history: list[tuple[str, str]], memory: list[str]) -> DraftOutcome:
-        """history: [(direction, text)] oldest first; direction in {'in','out'}."""
+    def draft_reply(self, history: list[tuple[str, str]], memory: list[str], own_messages: list[str] | None = None) -> DraftOutcome:
+        """history: [(direction, text)] oldest first; direction in {'in','out'}. own_messages: things he wrote
+        himself in his chats, used only as style examples (they never count as facts)."""
         last_in = next((t for d, t in reversed(history) if d == "in"), "")
         if self.manual_replies:
             return DraftOutcome(action="escalate", reason="no AI key set up, so type your reply in the box",
@@ -145,7 +151,7 @@ with confidence), and questions of theirs still unanswered (open_question)."""
 </conversation>
 
 Draft my next reply to their latest message."""
-        raw = self.llm.complete_json(self.system_prompt(facts), user, DRAFT_SCHEMA)
+        raw = self.llm.complete_json(self.system_prompt(facts, own_messages), user, DRAFT_SCHEMA)
         try:
             d = ModelDraft.model_validate(raw)
         except ValidationError as e:

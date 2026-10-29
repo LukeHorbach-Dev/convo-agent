@@ -338,3 +338,46 @@ def test_instagram_message_reader_on_a_page_shaped_like_instagram():
         browser.close()
     assert [(m["direction"], m["text"][:12]) for m in msgs] == [
         ("in", "hey how was "), ("out", "Hey im Luke "), ("in", "10:30 works ")]
+
+
+def test_self_check_passes_every_step_and_changes_nothing(site):
+    from agent.platform.selfcheck import self_check
+    world, _, web = site
+    world.new_follower("mia"); world.new_follower("noah"); world.incoming("noah", "hey")
+    report = self_check(web, settle_ms=0)
+    assert report.startswith("Self-check: 7 of 7 steps passed"), report
+    assert world.sent_log == [] and world.unfollowed == set()
+
+
+def test_self_check_reports_a_broken_step_with_details(site):
+    from agent.platform.selfcheck import self_check
+    world, server, web = site
+    world.new_follower("mia")
+    server.app.state.web["drift"] = True                     # Message button changed
+    report = self_check(web, settle_ms=0)
+    assert "FAIL  5 Message button opens a conversation" in report and "== FAILED 5" in report
+
+
+def test_unfollow_from_profile_and_never_twice(site, db):
+    """Unfollow goes Following -> Unfollow, skips the 'N following' count button, and is safe to repeat."""
+    world, _, web = site
+    world.new_follower("mia")
+    assert web.unfollow("mia") == "unfollowed" and world.unfollowed == {"mia"}
+    assert web.unfollow("mia") == "not_following"
+
+
+def test_unfollow_everyone_through_the_engine_respects_the_daily_limit(site, db):
+    world, _, web = site
+    s = make_settings(); s.policy.audience = "following"; s.limits.daily_unfollow_limit = 2
+    web.audience = "following"
+    for n in ("a.one", "b.two", "c.three"):
+        world.new_follower(n)
+    app = build_app(s, db=db, platform=web, world=world)
+    app.engine.run_once()                                   # reads the following list (mock: everyone gets hellos)
+    sent_before = len(world.sent_log)
+    out = app.engine.request_unfollow([r["username"] for r in app.db.all("SELECT username FROM accounts WHERE i_follow = 'yes'")])
+    assert out["queued"] == 3
+    settle(app.engine, 4)
+    assert len(world.unfollowed) == 2                       # the third waits for tomorrow
+    assert "blocked" in job_states(app.db, "unfollow").values()
+    assert len(world.sent_log) == sent_before

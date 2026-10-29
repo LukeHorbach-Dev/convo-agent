@@ -241,6 +241,44 @@ class WebPlatform:
             state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
         return re.search(r"/direct/t/([^/]+)/?", self.page.url).group(1)
 
+    def unfollow(self, username: str) -> str:
+        """Unfollow from their profile: Following -> Unfollow (and Unfollow again if Instagram asks), then check the
+        button now says Follow. Safe to repeat: if it already says Follow, nothing is clicked."""
+        self.sup.goto(self.site.url(self.site.profile_path(username)), expect=re.escape(f"/{username}"), ready="body")
+        timeout = self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms
+        def act():
+            either = ", ".join([self.site.following_button(), self.site.follow_button(), *self.site.restricted_markers()])
+            try:
+                self._visible(either).first.wait_for(state="visible", timeout=timeout)
+            except Exception:
+                self.sup.save_screenshot("selector-drift-unfollow")
+                raise SelectorDrift(f"{username}: no Following/Follow button on the profile")
+            if self._visible(self.site.following_button()).count() == 0:
+                if self._visible(self.site.follow_button()).count():
+                    return "not_following"
+                raise PermissionRestricted(f"{username}: profile isn't available")
+            self._visible(self.site.following_button()).first.click()
+            confirm = self._visible(self.site.unfollow_confirm())
+            try:
+                confirm.first.wait_for(state="visible", timeout=self.sup.cfg.action_timeout_ms)
+            except Exception:
+                self.page.keyboard.press("Escape")
+                self.sup.save_screenshot("selector-drift-unfollow")
+                raise SelectorDrift(f"{username}: the Following menu has no Unfollow option")
+            confirm.first.click()
+            try:                                     # private accounts: "Unfollow?" asks once more
+                confirm.first.wait_for(state="visible", timeout=1500)
+                confirm.first.click()
+            except Exception:
+                pass
+            try:
+                self._visible(self.site.follow_button()).first.wait_for(state="visible", timeout=timeout)
+            except Exception:
+                self.sup.save_screenshot("selector-drift-unfollow")
+                raise AmbiguousState(f"{username}: pressed Unfollow, but the profile doesn't show Follow yet")
+            return "unfollowed"
+        return self.sup.run(f"unfollow {username}", act)
+
     def send(self, thread_key: str, text: str, operation_id: str) -> SendResult:
         snap = self.read_thread(thread_key)
         before = sum(1 for m in snap.messages if m.direction == "out" and m.text == text)
