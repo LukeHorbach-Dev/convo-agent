@@ -19,6 +19,7 @@ from agent.intel.profile import Profile
 from agent.intel.reasoning import INJECTION, Drafter, check_text
 from agent.intel.voice import in_lukes_voice
 
+from .export import MEDIA_TAG
 from .store import Store, iso_ago, now_iso
 
 THINK_SCHEMA = {
@@ -53,7 +54,12 @@ concern: "high" if they might be under 19, ask for money, gift cards, crypto or 
 off Instagram fast, send sexual content, threaten, harass, or talk about hurting themselves; "low" for anything
 else that deserves a second look (pushy, odd links, a bot or scam feel); otherwise "none". When concern is high,
 leave reply empty and set needs_human=true.
-memory_notes: only what they actually said about themselves, and their questions Luke hasn't answered."""
+memory_notes: only what they actually said about themselves, and their questions Luke hasn't answered.
+
+THINGS YOU CAN'T SEE: text in square brackets stands for something sent that you can't see or hear: [photo],
+[video], [gif], [sticker], [file], [attachment], [reel by @someone: its caption], [post by @someone: its caption].
+Never pretend you saw it or know what's in it. React lightly to what the caption or the chat makes clear, or ask a
+short, easy question about it. Luke checks every one of these himself."""
 
 
 class Think(BaseModel):
@@ -160,6 +166,19 @@ def plan_replies(store: Store, profile: Profile, never: set[str], *, window_days
             out["skipped"] += 1
             continue
         context = {"theirs": theirs[-3:]}
+        # What they've sent since Luke last wrote. Voice messages and calls: Luke listens and answers himself.
+        last_mine = max((i for i, m in enumerate(msgs) if m["from_me"]), default=-1)
+        kinds = media_kinds(m["text"] for m in msgs[last_mine + 1:] if not m["from_me"])
+        heard = next((k for k in ("voice message", "call") if k in kinds), None)
+        if heard:
+            note = ("They sent a voice message. Listen to it in Instagram, then write your reply here (or skip it)."
+                    if heard == "voice message" else
+                    "They tried to call you. Have a look in Instagram, then write your reply here (or skip it).")
+            _draft(store, base, "", "draft", note, {**context, "manual": True, "needs_look": True, "media": heard})
+            out["for_you"] += 1
+            continue
+        if kinds:
+            context["media"] = kinds[-1]
         if manual:
             _draft(store, base, "", "draft", "type your reply (turn on AI replies in Settings to get one written)",
                    {**context, "manual": True})
@@ -179,6 +198,17 @@ def job_for(store: Store, t: dict, msgs: list[dict], base: dict, context: dict) 
     theirs = [m["text"] for m in msgs if not m["from_me"]]
     return {"base": base, "context": context, "history": history, "memory": memory, "theirs": theirs[-6:],
             "thread": {"id": t["id"], "username": t["username"], "other_name": t["other_name"]}}
+
+
+def media_kinds(texts) -> list[str]:
+    """The kinds of non-text things in some messages, in order: "voice message", "call", "reel", "post", "photo"..."""
+    out = []
+    for t in texts:
+        for m in MEDIA_TAG.finditer(t or ""):
+            k = "post" if m.group(1) == "shared a post" else m.group(1)
+            if k not in out:
+                out.append(k)
+    return out
 
 
 def own_messages(store: Store) -> list[str]:
@@ -208,8 +238,12 @@ def finish_reply(store: Store, profile: Profile, job: dict, raw: dict) -> bool:
     problems = check_text(reply) if reply else []
     unknown = [f for f in result.facts_used if not profile.fact(f) or profile.fact(f) not in profile.verified_facts()]
     injection = bool(INJECTION.search(job["theirs"][-1] if job["theirs"] else ""))
-    needs_look = result.needs_human or bool(problems) or bool(unknown) or injection or result.concern == "high" or not reply
-    note = "; ".join(dict.fromkeys(filter(None, [result.reason if result.needs_human else "", ", ".join(problems),
+    media = job["context"].get("media")
+    needs_look = (result.needs_human or bool(problems) or bool(unknown) or injection or result.concern == "high" or not reply
+                  or bool(media))
+    note = "; ".join(dict.fromkeys(filter(None, [
+        f"They sent {'an' if media and media[0] in 'aeiou' else 'a'} {media} the AI can't see, so check the reply fits" if media else "",
+        result.reason if result.needs_human else "", ", ".join(problems),
                                                "mentions something not in your About me" if unknown else "",
                                                "their message tries to give the AI instructions" if injection else "",
                                                result.concern_why if result.concern != "none" else ""])))

@@ -230,6 +230,7 @@ select.field { appearance: none; background-image: linear-gradient(45deg, transp
 .draft label { font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
 .draft textarea { width: 100%; border: 0; background: transparent; resize: vertical; min-height: 2.6em; outline: none; padding: 2px 0; color: var(--me-ink); line-height: 1.5; }
 .translate { font-size: .86rem; color: var(--muted); margin-top: 6px; }
+.media { display: inline; font-style: normal; } .media b { font-weight: 650; } .media span { color: var(--muted); }
 
 /* ============================================================== people + drawer */
 .plist { display: grid; }
@@ -409,6 +410,12 @@ function ago(iso) {
   if (s < 60) return 'just now'; if (s < 3600) return Math.floor(s / 60) + ' min ago'; if (s < 86400) return Math.floor(s / 3600) + ' h ago';
   return new Date(t).toLocaleDateString([], {weekday: 'short', day: 'numeric', month: 'short'});
 }
+const MEDIA = {'voice message': ['🎤', 'Voice message'], call: ['📞', 'Call'], photo: ['📷', 'Photo'], video: ['🎞️', 'Video'],
+  gif: ['✨', 'GIF'], sticker: ['🙂', 'Sticker'], file: ['📎', 'File'], attachment: ['📎', 'Attachment'], reel: ['🎬', 'Reel'],
+  post: ['🖼️', 'Post'], 'shared a post': ['🖼️', 'Post']};
+/* Message text with Convo's tags ("[reel by @x: caption]", "[voice message]") shown as labels. */
+const msgText = t => esc(t).replace(/\[(voice message|call|photo|video|gif|sticker|file|attachment|reel|post|shared a post)([^\]]*)\]/g,
+  (all, k, rest) => `<span class="media">${MEDIA[k][0]} <b>${MEDIA[k][1]}</b>${rest.trim() ? ' <span>' + rest.trim() + '</span>' : ''}</span>`);
 const clock = ms => new Date(ms).toLocaleString([], {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
 
 async function api(path, opts = {}) {
@@ -636,8 +643,8 @@ function replyCard(d) {
   const look = c.needs_look || c.manual;
   const tags = [interest >= 3 ? `<span class="tag go">${icon('star')} You'd click</span>` : interest === 2 ? '<span class="tag go">Interesting</span>' : '',
     concern === 'high' ? '<span class="tag bad">Careful</span>' : concern === 'low' ? '<span class="tag warn">Have a look</span>' : '',
-    c.direct ? '<span class="tag info">Your own</span>' : '', look && d.status === 'draft' ? '<span class="tag warn">Needs a look</span>' : ''].join('');
-  const chat = (d.recent || []).map(m => `<div class="bubble ${m.from_me ? 'me' : 'them'}">${esc(m.text)}<time>${esc(ago(m.at))}</time></div>`).join('');
+    c.direct ? '<span class="tag info">Your own</span>' : '', c.media && MEDIA[c.media] ? `<span class="tag info">${MEDIA[c.media][0]} ${esc(MEDIA[c.media][1])}</span>` : '', look && d.status === 'draft' ? '<span class="tag warn">Needs a look</span>' : ''].join('');
+  const chat = (d.recent || []).map(m => `<div class="bubble ${m.from_me ? 'me' : 'them'}">${msgText(m.text)}<time>${esc(ago(m.at))}</time></div>`).join('');
   const foreign = c.language && c.language.toLowerCase() !== 'english';
   const editable = !['sent', 'sending'].includes(d.status);
   return `<article class="card msg ${d.status === 'approved' ? 'approved' : ''} ${look && d.status === 'draft' ? 'look' : ''}">
@@ -771,7 +778,7 @@ function renderPerson(p) {
         : `<p class="muted">A report sums up who they are, what you have in common and anything to be careful about. It costs about ${cents(0.01)}.</p>`}</div>
       <div><label class="label" for="pnote">Your note about them</label><textarea id="pnote" class="field" rows="2" placeholder="Only you see this. The AI reads it when writing to them." onchange="saveNote('${esc(p.username)}', this.value)">${esc(p.note || '')}</textarea></div>
       ${p.memory.length ? `<div><h3>What Convo remembers</h3><ul>${p.memory.slice(-10).map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>` : ''}
-      <div><h3>Chat ${msgs.length ? `<span class="faint small">(last ${msgs.length})</span>` : ''}</h3>${msgs.length ? `<div class="chat">${msgs.map(m => `<div class="bubble ${m.from_me ? 'me' : 'them'}">${esc(m.text)}<time>${esc(clock(m.at))}</time></div>`).join('')}</div>` : '<p class="muted">No chat yet.</p>'}</div>
+      <div><h3>Chat ${msgs.length ? `<span class="faint small">(last ${msgs.length})</span>` : ''}</h3>${msgs.length ? `<div class="chat">${msgs.map(m => `<div class="bubble ${m.from_me ? 'me' : 'them'}">${msgText(m.text)}<time>${esc(clock(m.at))}</time></div>`).join('')}</div>` : '<p class="muted">No chat yet.</p>'}</div>
       ${p.drafts.length ? `<div><h3>Messages from Convo</h3>${p.drafts.map(d => `<p class="small"><span class="tag">${esc(d.status)}</span> ${esc(d.text || '(empty)')}</p>`).join('')}</div>` : ''}
     </div></aside>`);
 }
@@ -910,7 +917,10 @@ PAGES.settings = {
         <div class="setting"><div><span class="label">Self-check</span><span class="hint">Claude tries every step on your account without sending anything. About 5¢.</span></div>
           <div class="row"><button class="btn" id="checkbtn" onclick="runCheck()">${icon('refresh')} Run the check</button></div></div>
         <pre id="checkout" class="card sunk small" style="white-space:pre-wrap;margin-top:10px" hidden></pre>
-        <div class="setting"><div><span class="label">Keep the Instagram window tucked away</span><span class="hint">Minimised to the Dock while it works. If sending ever seems stuck, turn this off.</span></div>
+        <div class="setting"><div><span class="label">Check my download</span><span class="hint">Counts the kinds of messages in your newest download (voice messages, reels, photos...) without showing any words. Free. Handy to send to Claude.</span></div>
+          <div class="row"><button class="btn" onclick="downloadCheck()">${icon('file')} Check my download</button></div></div>
+        <pre id="dlout" class="card sunk small" style="white-space:pre-wrap;margin-top:10px" hidden></pre>
+        <div class="setting"><div><span class="label">Keep the Instagram window tucked away</span><span class="hint">Not recommended: a window minimised to the Dock can stop working. Leaving it open behind your other windows is fine, and Convo types into it there.</span></div>
           <span class="toggle"><input type="checkbox" id="tuck" onchange="saveSetting({tuck_window: this.checked})"><span></span></span></div></div></div>
 
       ${S.practice ? '' : `<div class="section"><h2>${icon('flask')} Practice</h2><div class="card">
@@ -953,6 +963,7 @@ async function saveSending() {
 async function signIn() { toast('Opening Instagram…'); await post('/api/instagram/login'); toast('Sign in in the Instagram window, then press Done.'); }
 async function signInDone() { const r = await post('/api/instagram/login/done'); toast(r.signed_in ? 'Signed in to Instagram.' : 'Instagram still shows the sign-in page.', r.signed_in ? '' : 'bad'); }
 async function runCheck() { $('#checkout').hidden = true; await post('/api/check'); toast('Running the check. It takes a couple of minutes.'); }
+async function downloadCheck() { const r = await api('/api/download/report', {method: 'POST', body: '{}'}); const o = $('#dlout'); o.textContent = r.report; o.hidden = false; }
 async function practice(real) { toast('Opening practice…'); const r = await post('/api/practice/start', {real_ai: real}); window.open(r.url, '_blank'); }
 function textSize(d) { const v = Math.min(24, Math.max(14, parseInt(prefs.get('sz', '17')) + d)); prefs.set('sz', v); applyPrefs(); }
 async function quitApp() {

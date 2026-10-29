@@ -27,7 +27,7 @@ from . import __version__
 from .ask import Ask, queue_message
 from .brain import never_list, prepare_hellos, think
 from .config import AssistantSettings
-from .export import ExportError, apply_export, find_downloads, read_export
+from .export import ExportError, apply_export, describe_export, find_downloads, read_export
 from .reports import briefing, people_csv, person, write_report
 from .sender import Sender
 from .store import Store, now_iso
@@ -448,6 +448,20 @@ def create_api(a: Assistant, token: str) -> FastAPI:
         if not a.load_download(paths):
             raise HTTPException(409, "Already busy with something; wait for it to finish.")
         return {"ok": True}
+
+    @api.post("/api/download/report", dependencies=[Depends(auth)])
+    def download_report():
+        files = find_downloads(a.s.downloads_dir)
+        if not files:
+            raise HTTPException(404, "No Instagram download in your Downloads folder.")
+        try:
+            report = describe_export(files)
+        except Exception as e:
+            raise HTTPException(400, f"Couldn't read the download ({str(e).splitlines()[0][:160]})")
+        out = a.s.data_dir / "diagnostics" / "download-check.txt"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(report + "\n")
+        return {"report": report}
 
     @api.post("/api/think", dependencies=[Depends(auth)])
     def write_replies(body: ThinkBody | None = None):

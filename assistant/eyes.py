@@ -522,18 +522,33 @@ class Hands:
     # so each is tried in turn and checked letter for letter; the one that works is tried first next time.
     TYPERS = ("insert", "keys", "edit")
 
-    def _focus_box(self) -> None:
-        """Bring the Instagram window's page to the front and put the caret at the end of the selected box."""
+    def _background_focus(self) -> None:
+        """Let the Instagram page behave as if it has the keyboard while its window stays behind Luke's other
+        windows, so typing works without bringing it to the front (and his own key presses never land in it)."""
         page = self.page
+        if getattr(self, "_focus_page", None) is page:
+            return
         try:
-            page.bring_to_front()
+            cdp = self.sup.context.new_cdp_session(page)
+            cdp.send("Emulation.setFocusEmulationEnabled", {"enabled": True})
+            self._cdp, self._focus_page = cdp, page          # kept: the setting lasts while the session does
         except Exception:
             pass
+
+    def _focus_box(self, front: bool = False) -> None:
+        """Put the caret at the end of the selected box. front=True also brings the window to the front."""
+        page = self.page
+        self._background_focus()
+        if front:
+            try:
+                page.bring_to_front()
+            except Exception:
+                pass
         page.evaluate(FOCUS_BOX)
 
-    def _clear_box(self) -> None:
+    def _clear_box(self, front: bool = False) -> None:
         page = self.page
-        self._focus_box()
+        self._focus_box(front)
         page.keyboard.press("ControlOrMeta+A")
         page.keyboard.press("Backspace")
         if (page.evaluate(BOX_TEXT) or "").strip():
@@ -557,19 +572,22 @@ class Hands:
             raise AmbiguousState("the message box wasn't selected when it was time to type")
         order = sorted(self.TYPERS, key=lambda h: h != getattr(self, "typer", None))
         seen = []
-        for how in order:
-            self._clear_box()
-            try:
-                self._type(how, text)
-            except Exception as e:
-                seen.append(f"{how}: {type(e).__name__}")
-                continue
-            page.wait_for_timeout(400)
-            typed = page.evaluate(BOX_TEXT)
-            if typed is not None and _same(typed, text):
-                self.typer = how
-                return how
-            seen.append(f"{how}: {typed!r}"[:60])
+        # In the background first; only if no way works there, with the window in front (and say so).
+        for front in (False, True):
+            for how in order:
+                self._clear_box(front)
+                try:
+                    self._type(how, text)
+                except Exception as e:
+                    seen.append(f"{how}: {type(e).__name__}")
+                    continue
+                page.wait_for_timeout(400)
+                typed = page.evaluate(BOX_TEXT)
+                if typed is not None and _same(typed, text):
+                    self.typer = how
+                    self.typed_in_front = front
+                    return how + (" with the window in front" if front else "")
+                seen.append(f"{how}{' (front)' if front else ''}: {typed!r}"[:60])
         self._clear_box()
         raise AmbiguousState("the message box didn't take the text exactly (" + "; ".join(seen) + "), so nothing was sent")
 

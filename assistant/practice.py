@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 import shutil
 import threading
 import time
@@ -30,8 +31,9 @@ ME_NAME = "Luke"
 PEOPLE = [
     ("maya.paints", "Maya Chen", "painter, coffee, long walks", ["hey :) saw your post about baking", "what do you usually make?"], True),
     ("tom.kicks", "Tom Riley", "Sunday league keeper", ["you still play football?", "we need a striker on sunday"], True),
-    ("sofia.reads", "Sofia Marin", "books and bad puns", ["omg did you finish that book i said about"], True),
-    ("jake_runs", "Jake Patel", "running club Maastricht", ["morning run tomorrow at 7 if you're up for it"], True),
+    ("sofia.reads", "Sofia Marin", "books and bad puns", ["omg did you finish that book i said about",
+                                                          "[reel by @bookclub: when the sequel finally drops]"], True),
+    ("jake_runs", "Jake Patel", "running club Maastricht", ["morning run tomorrow at 7 if you're up for it", "[voice message]"], True),
     ("lena.cooks", "Lena Vos", "chef in training", ["hiii how's your week going?"], True),
     ("cash.quick", "Free Money", "DM for crypto tips", ["hey can you send me 50 on paypal, ill pay back double"], True),
     ("young.ella", "Ella", "", ["hey im 16 btw, you seem cool"], True),
@@ -70,6 +72,18 @@ def answer_back(world: MockWorld, delay_s: float = 6.0) -> None:
     world.deliver = wrapped
 
 
+def _as_instagram(text: str, name: str, moji) -> dict:
+    """How Instagram's download writes a message: voice messages and shared reels the way real ones look."""
+    if text == "[voice message]":
+        return {"audio_files": [{"uri": "your_instagram_activity/messages/inbox/x/audio/1.mp4"}]}
+    reel = re.fullmatch(r"\[reel by @([\w.]+): (.*)\]", text)
+    if reel:
+        return {"content": moji(f"{name} sent an attachment."), "share": {
+            "link": f"https://www.instagram.com/reel/practice{zlib.crc32(reel.group(2).encode()) % 1000}/",
+            "share_text": moji(reel.group(2)), "original_content_owner": reel.group(1)}}
+    return {"content": moji(text)}
+
+
 def _ms(iso: str) -> int:
     return int(datetime.fromisoformat(iso).timestamp() * 1000)
 
@@ -99,7 +113,7 @@ def write_download(world: MockWorld, folder: Path) -> Path:
                 "participants": [{"name": moji(acct.display_name)}, {"name": ME_NAME}], "title": moji(acct.display_name),
                 "is_still_participant": True,
                 "messages": [{"sender_name": moji(ME_NAME if m["dir"] == "out" else acct.display_name),
-                              "timestamp_ms": _ms(m["at"]) + i, "content": moji(m["text"])}
+                              "timestamp_ms": _ms(m["at"]) + i, **_as_instagram(m["text"], acct.display_name, moji)}
                              for i, m in reversed(list(enumerate(t["messages"])))]}
     path = folder / f"instagram-{world.me}-{datetime.now():%Y-%m-%d-%H%M%S}-practice.zip"
     with zipfile.ZipFile(path, "w") as z:

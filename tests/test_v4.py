@@ -446,3 +446,87 @@ def test_saving_words_never_undoes_an_approval(app):
     c.post(f"/api/drafts/{did}", headers=H, json={"action": "save", "text": "hey there"})
     d = app.store.one("SELECT status, text FROM drafts WHERE id = ?", (did,))
     assert d == {"status": "approved", "text": "hey there"}
+
+
+# ------------------------------------------------------------------------------------------------ 4.1: voice, reels, photos
+def test_non_text_messages_are_read_the_way_instagram_writes_them():
+    from assistant.export import _message_text as text
+    assert text({"sender_name": "Anna", "audio_files": [{"uri": "a.mp4"}]}) == "[voice message]"
+    assert text({"sender_name": "Anna", "content": "Anna sent an attachment.", "share": {
+        "link": "https://www.instagram.com/reel/abc/", "share_text": "dog does a flip", "original_content_owner": "dogs"}}) \
+        == "[reel by @dogs: dog does a flip]"
+    assert text({"sender_name": "Anna", "content": "this is you", "share": {"link": "https://www.instagram.com/p/x/"}}) == "this is you [post]"
+    assert text({"sender_name": "Anna", "content": "hey", "photos": [{"uri": "p.jpg"}]}) == "hey [photo]"
+    assert text({"sender_name": "Anna", "content": "Missed a video chat"}) == "[call]"
+    assert text({"sender_name": "Anna", "content": "Video chat ended", "call_duration": 30}) == "[call]"
+    for not_a_message in ({"sender_name": "Anna", "content": "Liked a message"},
+                          {"sender_name": "Anna", "content": "Anna reacted 😂 to your message"},
+                          {"sender_name": "Anna", "content": "hi", "is_unsent": True}):
+        assert text(not_a_message) is None
+    assert text({"sender_name": "Anna", "content": "I liked a message you sent lol"}) == "I liked a message you sent lol"
+
+
+def _chat_export(tmp_path, messages, name="instagram-lukehorbach2-2026-10-30-m.zip"):
+    import zipfile
+    from tests.test_assistant import NOW_MS, chat
+    files = {"personal_information/personal_information/personal_information.json": {
+                 "profile_user": [{"string_map_data": {"Username": {"value": "lukehorbach2"}, "Name": {"value": "Luke"}}}]},
+             "connections/followers_and_following/following.json": {"relationships_following": [
+                 {"title": "maya.paints", "string_list_data": [{"href": "https://www.instagram.com/_u/maya.paints", "timestamp": 1}]}]}}
+    data = chat(["Maya", "Luke"], [])
+    data["messages"] = [{"sender_name": s, "timestamp_ms": NOW_MS - 1000 * (len(messages) - i), **m} for i, (s, m) in enumerate(messages)][::-1]
+    files["your_instagram_activity/messages/inbox/mayapaints_1/message_1.json"] = data
+    path = tmp_path / name
+    with zipfile.ZipFile(path, "w") as z:
+        for n, d in files.items():
+            z.writestr(n, json.dumps(d))
+    return path
+
+
+def test_voice_messages_are_left_for_luke_and_reels_always_need_his_look(tmp_path, loaded):
+    from assistant.brain import think
+    store = Store(":memory:")
+    profile = Profile.load(Path(__file__).parent / "fixtures" / "profile.json")
+    # Voice message after Luke's last message: no AI, waits for him.
+    apply_export(store, read_export([_chat_export(tmp_path, [("Luke", {"content": "hey :)"}), ("Maya", {"content": "omg"}),
+                                                             ("Maya", {"audio_files": [{"uri": "a.mp4"}]})])]), "lukehorbach2")
+    llm = FakeLLM()
+    think(store, profile, llm, set())
+    d = store.one("SELECT * FROM drafts WHERE kind = 'reply'")
+    ctx = json.loads(d["context"])
+    assert llm.calls == [] and d["text"] == "" and "voice message" in d["note"] and ctx["needs_look"] and ctx["media"] == "voice message"
+    # A reel: the AI writes something, it's told it can't see the reel, and it always needs Luke's look.
+    store2 = Store(":memory:")
+    apply_export(store2, read_export([_chat_export(tmp_path, [("Maya", {"content": "Maya sent an attachment.", "share": {
+        "link": "https://www.instagram.com/reel/x/", "share_text": "cats being weird", "original_content_owner": "catvids"}})],
+        name="instagram-lukehorbach2-2026-10-30-n.zip")]), "lukehorbach2")
+    llm2 = FakeLLM()
+    llm2.queue.append(answer("haha the cat one is so good"))
+    think(store2, profile, llm2, set())
+    system, user = llm2.calls[0]
+    assert "[reel by @catvids: cats being weird]" in user and "THINGS YOU CAN'T SEE" in system
+    d2 = store2.one("SELECT * FROM drafts WHERE kind = 'reply'")
+    assert json.loads(d2["context"])["needs_look"] and "reel the AI can't see" in d2["note"]
+    app = Assistant(settings_for(tmp_path), store=store2, make_web=lambda: None, llm=FakeLLM(), notify=lambda *x: None)
+    assert app.approve_ready("reply") == 0                         # never in "Approve all"
+
+
+def test_older_ways_of_saving_these_are_tidied_on_the_next_load(tmp_path):
+    store = Store(":memory:")
+    from tests.test_assistant import NOW_MS
+    store.execute("INSERT INTO messages(thread_id, at, from_me, sender, text) VALUES ('mayapaints_1', ?, 0, 'Maya', '[shared a post]')",
+                  (NOW_MS - 2000,))
+    store.execute("INSERT INTO messages(thread_id, at, from_me, sender, text) VALUES ('mayapaints_1', ?, 0, 'Maya', 'Liked a message')",
+                  (NOW_MS - 500,))
+    apply_export(store, read_export([_chat_export(tmp_path, [("Maya", {"content": "Maya sent an attachment.", "share": {
+        "link": "https://www.instagram.com/reel/x/", "original_content_owner": "catvids"}}), ("Luke", {"content": "haha"})])]),
+        "lukehorbach2")
+    texts = [r["text"] for r in store.all("SELECT text FROM messages ORDER BY at")]
+    assert texts == ["[reel by @catvids]", "haha"]
+
+
+def test_download_check_counts_kinds_without_words(tmp_path):
+    from assistant.export import describe_export
+    report = describe_export([_chat_export(tmp_path, [("Maya", {"content": "secret words"}), ("Maya", {"audio_files": [{"uri": "a"}]}),
+                                                      ("Maya", {"content": "Liked a message"})])])
+    assert "secret" not in report and "[voice message]" in report and "left out" in report and "audio_files" in report

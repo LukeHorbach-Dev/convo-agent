@@ -81,6 +81,9 @@ def test_every_page_loads_and_the_main_buttons_work(running):
         # Edit and approve one reply
         page.click('#nav button[data-page="replies"]')
         page.wait_for_selector(".msg textarea")
+        body = page.inner_text("#list")
+        assert "Voice message" in body and "Listen to it in Instagram" in body       # left for Luke, no AI text
+        assert "Reel by @bookclub" in body and "can't see" in body                    # written, but needs his look
         first = page.locator(".msg textarea").first
         first.fill("sounds good, see you then")
         first.dispatch_event("change")

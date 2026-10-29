@@ -80,18 +80,76 @@ def _timestamp(item: dict) -> int | None:
     return None
 
 
+# Lines Instagram writes into chats that aren't messages from the person (with or without their name in front).
+_IGNORE = re.compile(r"(?i)^(liked a message|reacted .{1,16} to (your|a) message|unsent a message|changed the (theme|group photo)\b.*"
+                     r"|set (the|your|their|his|her) nickname\b.*|named the group\b.*)\.?$")
+_ATTACHMENT = re.compile(r"(?i)^sent an attachment\.?$")
+_CALL = re.compile(r"(?i)^(missed an? (video|audio|voice) (chat|call)|started an? (video|audio|voice) (chat|call)"
+                   r"|(video|audio|voice) (chat|call) ended|call ended)\.?$")
+# Tags Convo uses for things that aren't text. The AI is told it can't see these; voice messages and calls are
+# left for Luke.
+MEDIA_TAG = re.compile(r"\[(voice message|call|photo|video|gif|sticker|file|attachment|reel|post|shared a post)\b[^\]]*\]")
+
+
+def _without_name(content: str, sender: str) -> str:
+    for name in (sender, "You"):
+        if name and content.lower().startswith(name.lower() + " "):
+            return content[len(name) + 1:]
+    return content
+
+
+def _share_tag(share: dict) -> str:
+    link = share.get("link") or ""
+    kind = "reel" if "/reel" in link else "post"
+    owner = (share.get("original_content_owner") or "").strip().lstrip("@")
+    caption = re.sub(r"\s+", " ", fix_text(share.get("share_text") or "")).strip()
+    caption = (caption[:140] + "...") if len(caption) > 140 else caption
+    return f"[{kind}" + (f" by @{owner}" if owner else "") + (f": {caption}" if caption else "") + "]"
+
+
 def _message_text(m: dict) -> str | None:
-    """Plain text for a message, or a short tag for media; None for things that aren't messages."""
+    """Plain text for a message, or a short tag for anything else ("[voice message]", "[reel by @x: caption]");
+    None for things that aren't messages (likes, reactions, unsent messages, theme changes)."""
+    if m.get("is_unsent"):
+        return None
+    sender = fix_text(m.get("sender_name") or "")
     content = fix_text(m.get("content") or "").strip()
-    if content:
-        return content
-    for key, tag in (("photos", "[photo]"), ("videos", "[video]"), ("audio_files", "[voice message]"),
-                     ("gifs", "[gif]"), ("sticker", "[sticker]"), ("files", "[file]")):
+    bare = _without_name(content, sender)
+    share = m.get("share") if isinstance(m.get("share"), dict) else None
+    if content and _IGNORE.match(bare):
+        return None
+    if m.get("call_duration") is not None or (content and _CALL.match(bare)):
+        return "[call]"
+    attachment_only = bool(content) and bool(_ATTACHMENT.match(bare))
+    tag = None
+    for key, t in (("audio_files", "[voice message]"), ("photos", "[photo]"), ("videos", "[video]"), ("gifs", "[gif]"),
+                   ("sticker", "[sticker]"), ("files", "[file]")):
         if m.get(key):
+            tag = t
+            break
+    if tag is None and share:
+        tag = _share_tag(share)
+    if content and not attachment_only:
+        # Text typed with a shared reel or post is often just the post's address; keep what they wrote.
+        if share and tag and content == (share.get("link") or "").strip():
             return tag
-    if m.get("share"):
-        return "[shared a post]"
+        return f"{content} {tag}" if tag else content
+    if tag:
+        return tag
+    if attachment_only:
+        return "[attachment]"
+    if m.get("share") is not None:
+        return "[post]"
     return None
+
+
+_IGNORE_NAMED = re.compile(r"(?i)^[\w .'-]{0,40}\b(liked a message|reacted .{1,16} to (your|a) message|unsent a message)\.?$")
+
+
+def is_ignorable(text: str, sender: str) -> bool:
+    """For text saved by older versions: lines that aren't messages."""
+    t = (text or "").strip()
+    return bool(_IGNORE.match(_without_name(t, sender or "")) or _IGNORE_NAMED.match(t))
 
 
 class _Source:
@@ -225,7 +283,20 @@ def apply_export(store: Store, data: ExportData, me_username: str) -> dict:
             username = None if is_group else _folder_username(t.id, known)
             if not t.messages:
                 continue
+            # Older versions saved some non-text messages differently ("[shared a post]", "Liked a message"):
+            # bring those rows in line with how this version reads them.
+            for r in store.all("SELECT at, sender, text FROM messages WHERE thread_id = ?", (t.id,)):
+                if is_ignorable(r["text"], r["sender"]):
+                    store.execute("DELETE FROM messages WHERE thread_id = ? AND at = ? AND sender = ? AND text = ?",
+                                  (t.id, r["at"], r["sender"], r["text"]))
+            for d in store.all("SELECT id, replying_to FROM drafts WHERE kind = 'reply' AND thread_id = ? "
+                               "AND status IN ('draft', 'writing')", (t.id,)):
+                if is_ignorable(d["replying_to"], ""):    # a draft answering a "liked a message" line
+                    store.execute("DELETE FROM drafts WHERE id = ?", (d["id"],))
             for m in t.messages:
+                if "[" in m.text:                     # a tag whose wording changed between versions
+                    store.execute("DELETE FROM messages WHERE thread_id = ? AND at = ? AND sender = ? AND text != ? "
+                                  "AND text LIKE '%[%'", (t.id, m.at, m.sender, m.text))
                 cur = store.execute("INSERT OR IGNORE INTO messages(thread_id, at, from_me, sender, text) VALUES (?, ?, ?, ?, ?)",
                                     (t.id, m.at, int(m.sender == me_name), m.sender, m.text))
                 new_msgs += cur.rowcount
@@ -270,3 +341,33 @@ def find_downloads(folder: Path) -> list[Path]:
     if not date:
         return [newest]
     return [z for z in zips if date.group(0) in z.name and abs(z.stat().st_mtime - newest.stat().st_mtime) < 6 * 3600]
+
+
+def describe_export(paths: list[Path]) -> str:
+    """What kinds of messages a download holds, without any of their words: how many of each shape (which fields
+    Instagram filled in), and what Convo makes of them. Safe to share."""
+    src = _Source(paths)
+    shapes: dict[str, int] = {}
+    kinds: dict[str, int] = {}
+    threads = 0
+    for n in src.names():
+        if not re.search(r"(?:^|/)messages/(inbox|message_requests)/[^/]+/message_\d+\.json$", n):
+            continue
+        threads += 1
+        for m in src.read(n).get("messages", []):
+            keys = sorted(k for k in m if k not in ("sender_name", "timestamp_ms"))
+            shape = ", ".join(keys) or "(nothing)"
+            shapes[shape] = shapes.get(shape, 0) + 1
+            text = _message_text(m)
+            if text is None:
+                kind = "left out (like, reaction, unsent, theme)"
+            else:
+                tags = [f"[{t}]" for t in MEDIA_TAG.findall(text)]
+                kind = (("text + " if MEDIA_TAG.sub("", text).strip() else "") + tags[0]) if tags else "text"
+            kinds[kind] = kinds.get(kind, 0) + 1
+    lines = [f"Download check: {threads} chat files, {sum(kinds.values())} messages. No message words are shown.", "",
+             "What Convo makes of them:"]
+    lines += [f"  {n:>6}  {k}" for k, n in sorted(kinds.items(), key=lambda x: -x[1])]
+    lines += ["", "Which fields Instagram filled in:"]
+    lines += [f"  {n:>6}  {k}" for k, n in sorted(shapes.items(), key=lambda x: -x[1])[:40]]
+    return "\n".join(lines)

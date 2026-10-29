@@ -289,6 +289,9 @@ class Sender:
             self._check_blocked()
             self.web.send_here(d["text"])
             self._check_blocked()
+            if getattr(self.web, "typed_in_front", False):
+                self.store.log("warn", "Had to bring the Instagram window to the front to type that message. If you were "
+                                       "typing somewhere else at that moment, check that message in Instagram.")
             self._remember_chat(chat)
             with self.store.transaction():
                 self.store.execute("UPDATE drafts SET status = 'sent', sent_at = ?, updated_at = ?, note = NULL WHERE id = ?",
