@@ -11,6 +11,12 @@ message you approved, checks it letter for letter in the message box, and only t
 appeared. This costs about 1 US cent per message or unfollow with Claude Haiku (Settings can switch to Sonnet:
 steadier on unusual pages, about 10 to 20 cents each).
 
+Also since 3.1: **Watch it work** on the Today page shows the Instagram page Claude is looking at while it sends;
+**Send just one first** sends a single message and pauses so you can check it in Instagram; each chat's address is
+remembered after the first visit, so later messages to the same person go straight there (fewer steps, cheaper);
+and a **daily AI spending limit** (Settings, default 5 US dollars) pauses writing and sending for the day once
+reached.
+
 **Nothing is sent until you approve it.** Approving can be one tap for a whole batch ("Approve all ready ones",
 "Approve all hellos"); replies the AI flags still need you one by one.
 

@@ -78,6 +78,8 @@ class Sender:
         self._thread: threading.Thread | None = None
         self.identity_ok = False
         self._reset = False
+        self.just_one = False                   # "Send just one first": pause after the first message goes
+        self._budget_logged = False
 
     # ------------------------------------------------------------------ control
     def start(self) -> "Sender":
@@ -85,8 +87,9 @@ class Sender:
         self._thread.start()
         return self
 
-    def go(self) -> None:
+    def go(self, just_one: bool = False) -> None:
         self.active, self.wait_until, self.page_failures = True, 0.0, 0
+        self.just_one = just_one
         self.status = "Starting"
 
     def pause(self, why: str = "Paused") -> None:
@@ -134,6 +137,17 @@ class Sender:
             self.status = f"Sent today's {pace.daily_messages}. The rest go tomorrow by themselves."
         if unf and self.store.unfollowed_today() >= pace.daily_unfollows:
             unf = None
+        budget = getattr(self.s, "daily_ai_budget_usd", 0) or 0
+        if (msg or unf) and budget and self.store.spent_today() >= budget:
+            self.status = (f"Reached today's AI spending limit (${budget:.2f}). Carries on tomorrow by itself, "
+                           "or raise the limit in Settings.")
+            if not self._budget_logged:
+                self._budget_logged = True
+                self.store.log("warn", self.status)
+                self.notify("Instagram assistant paused", self.status)
+            self.wait_until = time.time() + 1800
+            return False
+        self._budget_logged = False
         if not msg and not unf:
             if self.store.scalar("SELECT COUNT(*) FROM drafts WHERE status = 'approved'") == 0 and \
                self.store.scalar("SELECT COUNT(*) FROM unfollows WHERE status = 'queued'") == 0:
@@ -184,6 +198,7 @@ class Sender:
             self.store.execute("UPDATE drafts SET status = 'sending', tries = tries + 1, updated_at = ? WHERE id = ? AND status = 'approved'",
                                (now_iso(), d["id"]))
         who = ("@" + d["username"]) if d["username"] else d["other_name"]
+        spent_before = getattr(self.web, "total_usd", 0.0)
         try:
             chat = self._open_chat(d)
             if d["kind"] == "hello":
@@ -196,13 +211,19 @@ class Sender:
             self._check_blocked()
             self.web.send_here(d["text"])
             self._check_blocked()
+            self._remember_chat(chat)
             with self.store.transaction():
                 self.store.execute("UPDATE drafts SET status = 'sent', sent_at = ?, updated_at = ?, note = NULL WHERE id = ?",
                                    (now_iso(), now_iso(), d["id"]))
                 if d["thread_id"]:
                     self.store.execute("UPDATE threads SET last_from_me = 1 WHERE id = ?", (d["thread_id"],))
-            self.store.log("good", f"Sent to {who}: {d['text']}")
+            cents = (getattr(self.web, "total_usd", 0.0) - spent_before) * 100
+            self.store.log("good", f"Sent to {who}: {d['text']}" + (f" (about {cents:.1f} cents)" if cents >= 0.05 else ""))
             self.page_failures = 0
+            if self.just_one:
+                self.just_one = False
+                self.pause("Sent one. Have a look at it in Instagram, then press Send everything I approved for the rest.")
+                self.store.log("info", "Sent one so you can check it. Press Send everything I approved for the rest.")
         except DeliveryUnknown as e:
             self._set(d, "unsure", "not sure it went through; have a look in the chat before trying again", "warn")
             log.info("delivery unknown", extra={"outcome": str(e)[:100]})
@@ -211,7 +232,8 @@ class Sender:
 
     def _open_chat(self, d: dict):
         if d["username"]:
-            return self.web.open_chat(username=d["username"])
+            row = self.store.one("SELECT chat_url FROM people WHERE username = ?", (d["username"],))
+            return self.web.open_chat(username=d["username"], known_url=row["chat_url"] if row else None)
         chat = self.web.open_chat(name=d["other_name"])
         # Learn their username from the chat, so next time the chat opens directly.
         if chat.username and re.fullmatch(r"[A-Za-z0-9._]{1,30}", chat.username):
@@ -220,6 +242,13 @@ class Sender:
                 if d["thread_id"]:
                     self.store.execute("UPDATE threads SET username = ? WHERE id = ?", (chat.username, d["thread_id"]))
         return chat
+
+    def _remember_chat(self, chat) -> None:
+        """Keep the chat's address, so the next message to them opens it directly (fewer steps, less cost)."""
+        if chat.username and chat.url:
+            with self.store.transaction():
+                self.store.execute("INSERT OR IGNORE INTO people(username) VALUES (?)", (chat.username,))
+                self.store.execute("UPDATE people SET chat_url = ? WHERE username = ?", (chat.url, chat.username))
 
     def _still_current(self, d: dict, chat) -> tuple | None:
         """None if it's fine to send the reply; otherwise (status, note, log kind)."""

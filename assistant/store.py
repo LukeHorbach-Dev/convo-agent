@@ -105,6 +105,9 @@ class Store:
         self._lock = threading.RLock()
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(SCHEMA)
+        # Added in 3.1: where each person's chat is on Instagram, learned the first time it's opened.
+        if "chat_url" not in {r[1] for r in self._conn.execute("PRAGMA table_info(people)")}:
+            self._conn.execute("ALTER TABLE people ADD COLUMN chat_url TEXT")
 
     # ---------------------------------------------------------------- basics
     def execute(self, sql: str, params: tuple | dict = ()) -> sqlite3.Cursor:
@@ -169,6 +172,9 @@ class Store:
             spend[counter + "_usd"] = round(spend.get(counter + "_usd", 0.0) + usd, 6)
             keep = ("total", "drafts", "drafts_usd", "web", "web_usd")
             self.set("ai_spend", {k: v for k, v in spend.items() if k in keep or k >= iso_ago(days=31)[:10]})
+
+    def spent_today(self) -> float:
+        return (self.get("ai_spend", {}) or {}).get(now_iso()[:10], 0.0)
 
     # ---------------------------------------------------------------- counts used in several places
     def sent_today(self) -> int:

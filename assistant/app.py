@@ -2,6 +2,7 @@
 write replies). Also the dashboard's web API."""
 from __future__ import annotations
 
+import base64
 import hmac
 import json
 import re
@@ -56,6 +57,7 @@ class Assistant:
         self.make_web = make_web or self._instagram
         self.sender = Sender(self.store, settings, self.make_web, notify=notify)
         self.job = {"name": None, "done": 0, "total": 0, "error": None, "started": None}
+        self.live = {"png": None, "note": "", "at": 0.0}      # the latest page Claude saw, for the live view
         self._job_lock = threading.Lock()
         self._stop_job = threading.Event()
 
@@ -73,7 +75,8 @@ class Assistant:
         client = anthropic.Anthropic(api_key=self.s.llm.api_key.get_secret_value(), timeout=60, max_retries=2)
         return Hands(BrowserSupervisor(self.s.browser, site), site, self.s.account_username, client,
                      model=self.s.eyes.model, effort=self.s.eyes.effort,
-                     on_cost=lambda usd: self.store.add_spend(usd, "web"))
+                     on_cost=lambda usd: self.store.add_spend(usd, "web"),
+                     on_view=lambda png, note: self.live.update(png=png, note=note, at=time.time()))
 
     @property
     def manual(self) -> bool:
@@ -123,10 +126,16 @@ class Assistant:
             self.job["done"], self.job["total"] = done, total
         out = think(self.store, self.profile(), self.llm, never_list(self.s.never_list_path),
                     window_days=self.s.reply_window_days, manual=self.manual, min_age=self.s.min_age,
-                    progress=progress, stop=self._stop_job.is_set)
+                    progress=progress, stop=lambda: self._stop_job.is_set() or self.over_budget())
+        if self.over_budget():
+            self.store.log("warn", f"Stopped writing replies: reached today's AI spending limit (${self.s.daily_ai_budget_usd:.2f}). "
+                                   "Press Write replies tomorrow, or raise the limit in Settings.")
         ready = self.store.scalar("SELECT COUNT(*) FROM drafts WHERE status = 'draft'")
         if ready:
             self.notify("Instagram assistant", f"{ready} messages ready for you to check")
+
+    def over_budget(self) -> bool:
+        return not self.manual and self.store.spent_today() >= self.s.daily_ai_budget_usd
 
     def stop_job(self) -> None:
         self._stop_job.set()
@@ -153,6 +162,10 @@ class NoteBody(BaseModel):
     note: str
 
 
+class SendBody(BaseModel):
+    just_one: bool = False
+
+
 class ImportBody(BaseModel):
     path: str | None = None
 
@@ -173,6 +186,7 @@ class SettingsBody(BaseModel):
     ai_key: str | None = None
     tuck_window: bool | None = None
     eyes_model: str | None = None
+    daily_ai_budget_usd: float | None = None
 
 
 def policy_problems(text: str) -> list[str]:
@@ -228,7 +242,8 @@ def create_api(a: Assistant, token: str) -> FastAPI:
                 "concerning": c("SELECT COUNT(*) FROM people WHERE concern = 'high'"),
             },
             "settings": {**a.s.pace.model_dump(), "reply_window_days": a.s.reply_window_days,
-                         "tuck_window": a.s.browser.start_minimized, "eyes_model": a.s.eyes.model},
+                         "tuck_window": a.s.browser.start_minimized, "eyes_model": a.s.eyes.model,
+                         "daily_ai_budget_usd": a.s.daily_ai_budget_usd},
             "ai": {"on": not a.manual, "model": a.s.llm.model, "spend_total": spend.get("total", 0.0),
                    "spend_today": spend.get(now_iso()[:10], 0.0), "drafts": spend.get("drafts", 0),
                    "drafts_usd": spend.get("drafts_usd", 0.0), "web_steps": spend.get("web", 0),
@@ -329,16 +344,25 @@ def create_api(a: Assistant, token: str) -> FastAPI:
 
     # -------------------------------------------------- sending
     @api.post("/api/send/{what}", dependencies=[Depends(auth)])
-    def send(what: str):
+    def send(what: str, body: SendBody | None = None):
         if what == "start":
-            a.sender.go()
-            st.log("info", "Started sending what you approved.")
+            one = bool(body and body.just_one)
+            a.sender.go(just_one=one)
+            st.log("info", "Sending one message so you can watch it." if one else "Started sending what you approved.")
         elif what == "pause":
             a.sender.pause("Paused by you")
             st.log("info", "Paused.")
         else:
             raise HTTPException(404, "unknown")
         return {"ok": True}
+
+    @api.get("/api/live", dependencies=[Depends(auth)])
+    def live():
+        """The latest page Claude looked at, while sending or unfollowing (stays on this Mac)."""
+        lv = a.live
+        fresh = lv["png"] is not None and time.time() - lv["at"] < 120
+        return {"active": a.sender.active, "status": a.sender.status, "note": lv["note"] if fresh else "",
+                "image": base64.b64encode(lv["png"]).decode() if fresh else None}
 
     # -------------------------------------------------- people
     @api.get("/api/people", dependencies=[Depends(auth)])
@@ -452,6 +476,11 @@ def create_api(a: Assistant, token: str) -> FastAPI:
             env.update({"AGENT_LLM__PROVIDER": "anthropic", "AGENT_LLM__API_KEY": key})
             a.sender.reset_browser()                  # the next send opens Instagram with the new key
             st.log("good", "AI replies are on.")
+        if body.daily_ai_budget_usd is not None:
+            if not 0.5 <= body.daily_ai_budget_usd <= 100:
+                raise HTTPException(400, "The daily AI limit must be between 0.50 and 100 dollars")
+            a.s.daily_ai_budget_usd = body.daily_ai_budget_usd
+            env["AGENT_DAILY_AI_BUDGET_USD"] = str(body.daily_ai_budget_usd)
         if body.eyes_model is not None:
             if body.eyes_model not in ("claude-haiku-5-5", "claude-sonnet-5-5"):
                 raise HTTPException(400, "eyes_model must be claude-haiku-5-5 or claude-sonnet-5-5")

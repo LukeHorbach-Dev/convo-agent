@@ -47,7 +47,7 @@ class Robot:
         self.messages = self
 
     def create(self, **kw):
-        self.calls.append(kw)
+        self.calls.append({**kw, "messages": list(kw["messages"])})   # as it was at this call
         if len(kw["messages"]) == 1:              # a new task
             self.unfollowed = False
         page = self.hands_ref["hands"].page
@@ -297,7 +297,8 @@ class FakeHands:
     def whoami(self):
         return "lukehorbach2"
 
-    def open_chat(self, username=None, name=None):
+    def open_chat(self, username=None, name=None, known_url=None):
+        self.known_urls = getattr(self, "known_urls", []) + [known_url]
         if self.problem:
             raise self.problem
         return self.chats[username or name]
@@ -380,3 +381,93 @@ def test_messages_are_compared_the_way_claude_copies_them():
     assert similar("what do you do for fun", "what do you do for fun?")
     assert not similar("see you tomorrow", "what do you do for fun?")
     assert similar("😂😂", "😂😂")
+
+
+# ------------------------------------------------------------------------------------------------ 3.1 refinements
+def images_in(call):
+    return [c for m in call["messages"] if m["role"] == "user" and isinstance(m["content"], list) for b in m["content"]
+            if isinstance(b, dict) and b.get("type") == "tool_result" and isinstance(b.get("content"), list)
+            for c in b["content"] if c.get("type") == "image"]
+
+
+@pytest.mark.browser
+def test_a_fresh_picture_comes_back_after_the_last_click_of_a_turn(site):
+    world, _, make_hands = site
+    world.new_follower("anna")
+    h = make_hands(misbehave=[use("left_click", {"coordinate": [5, 5]})])     # a click with no screenshot asked for
+    h.open_chat(username="anna")
+    assert len(images_in(h.robot.calls[1])) == 1
+
+
+@pytest.mark.browser
+def test_chats_are_remembered_so_the_next_message_opens_directly(site, tmp_path):
+    world, _, make_hands = site
+    world.new_follower("anna")
+    store = Store(":memory:")
+    add_draft(store, "hello", "anna", "Hey im Luke :)")
+    h = make_hands()
+    sender = Sender(store, settings_for(tmp_path), lambda: h, notify=lambda *a: None, sleep=lambda s: None)
+    run_sender(sender)
+    url = store.one("SELECT chat_url FROM people WHERE username = 'anna'")["chat_url"]
+    assert url and "/direct/t/" in url
+    world.incoming("anna", "hey :) how are you")
+    add_draft(store, "reply", "anna", "good thanks, you ?", replying_to="hey :) how are you")
+    before = len(h.robot.calls)
+    run_sender(sender)
+    assert ("anna", "good thanks, you ?") in world.sent_log
+    assert len(h.robot.calls) - before <= 2                    # straight to the chat: click the box, report
+    assert any("cents" in r["text"] for r in store.all("SELECT text FROM activity WHERE kind = 'good'"))
+
+
+@pytest.mark.browser
+def test_live_view_gets_each_picture(site):
+    world, _, make_hands = site
+    world.new_follower("anna")
+    seen = []
+    h = make_hands()
+    h.on_view = lambda png, note: seen.append((png[:8], note))
+    h.open_chat(username="anna")
+    assert seen and all(p == b"\x89PNG\r\n\x1a\n" for p, _ in seen) and seen[-1][1] in ("Clicking", "Looking at the page")
+
+
+def test_send_just_one_first_then_pause(tmp_path):
+    store = Store(":memory:")
+    add_draft(store, "hello", "a.one", "Hey :)")
+    add_draft(store, "hello", "b.two", "Hey :)")
+    hands = FakeHands({"a.one": chat(username="a.one", empty=True), "b.two": chat(username="b.two", empty=True)})
+    sender = Sender(store, settings_for(tmp_path), lambda: hands, notify=lambda *a: None, sleep=lambda s: None)
+    sender.go(just_one=True)
+    for _ in range(4):
+        if sender.active:
+            sender.step()
+    assert len(hands.sent) == 1 and not sender.active and sender.status.startswith("Sent one")
+
+
+def test_daily_ai_limit_pauses_sending_until_tomorrow(tmp_path):
+    import time
+    store = Store(":memory:")
+    add_draft(store, "hello", "a.one", "Hey :)")
+    store.add_spend(6.0, "web")
+    s = settings_for(tmp_path); s.daily_ai_budget_usd = 5.0
+    hands = FakeHands({"a.one": chat(username="a.one", empty=True)})
+    banners = []
+    sender = Sender(store, s, lambda: hands, notify=lambda t, x: banners.append(x), sleep=lambda s: None)
+    run_sender(sender, steps=2)
+    assert hands.sent == [] and "spending limit" in sender.status and sender.wait_until > time.time()
+    assert len(banners) == 1
+
+
+def test_dashboard_live_view_and_send_one(tmp_path):
+    from fastapi.testclient import TestClient
+    from agent.intel.llm import FakeLLM
+    from assistant.app import Assistant, create_api
+    a = Assistant(settings_for(tmp_path), store=Store(":memory:"), make_web=lambda: None, llm=FakeLLM(), notify=lambda *a: None)
+    c = TestClient(create_api(a, "tok"), base_url="http://127.0.0.1")
+    H = {"X-Agent-Token": "tok"}
+    assert c.get("/api/live", headers=H).json()["image"] is None
+    a.live.update(png=b"\x89PNGfake", note="Clicking", at=__import__("time").time())
+    assert c.get("/api/live", headers=H).json()["note"] == "Clicking"
+    assert c.get("/api/live").status_code == 401
+    c.post("/api/send/start", headers=H, json={"just_one": True})
+    assert a.sender.active and a.sender.just_one
+    assert c.post("/api/settings", headers=H, json={"daily_ai_budget_usd": 0.1}).status_code == 400

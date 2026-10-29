@@ -137,8 +137,13 @@
       <button class="btn" onclick="openTab('hellos')">Check hellos</button></div>
     <div class="row" style="margin-top:12px">
       <button class="btn go big" id="sendbtn" onclick="startSending()">Send everything I approved</button>
+      <button class="btn" id="onebtn" onclick="startSending(true)">Send just one first</button>
       <button class="btn" id="pausebtn" onclick="post('/api/send/pause')">Pause</button></div>
     <p class="muted" id="sendstatus"></p></div></div>
+  <div class="card" id="livecard" hidden>
+    <h3>Watch it work</h3>
+    <p class="muted" id="livenote">What Claude sees on Instagram, updated every couple of seconds.</p>
+    <img id="liveimg" alt="The Instagram page Claude is looking at" style="width:100%;border-radius:10px;border:1px solid var(--line)"></div>
   <div class="tiles" id="tiles"></div>
   <h2>What's been happening</h2>
   <div class="card feed" id="feed"></div>
@@ -209,7 +214,8 @@
     <div class="row" style="margin-top:8px"><span class="grow">Unfollows a day (max 300)</span><input id="du" class="field" style="width:110px" type="number" min="0" max="300"></div>
     <div class="row" style="margin-top:8px"><span class="grow">Seconds between unfollows</span><input id="gu" class="field" style="width:110px" type="number" min="0" max="600"></div>
     <div class="row" style="margin-top:8px"><span class="grow">Reply to chats from the last how many days</span><input id="rw" class="field" style="width:110px" type="number" min="1"></div>
-    <p class="muted">Instagram blocks accounts that send or unfollow too much in one day, so these stay numbers. When today's number is reached, the rest go tomorrow by themselves.</p>
+    <div class="row" style="margin-top:8px"><span class="grow">AI spending limit per day, in US dollars</span><input id="bud" class="field" style="width:110px" type="number" min="0.5" max="100" step="0.5"></div>
+    <p class="muted">Instagram blocks accounts that send or unfollow too much in one day, so these stay numbers. When today's number is reached, the rest go tomorrow by themselves. The AI limit stops writing and sending for the day once that much has been spent.</p>
     <button class="btn primary" onclick="saveSettings()">Save</button>
   </div>
   <h2>Instagram window</h2>
@@ -226,7 +232,7 @@
   <h2>Your daily routine</h2>
   <div class="card">
     <p><b>Evening.</b> Request your download in Instagram (Accounts Center, Your information and permissions, Download your information: Messages and Followers and following, JSON, All time). When the email comes, download the file into Downloads, then press <b>Load from Downloads</b>. The app reads it and writes replies by itself.</p>
-    <p><b>Morning.</b> Open Replies and Hellos, change anything you want, approve, then press <b>Send everything I approved</b>. It sends one at a time at a steady pace and you can carry on using your laptop.</p>
+    <p><b>Morning.</b> Open Replies and Hellos, change anything you want, approve, then press <b>Send everything I approved</b> (or <b>Send just one first</b> to watch one go and check it in Instagram). It sends one at a time at a steady pace and you can carry on using your laptop.</p>
   </div>
   <h2>When something goes wrong</h2>
   <div class="card">
@@ -281,10 +287,20 @@ function pills(id, key, opts, reload) {
 // ---------------------------------------------------------------- today
 async function loadDownload() { await post('/api/import', {}); }
 async function writeReplies() { await post('/api/think'); }
-async function startSending() {
-  if (!S.counts.approved) return alert('Nothing approved yet. Check your replies and hellos first.');
-  await post('/api/send/start');
+async function startSending(justOne) {
+  if (!S.counts.approved && !S.counts.unfollow_queued) return alert('Nothing approved yet. Check your replies and hellos first.');
+  await post('/api/send/start', {just_one: !!justOne});
 }
+async function refreshLive() {
+  const card = document.getElementById('livecard');
+  if (document.hidden || !S || !S.sender.active) { card.hidden = true; return; }
+  const lv = await api('/api/live');
+  if (!lv.image) return;
+  document.getElementById('liveimg').src = 'data:image/png;base64,' + lv.image;
+  document.getElementById('livenote').textContent = lv.status + (lv.note ? ' · ' + lv.note : '');
+  card.hidden = false;
+}
+
 function renderToday(s) {
   const c = s.counts, li = s.last_import, job = s.job, snd = s.sender;
   let cls = 'go', title = 'All good', sub = '';
@@ -468,20 +484,20 @@ function renderSettings(s) {
   if (ey && document.activeElement !== ey) ey.value = s.settings.eyes_model;
   const set = (id, v) => { const e = document.getElementById(id); if (document.activeElement !== e) e.value = v; };
   set('dm', s.settings.daily_messages); set('gm', s.settings.message_gap_s); set('du', s.settings.daily_unfollows);
-  set('gu', s.settings.unfollow_gap_s); set('rw', s.settings.reply_window_days);
+  set('gu', s.settings.unfollow_gap_s); set('rw', s.settings.reply_window_days); set('bud', s.settings.daily_ai_budget_usd);
   document.getElementById('tuck').checked = !!s.settings.tuck_window;
   document.getElementById('ver').textContent = `Version ${s.version}, set up for @${s.you}`;
 }
 async function saveSettings() {
   const n = id => Number(document.getElementById(id).value);
-  await post('/api/settings', {daily_messages: n('dm'), message_gap_s: n('gm'), daily_unfollows: n('du'), unfollow_gap_s: n('gu'), reply_window_days: n('rw')});
+  await post('/api/settings', {daily_messages: n('dm'), message_gap_s: n('gm'), daily_unfollows: n('du'), unfollow_gap_s: n('gu'), reply_window_days: n('rw'), daily_ai_budget_usd: n('bud')});
   alert('Saved.');
 }
 
 async function refresh() { S = await api('/api/state'); renderToday(S); renderSettings(S); }
 async function boot() {
   if (!TOKEN) return show(false);
-  try { await refresh(); show(true); openTab(store.get('tab', 'today')); setInterval(() => refresh().catch(() => {}), 3000); } catch (e) { show(false); }
+  try { await refresh(); show(true); openTab(store.get('tab', 'today')); setInterval(() => refresh().catch(() => {}), 3000); setInterval(() => refreshLive().catch(() => {}), 2000); } catch (e) { show(false); }
 }
 boot();
 </script>
