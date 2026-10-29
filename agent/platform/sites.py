@@ -30,6 +30,7 @@ class SiteProfile:
     challenge_url_patterns: list[str] = field(default_factory=list)
     login_selectors: list[str] = field(default_factory=list)
     ready_timeout_ms: int | None = None  # how long to wait for a page's key element; None = the action timeout
+    settle_ms: int = 0                   # steady pause after each page load, click and scroll (0 on the mock site)
     notes: tuple[str, ...] = ()
 
     def url(self, path: str) -> str:
@@ -45,7 +46,13 @@ class SiteProfile:
     def profile_path(self, username: str) -> str: return f"/{username}/"
     def followers_path(self, me: str) -> str: return f"/{me}/followers/"
     def list_link(self, me: str, which: str = "followers") -> str:   # on your profile; opens that list
-        return f'a[href$="/{me}/{which}/"]'
+        # A link to the list, or the "1,764 following" count itself, which live is a clickable label, not a link.
+        # Anchored at the end so "followers" and "following" can't be mixed up.
+        pattern = f'"^[0-9.,]+[KkMm]? +{which}$", "i"'          # no backslashes: they'd need CSS escaping
+        return f'a[href$="/{me}/{which}/"], main [role="link"]:text-matches({pattern}), main a:text-matches({pattern})'
+    def list_title(self, which: str) -> str:
+        """The open list pop-up's title ("Followers" / "Following"): the two lists look alike otherwise."""
+        return f'[role="dialog"] :text-is("{which.title()}")'
     def follower_links(self) -> str: raise NotImplementedError
     def followers_ready(self) -> str: raise NotImplementedError
     def inbox_ready(self) -> str: raise NotImplementedError
@@ -116,9 +123,7 @@ class InstagramProfile(SiteProfile):
         return 'div[role="dialog"] a[href^="/"]'
 
     def list_link(self, me: str, which: str = "followers") -> str:
-        # The "796 followers" / "1,465 following" link in your profile header; the text fallback covers a header
-        # without that href.
-        return f'a[href$="/{me}/{which}/"], header a:has-text("{which}")'
+        return SiteProfile.list_link(self, me, which)
 
     def thread_rows(self):
         # Inbox rows are div[role=button] without links, inside div[aria-label="Thread list"]. Conversation rows show a
@@ -188,6 +193,7 @@ INSTAGRAM = InstagramProfile(
     challenge_url_patterns=[r"/challenge/", r"/checkpoint/", r"/accounts/suspended", r"/two_factor"],
     login_selectors=['input[name="password"]'],
     ready_timeout_ms=25_000,             # a full page load renders the app first and pop-ups like followers later
+    settle_ms=1_500,                     # Luke asked for it a little slower; also gives lazy content time to appear
     notes=("Instagram Web has no new-follower event stream; followers are inferred by diffing the list",
            "message ids are content hashes (no stable ids in the page)",
            "delivery checks re-read the thread and are best effort",

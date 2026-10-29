@@ -50,6 +50,11 @@ class WebPlatform:
     def page(self):
         return self.sup.page
 
+    def _pause(self) -> None:
+        """A short, steady pause after a click so the next page or pop-up can finish loading."""
+        if self.site.settle_ms:
+            self.page.wait_for_timeout(self.site.settle_ms // 2)
+
     def _visible(self, selector: str):
         """Locator restricted to visible elements; hidden duplicates (common on Instagram) are ignored."""
         return self.page.locator(selector).filter(visible=True)
@@ -81,14 +86,28 @@ class WebPlatform:
         self.sup.goto(self.site.url(self.site.profile_path(self.me)), expect=re.escape(f"/{self.me}/"), ready=link)
         def open_list():
             self._visible(link).first.click()
+            self._pause()
             try:
                 self._visible(self.site.followers_ready()).first.wait_for(
                     state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
             except Exception as e:
                 self.sup.save_screenshot(f"selector-drift-{which}")
                 raise SelectorDrift(f"{which} list did not open after clicking {link}: {self.site.followers_ready()}") from e
-        log.info(f"opening {which} list", extra={"outcome": f"clicking the {which} link on your profile"})
+        log.info(f"opening {which} list", extra={"outcome": f"clicking the {which} count on your profile"})
         self.sup.run(f"open {which}", open_list)
+        def right_list():
+            # Seen live: the app opened Followers when it meant Following. Never read a list without its title.
+            other = "followers" if which == "following" else "following"
+            try:
+                self._visible(self.site.list_title(which)).first.wait_for(state="visible", timeout=self.sup.cfg.action_timeout_ms)
+                wrong = self._visible(self.site.list_title(other)).count() and which == "following"
+            except Exception:
+                wrong = True
+            if wrong:
+                self.sup.save_screenshot(f"selector-drift-{which}")
+                self.page.keyboard.press("Escape")
+                raise SelectorDrift(f"the list that opened isn't your {which} list")
+        self.sup.run(f"check {which} list", right_list)
         def read():
             links = self._visible(self.site.follower_links())
             try:
@@ -108,6 +127,8 @@ class WebPlatform:
                 links.last.scroll_into_view_if_needed()
                 links.last.hover()
                 self.page.mouse.wheel(0, 2500)       # a real scroll inside the list, which is what loads more
+                if self.site.settle_ms:
+                    self.page.wait_for_timeout(self.site.settle_ms)
                 links.last.evaluate("""a => { for (let e = a.parentElement; e; e = e.parentElement)
                     if (e.scrollHeight > e.clientHeight + 10 && getComputedStyle(e).overflowY !== 'visible') {
                       e.scrollTop = e.scrollHeight; break; } }""")
@@ -148,6 +169,7 @@ class WebPlatform:
                 for r in rows.all()[: self.max_threads]:
                     if r.evaluate(self.ROW_TEXT_JS) == text:
                         r.click()
+                        self._pause()
                         self.page.wait_for_url(re.compile(r"/direct/t/[^/]+"), timeout=self.sup.cfg.action_timeout_ms)
                         self._visible(self.site.thread_ready()).first.wait_for(
                             state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
@@ -206,9 +228,12 @@ class WebPlatform:
                     raise PermissionRestricted(f"{username}: messaging is not available ({marker})")
             btn = self._visible(self.site.message_button())
             n = btn.count()
+            if n == 0 and self._visible(self.site.follow_button()).count() and not self._visible(self.site.following_button()).count():
+                raise PermissionRestricted(f"{username}: you don't follow them, so their profile has no Message button")
             if n == 0:
                 raise SelectorDrift(f"{username}: no Message control found on the profile")
             btn.first.click()                         # the first one is the profile's own button
+            self._pause()
             return self._wait_for_conversation(username)
         key = self.sup.run(f"open dm {username}", click)
         if key is None and (url := self.site.dm_url(username)):
@@ -230,6 +255,7 @@ class WebPlatform:
         while not re.search(r"/direct/t/[^/]+", self.page.url):
             if not expanded and self._visible(self.site.dm_expand()).count():
                 self._visible(self.site.dm_expand()).first.click()
+                self._pause()
                 expanded = True
             if time.monotonic() > deadline:
                 log.info("conversation did not open", extra={"outcome": "expanded pop-up" if expanded else "no expand control"})
@@ -257,6 +283,7 @@ class WebPlatform:
                     return "not_following"
                 raise PermissionRestricted(f"{username}: profile isn't available")
             self._visible(self.site.following_button()).first.click()
+            self._pause()
             confirm = self._visible(self.site.unfollow_confirm())
             try:
                 confirm.first.wait_for(state="visible", timeout=self.sup.cfg.action_timeout_ms)
@@ -265,6 +292,7 @@ class WebPlatform:
                 self.sup.save_screenshot("selector-drift-unfollow")
                 raise SelectorDrift(f"{username}: the Following menu has no Unfollow option")
             confirm.first.click()
+            self._pause()
             try:                                     # private accounts: "Unfollow?" asks once more
                 confirm.first.wait_for(state="visible", timeout=1500)
                 confirm.first.click()

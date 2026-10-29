@@ -96,7 +96,7 @@ immediately and survives restarts until you clear it.
 ## Test
 
 ```bash
-.venv/bin/python -m pytest                      # everything (about 2 minutes, 245 tests)
+.venv/bin/python -m pytest                      # everything (about 2 minutes, 248 tests)
 .venv/bin/python -m pytest -m "not browser"     # skip the real-Chromium tests
 CHAOS_SEEDS=300 .venv/bin/python -m pytest tests/test_chaos.py   # longer randomized fault run
 ```

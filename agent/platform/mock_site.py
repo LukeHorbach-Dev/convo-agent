@@ -25,7 +25,7 @@ def page(world: MockWorld, body: str, title: str = "Mock") -> HTMLResponse:
 
 def create_site(world: MockWorld) -> FastAPI:
     app = FastAPI()
-    app.state.web = {"hang_paths": set(), "send_hang_s": 0.0, "drift": False, "no_expand": False}
+    app.state.web = {"hang_paths": set(), "send_hang_s": 0.0, "drift": False, "no_expand": False, "swap_lists": False}
 
     @app.middleware("http")
     async def faults(request: Request, call_next):
@@ -118,18 +118,24 @@ def create_site(world: MockWorld) -> FastAPI:
     @app.get("/{username}/following/")
     @app.get("/{username}/followers/")
     def followers(username: str, request: Request):
-        # The mock has one list: "following" shows the same accounts as "followers".
+        # Following: the accounts in follower_events. Followers: those plus "fans" (people you don't follow back),
+        # so reading the wrong list shows up in tests.
+        which = "following" if request.url.path.rstrip("/").endswith("following") else "followers"
         # Like Instagram: loading /followers/ directly can show just the profile, with no list. The list opens when
         # you arrive from the profile's followers link.
         if not (request.headers.get("referer") or "").endswith(f"/{username}/"):
             return page(world, '<div role="dialog" style="display:none"></div>'
                                f'<h1 data-testid="profile-username">{E(username)}</h1>', "Profile")
         with world.lock:
-            items = "".join(f'<li><a data-testid="follower" data-display-name="{E(world.accounts[e["username"]].display_name)}" '
-                            f'href="/{E(e["username"])}/">{E(e["username"])}</a></li>' for e in reversed(world.follower_events) if e["username"] not in world.unfollowed)   # newest first, like Instagram
+            names = [e["username"] for e in reversed(world.follower_events) if e["username"] not in world.unfollowed]  # newest first
+            if which == "followers":
+                names = list(reversed(world.fans)) + names
+            items = "".join(f'<li><a data-testid="follower" data-display-name="{E(world.accounts[u].display_name)}" '
+                            f'href="/{E(u)}/">{E(u)}</a> <div role="button">{"Following" if which == "following" else "Remove"}</div></li>'
+                            for u in names)
         # Like Instagram: the list is a modal role=dialog, and an empty, hidden role=dialog sits earlier in the DOM.
         return page(world, '<div role="dialog" style="display:none"></div>'
-                           f'<div role="dialog"><h1>Followers</h1><ul>{items}</ul></div>', "Followers")
+                           f'<div role="dialog"><h1>{which.title()}</h1><ul>{items}</ul></div>', which.title())
 
     @app.get("/{username}/")
     def profile(username: str):
@@ -138,8 +144,9 @@ def create_site(world: MockWorld) -> FastAPI:
             if username == world.me:
                 return page(world, f'<header><h1 data-testid="profile-username">{E(username)}</h1>'
                                    '<a href="/accounts/edit/">Edit profile</a></header>'
-                                   f'<a href="/{E(username)}/followers/">{len(world.follower_events)} followers</a> '
-                                   f'<a href="/{E(username)}/following/">{len(world.follower_events)} following</a>')
+                                   # Live profile (29 Oct): the counts are clickable labels (span role=link), not links.
+                                   f'<span role="link" onclick="location.href=\'/{E(username)}/followers/\'">{len(world.follower_events) + len(world.fans)} followers</span> '
+                                   f'<span role="link" onclick="location.href=\'/{E(username)}/{"followers" if app.state.web["swap_lists"] else "following"}/\'">{len(world.follower_events)} following</span>')
             if not acct:
                 return page(world, "<p>Sorry, this page isn't available.</p>", "Page not found")
             f = world.faults
@@ -158,7 +165,9 @@ def create_site(world: MockWorld) -> FastAPI:
                        f'<aside id="chat" hidden><b>{E(username)}</b>{expand}'
                        f'<div data-testid="popup-composer" contenteditable="true">Message...</div></aside>')
             script = ""
-            if username in world.unfollowed:
+            if username in world.fans and username not in [e["username"] for e in world.follower_events]:
+                btn = ""                                    # like live: no Message button for someone you don't follow
+            if username in world.unfollowed or username in world.fans:
                 follow = '<div>Follow</div>'
             else:
                 # Like Instagram: "Following" opens a menu whose "Unfollow" item unfollows; the button then says Follow.

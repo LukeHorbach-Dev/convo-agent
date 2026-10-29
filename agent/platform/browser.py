@@ -209,6 +209,8 @@ class BrowserSupervisor:
                 # role=dialog elements) earlier in the page, and waiting on the first match would wait on a hidden one.
                 self.page.locator(ready).filter(visible=True).first.wait_for(
                     state="visible", timeout=self.site.ready_timeout_ms or self.cfg.action_timeout_ms)
+                if self.site.settle_ms:
+                    self.page.wait_for_timeout(self.site.settle_ms)   # let the rest of the page arrive
             except Exception as e:
                 self.check_session()
                 path = urlsplit(self.page.url).path

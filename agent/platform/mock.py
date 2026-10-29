@@ -51,6 +51,7 @@ class MockWorld:
         self.lock = threading.RLock()
         self.sent_log: list[tuple[str, str]] = []   # ground truth of every delivered outbound message
         self.unfollowed: set[str] = set()           # accounts the operator had the agent unfollow
+        self.fans: list[str] = []                   # follow you, but you don't follow them (only in Followers)
 
     def next_id(self, prefix: str) -> str:
         return f"{prefix}{next(self._ids)}"
@@ -60,6 +61,12 @@ class MockWorld:
             acct = MockAccount(username, display_name or username.title(), self.next_id("pid"), bio)
             self.accounts[username] = acct
             return acct
+
+    def new_fan(self, username: str) -> None:
+        with self.lock:
+            if username not in self.accounts:
+                self.add_account(username)
+            self.fans.append(username)
 
     def new_follower(self, username: str, display_name: str = "", bio: str = "") -> None:
         with self.lock:

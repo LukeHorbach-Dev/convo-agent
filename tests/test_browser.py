@@ -165,6 +165,35 @@ def test_unavailable_profile_is_skipped_not_treated_as_a_broken_page(site):
         web.open_dm("someone.who.left")
 
 
+def test_following_list_never_includes_people_you_dont_follow(site, db):
+    """Seen live: hellos were lined up for people from the Followers list. Fans (follow you, you don't follow
+    them back) must never get one when the app works from your Following list."""
+    world, _, web = site
+    web.audience = "following"
+    s = make_settings(); s.policy.audience = "following"
+    world.new_follower("friend.one"); world.new_fan("fan.only")
+    app = build_app(s, db=db, platform=web, world=world)
+    settle(app.engine, 3)
+    assert [u for u, _ in world.sent_log] == ["friend.one"]
+    assert app.db.scalar("SELECT COUNT(*) FROM accounts WHERE username = 'fan.only'") == 0
+
+
+def test_the_wrong_list_opening_is_caught_before_anything_is_read(site, db):
+    world, server, web = site
+    web.audience = "following"
+    world.new_follower("friend.one"); world.new_fan("fan.only")
+    server.app.state.web["swap_lists"] = True                 # the "following" count opens Followers
+    with pytest.raises(SelectorDrift, match="isn't your following list"):
+        web.poll_followers()
+
+
+def test_someone_you_dont_follow_is_skipped_not_treated_as_a_broken_page(site):
+    world, _, web = site
+    world.new_fan("fan.only")
+    with pytest.raises(PermissionRestricted, match="don't follow them"):
+        web.open_dm("fan.only")
+
+
 # 1. a page that never finishes loading
 def test_navigation_timeout_is_classified(site):
     world, server, web = site

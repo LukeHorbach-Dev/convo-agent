@@ -21,6 +21,8 @@ a fix is ever undone.
 | 13 | Fix for #11 "didn't work" | The update never got installed (no DONE), so the old version ran | `update.sh` installs from the zip in one step; the version is printed at startup and shown on the dashboard | `update.sh` tested on an old install with personal data |
 | 14 | Canned "Sounds interesting…" replies | No AI key: the test model was writing replies | On Instagram without a key, reply boxes are left empty for you to type | `test_without_an_ai_key_real_replies_are_left_for_you_to_write` |
 | 15 | Self-check steps 5 and 7: no Message / Following button found | That profile had no `<header>` element; the buttons were found by header and role | Profile buttons found by exact visible text inside `<main>`; unfollow is confirmed by "Following" disappearing (suggested accounts have their own Follow buttons) | mock profiles have no header, role-less buttons and a suggestions strip |
+| 16 | Check picked @hui060818, whose profile says Follow | On the live profile the counts are clickable labels, not links; the app opened Followers when it meant Following and never checked | Counts found by their words ("1,764 following", anchored so followers/following can't mix); the list's title must say Following before anything is read; someone you don't follow is skipped, not reported as a broken page | mock: counts are labels, Followers includes fans, a swapped-lists fault; three tests |
+| 17 | Moving too fast | No pause after loads, clicks and scrolls | Steady 1.5 s after each page load and scroll, 0.75 s after each click (Instagram only) | n/a |
 
 ## Self-check
 
