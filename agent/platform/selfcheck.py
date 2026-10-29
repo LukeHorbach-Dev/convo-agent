@@ -53,9 +53,10 @@ def self_check(web: WebPlatform, settle_ms: int = 3000) -> str:
         found = reader.poll_followers()
         assert found, "list opened but no accounts read"
         ctx["someone"] = found[0].username
-        total = web.page.locator(site.list_link(me, "following")).first.inner_text() if web.page.locator(site.list_link(me, "following")).count() else "?"
+        marked = web.page.locator('[data-agent-target="following"]')
+        total = marked.first.inner_text().replace("\n", " ") if marked.count() else "?"
         return f"read {len(found)} in 3 scrolls; profile says {total.strip()!r}; first: @{found[0].username}"
-    step("2 following list", following_list, [site.list_link(me, "following"), site.followers_ready(), site.follower_links()])
+    step("2 following list", following_list, ['[data-agent-target="following"]', site.followers_ready(), site.follower_links()])
 
     def inbox():
         web.sup.goto(site.url(site.inbox_path()), expect=r"/direct/", ready=site.inbox_ready())

@@ -410,3 +410,22 @@ def test_unfollow_everyone_through_the_engine_respects_the_daily_limit(site, db)
     assert len(world.unfollowed) == 2                       # the third waits for tomorrow
     assert "blocked" in job_states(app.db, "unfollow").values()
     assert len(world.sent_log) == sent_before
+
+
+def test_count_finder_on_the_live_profile_shapes():
+    """Seen live (29 Oct): the number is its own piece and the word sits beside it; no hrefs; sometimes a
+    non-breaking space. The finder must pick Following, never Followers."""
+    from playwright.sync_api import sync_playwright
+    from agent.platform.web import MARK_COUNT_JS
+    html = """<main><ul>
+      <li><div role="button"><span><span>8</span></span> posts</div></li>
+      <li><a role="link"><span><span>819</span></span> followers</a></li>
+      <li><a role="link"><span><span>1,765</span></span>&nbsp;following</a></li></ul>
+      <p>Followed by someone and 5 more following this</p></main>"""
+    with sync_playwright() as p:
+        b = p.chromium.launch(); pg = b.new_page(); pg.set_content(html)
+        assert pg.evaluate(MARK_COUNT_JS, "following") is True
+        assert pg.locator('[data-agent-target="following"]').inner_text().replace("\xa0", " ") == "1,765 following"
+        assert pg.evaluate(MARK_COUNT_JS, "followers") is True
+        assert pg.locator('[data-agent-target="followers"]').inner_text() == "819 followers"
+        b.close()

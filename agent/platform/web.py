@@ -14,6 +14,23 @@ from .sites import SiteProfile, content_id
 
 USERNAME = re.compile(r"^/([A-Za-z0-9._]{1,30})/?$")
 log = logging.getLogger("web")
+
+# Marks the smallest element in <main> whose text is a count and the word (e.g. "1,765 following", also when the
+# number and the word are separate pieces), or its clickable ancestor, with data-agent-target=<word>.
+MARK_COUNT_JS = r"""(which) => {
+  const main = document.querySelector('main'); if (!main) return false;
+  const re = new RegExp('^[0-9.,]+\\s*[kmb]?\\s*' + which + '$', 'i');
+  let best = null;
+  for (const e of main.querySelectorAll('*')) {
+    const t = (e.textContent || '').replace(/\s+/g, ' ').trim();
+    if (t.length > 30 || !re.test(t)) continue;
+    if (!best || best.contains(e)) best = e;
+  }
+  if (!best) return false;
+  document.querySelectorAll('[data-agent-target="' + which + '"]').forEach(e => e.removeAttribute('data-agent-target'));
+  (best.closest('a, [role="link"], [role="button"], button') || best).setAttribute('data-agent-target', which);
+  return true;
+}"""
 RESERVED = {"direct", "explore", "reels", "accounts", "stories", "p", "reel", "about", "legal", "challenge", "api"}
 
 
@@ -82,17 +99,25 @@ class WebPlatform:
         Opened the way a person does: your profile, then the list link. Loading the list's address directly
         doesn't open the pop-up on Instagram in every browser session."""
         which = self.audience
-        link = self.site.list_link(self.me, which)
-        self.sup.goto(self.site.url(self.site.profile_path(self.me)), expect=re.escape(f"/{self.me}/"), ready=link)
+        link = f'[data-agent-target="{which}"]'
+        self.sup.goto(self.site.url(self.site.profile_path(self.me)), expect=re.escape(f"/{self.me}/"), ready="main")
         def open_list():
-            self._visible(link).first.click()
+            # Find the count the way a person reads it: a number followed by the word ("1,765 following"),
+            # however the page splits it into pieces, then click it.
+            deadline = time.monotonic() + (self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms) / 1000
+            while not self.page.evaluate(MARK_COUNT_JS, which):
+                if time.monotonic() > deadline:
+                    self.sup.save_screenshot(f"selector-drift-{which}")
+                    raise SelectorDrift(f"couldn't find the {which} count on your profile")
+                self.page.wait_for_timeout(500)
+            self.page.locator(link).first.click()
             self._pause()
             try:
                 self._visible(self.site.followers_ready()).first.wait_for(
                     state="visible", timeout=self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms)
             except Exception as e:
                 self.sup.save_screenshot(f"selector-drift-{which}")
-                raise SelectorDrift(f"{which} list did not open after clicking {link}: {self.site.followers_ready()}") from e
+                raise SelectorDrift(f"the {which} list didn't open after clicking its count") from e
         log.info(f"opening {which} list", extra={"outcome": f"clicking the {which} count on your profile"})
         self.sup.run(f"open {which}", open_list)
         def right_list():

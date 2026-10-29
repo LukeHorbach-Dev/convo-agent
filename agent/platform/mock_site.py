@@ -145,8 +145,8 @@ def create_site(world: MockWorld) -> FastAPI:
                 return page(world, f'<header><h1 data-testid="profile-username">{E(username)}</h1>'
                                    '<a href="/accounts/edit/">Edit profile</a></header>'
                                    # Live profile (29 Oct): the counts are clickable labels (span role=link), not links.
-                                   f'<span role="link" onclick="location.href=\'/{E(username)}/followers/\'">{len(world.follower_events) + len(world.fans)} followers</span> '
-                                   f'<span role="link" onclick="location.href=\'/{E(username)}/{"followers" if app.state.web["swap_lists"] else "following"}/\'">{len(world.follower_events)} following</span>')
+                                   f'<span role="link" onclick="location.href=\'/{E(username)}/followers/\'"><span>{len(world.follower_events) + len(world.fans)}</span><span> followers</span></span> '
+                                   f'<span role="link" onclick="location.href=\'/{E(username)}/{"followers" if app.state.web["swap_lists"] else "following"}/\'"><span>{len(world.follower_events)}</span><span> following</span></span>')
             if not acct:
                 return page(world, "<p>Sorry, this page isn't available.</p>", "Page not found")
             f = world.faults

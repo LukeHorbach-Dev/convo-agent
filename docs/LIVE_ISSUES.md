@@ -23,6 +23,7 @@ a fix is ever undone.
 | 15 | Self-check steps 5 and 7: no Message / Following button found | That profile had no `<header>` element; the buttons were found by header and role | Profile buttons found by exact visible text inside `<main>`; unfollow is confirmed by "Following" disappearing (suggested accounts have their own Follow buttons) | mock profiles have no header, role-less buttons and a suggestions strip |
 | 16 | Check picked @hui060818, whose profile says Follow | On the live profile the counts are clickable labels, not links; the app opened Followers when it meant Following and never checked | Counts found by their words ("1,764 following", anchored so followers/following can't mix); the list's title must say Following before anything is read; someone you don't follow is skipped, not reported as a broken page | mock: counts are labels, Followers includes fans, a swapped-lists fault; three tests |
 | 17 | Moving too fast | No pause after loads, clicks and scrolls | Steady 1.5 s after each page load and scroll, 0.75 s after each click (Instagram only) | n/a |
+| 18 | Check step 2: "1,765 following" not found | The number and the word are separate pieces of the page, so no single link or label reads "1,765 following" | A small page script finds the number followed by the word, however it is split (also with a non-breaking space), and clicks its clickable parent | mock splits the count into pieces; a test on the live shape |
 
 ## Self-check
 
