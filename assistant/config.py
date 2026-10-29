@@ -39,6 +39,10 @@ class AssistantSettings(BaseSettings):
     pace: Pace = Pace()
     eyes: Eyes = Eyes()
     daily_ai_budget_usd: float = Field(5.0, ge=0.5, le=100)   # sending and writing pause for the day past this
+    write_overnight: bool = True             # replies through the half-price overnight service (usually within the hour)
+    send_at: str | None = Field(None, pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")    # start sending what's approved
+    quiet_from: str | None = Field(None, pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")  # no sending between these
+    quiet_to: str | None = Field(None, pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
     reply_window_days: int = Field(90, ge=1)     # only draft replies for chats where they wrote in this window
     min_age: int = 19
     dashboard_port: int = 8765

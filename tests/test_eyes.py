@@ -365,15 +365,20 @@ def test_instagram_warnings_mean_a_long_break(tmp_path):
 
 
 def test_without_an_ai_key_sending_stops_and_says_so(tmp_path):
-    from assistant.app import Assistant
-    from agent.intel.llm import FakeLLM
+    from agent.platform.sites import INSTAGRAM
+    hands = Hands(None, INSTAGRAM, "lukehorbach2", None)           # no AI client: nothing that needs Claude can run
+    with pytest.raises(InterventionRequired, match="AI key"):
+        hands._task("x", [])
     store = Store(":memory:")
     add_draft(store, "hello", "x.one", "Hey, hows your week going ?")
-    a = Assistant(settings_for(tmp_path), store=store, llm=FakeLLM(), notify=lambda *a: None)
-    with pytest.raises(InterventionRequired):
-        a._instagram()
-    run_sender(a.sender, steps=2)
-    assert a.sender.status.startswith("Stopped") and "AI key" in a.sender.status
+
+    class NoKey(FakeHands):
+        def whoami(self):
+            raise InterventionRequired("Sending needs your AI key, because Claude looks at Instagram's page to do it.")
+    sender = Sender(store, settings_for(tmp_path), lambda: NoKey(), notify=lambda *a: None, sleep=lambda s: None)
+    run_sender(sender, steps=2)
+    assert sender.status.startswith("Stopped") and "AI key" in sender.status
+    assert store.one("SELECT status FROM drafts")["status"] == "approved"
 
 
 def test_messages_are_compared_the_way_claude_copies_them():

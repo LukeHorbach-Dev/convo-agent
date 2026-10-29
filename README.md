@@ -1,60 +1,83 @@
-# Instagram assistant (version 3)
+# Convo, your Instagram assistant (version 4)
 
-The assistant reads **Instagram's own data download** to know exactly who you follow, who follows you, and every
-conversation. The AI (Claude, with your API key) writes hellos and replies in your voice, sorts chats into "you'd
-click", "worth a closer look" and the rest, and remembers what people told you.
+Convo is a Mac app. It reads **Instagram's own data download** to know exactly who you follow, who follows you and
+every conversation. Claude writes hellos and replies in your voice, sorts people into "you'd click", "worth a
+closer look" and the rest, and remembers what they told you. You check, approve and send, or ask it things.
 
-**New in version 3: Claude uses the website the way you do.** Earlier versions clicked Instagram's pages by their
-hidden code, which broke whenever Instagram changed it. Now, for each message or unfollow, Claude looks at a picture
-of the page and clicks (assistant/eyes.py). Claude can't type and never presses Enter: the app types the exact
-message you approved, checks it letter for letter in the message box, and only then sends it and checks it
-appeared. This costs about 1 US cent per message or unfollow with Claude Haiku (Settings can switch to Sonnet:
-steadier on unusual pages, about 10 to 20 cents each).
+## Install
 
-Also since 3.1: **Watch it work** on the Today page shows the Instagram page Claude is looking at while it sends;
-**Send just one first** sends a single message and pauses so you can check it in Instagram; each chat's address is
-remembered after the first visit, so later messages to the same person go straight there (fewer steps, cheaper);
-and a **daily AI spending limit** (Settings, default 5 US dollars) pauses writing and sending for the day once
-reached.
+1. Unzip `Convo-4.x.zip` and drag **Convo** into Applications.
+2. In Terminal, once: `xattr -cr /Applications/Convo.app` (tells macOS you trust it; it isn't signed by Apple).
+3. Open Convo. The first time a Terminal window sets it up (3 to 5 minutes: Python, its parts and a browser, all
+   inside `~/Library/Application Support/Convo`), then the app opens. An older `~/Downloads/convo-agent` folder is
+   copied across (sign-in, data, settings, AI key) and left untouched.
 
-**Nothing is sent until you approve it.** Approving can be one tap for a whole batch ("Approve all ready ones",
-"Approve all hellos"); replies the AI flags still need you one by one.
+Updating: drag the new Convo over the old one. Data lives in Application Support, so nothing is lost.
 
-## Daily routine
+## A day with Convo
 
-1. **Evening:** request your download in Instagram (Accounts Center → Your information and permissions → Download
-   your information → Messages + Followers and following, **JSON**, **All time**). When it arrives, save it to
-   Downloads and press **Load from Downloads** on the dashboard. Replies are written by themselves.
-2. **Morning:** check **Replies** and **Hellos**, change anything, approve, then **Send everything I approved**.
-   It goes one at a time at a steady pace in the background; you can use your laptop meanwhile.
+1. **Evening:** request your download in Instagram (Accounts Center, Your information and permissions, Download
+   your information: Messages + Followers and following, **JSON**, **All time**). Save it in Downloads and press
+   **Load** on Today. Replies are written **overnight at half price** (Anthropic's batch service; usually within
+   the hour).
+2. **Morning:** check **Replies** and **Hellos**, approve (one by one or "Approve all ready"), then **Send**, or
+   **Send just one first** to watch it in the live view. Or set **Send by itself at** in Settings.
 
-## Commands
+## What's in it
+
+| | |
+|---|---|
+| **Stop now** | The red button stops everything at once: Claude stops at its next click, writing stops. |
+| **Ask (⌘K)** | "What did @maya say?", "who's interesting this week?", "write a reply to @tom about sunday", "send 'see you at 6' to @ben", "stop". Simple commands are free. |
+| **Person panel** | Click anyone: their whole chat, what Convo remembers, your note, an AI report (about 1¢), message them, never-message, unfollow. |
+| **Briefing** | Today shows new messages, who's waiting, people you'd click with and chats worth a closer look. |
+| **Watch it work** | While sending, Today shows the Instagram page Claude is looking at. |
+| **Schedules** | Send at a set time each day; quiet hours when nothing is sent. |
+| **Spending limit** | Writing and sending pause for the day at your limit (default $5). Spend is broken down in Settings. |
+| **Practice** | Settings, Practice: a pretend Instagram with made-up people to try everything, including an **automatic** switch that approves and sends by itself. Only practice has that switch. |
+| **Spreadsheet** | People, Spreadsheet: everyone with summaries, interest, concerns, notes. |
+| **Self-check** | Settings: Claude tries every Instagram step on your account without sending anything (about 5¢). |
+
+## How sending works (and why it's reliable)
+
+Claude looks at a picture of the page and clicks, like a person (assistant/eyes.py), so Instagram changing its
+pages doesn't break anything. Claude can't type and never presses Enter: the app types the exact approved text,
+checks it letter for letter in the message box, sends it, and checks it appeared. Before a reply it checks it's
+the right person and that they haven't written again; before a hello, that the chat is empty. Each chat's address
+is remembered, so later messages go straight there. Problems are sorted into: try later, skip this person, take a
+break (Instagram said slow down: 6 hours), or stop and tell you.
+
+## Costs (US cents)
+
+| | Opus (default) | Sonnet | Haiku |
+|---|---|---|---|
+| Write a reply overnight | about 1¢ | about 0.6¢ | under 0.1¢ |
+| Write a reply straight away | about 2¢ | about 1¢ | about 0.1¢ |
+| Send a message / unfollow (Claude Haiku looking) | about 1¢ | | |
+| Hellos | free to write (your own words), about 1¢ to send | | |
+
+At $5 a day that's roughly 150 to 250 messages written and sent.
+
+## For developers
 
 ```bash
-bash setup-mac.sh     # install (copies your sign-in from ../convo-agent-old if present)
-bash login.sh         # sign in to Instagram in the assistant's browser
-bash check.sh         # Claude tries every website step without sending anything (about 5 cents);
-                      # send Claude data/diagnostics/check.txt
-bash start.sh         # start the assistant and open the dashboard
-bash update.sh        # install a newer zip from Downloads, keeping your data
+uv venv -p 3.12 .venv && uv pip install -p .venv/bin/python -r requirements.lock && uv pip install -p .venv/bin/python -e . --no-deps
+.venv/bin/playwright install chromium
+.venv/bin/python -m pytest -q          # about 300 tests, 5 minutes (real Chromium against the practice site)
+.venv/bin/python -m assistant run      # the app in this Terminal (dashboard on http://127.0.0.1:8765)
+.venv/bin/python -m assistant practice # the practice copy (port 8766); --real-ai to use real Claude
+python3 mac/make_icon.py               # the app icon (needs Pillow)
+python3 mac/build_app.py               # dist/Convo.app and dist/Convo-<version>.zip
 ```
 
-## How problems are handled
-
-Each problem is sorted into: **try later** (Instagram didn't load: waits 10 minutes), **skip this person** (private,
-gone, can't be messaged), **take a break** (Instagram said "try again later": 6 hours), or **stop and tell you**
-(sign in again, the AI key or credit needs looking at, or Claude couldn't finish three times in a row). Before every reply it checks it's the right
-chat, that they haven't written again since the download, and that you haven't already answered; before every
-hello it checks the chat is empty. Daily numbers (messages, unfollows) and the gaps between them are in Settings.
-
-## Costs
-
-Hellos use your own wording and cost nothing to write. Writing each reply is one AI call: about 1 to 3 US cents.
-Sending each message or unfollowing someone: about 1 cent (Claude looking at the page and clicking).
+Layout: `assistant/` is the app (export.py reads downloads, brain.py and writer.py write replies, eyes.py uses
+Instagram, sender.py works through what's approved, ask.py is the Ask box, reports.py, practice.py, app.py is the
+dashboard API, web/app.html the dashboard). `agent/` is version 1, reused for the browser supervisor, voice rules
+and AI client. `mac/` is the app bundle.
 
 ---
 
-The rest of this file describes version 1 (`agent/`), which version 2 reuses for the browser, the voice rules and
+The rest of this file describes version 1 (`agent/`), which later versions reuse for the browser, the voice rules and
 the AI connection.
 
 # Conversation Agent

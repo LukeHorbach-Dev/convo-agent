@@ -3,501 +3,982 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Instagram assistant</title>
+<meta name="color-scheme" content="light dark">
+<title>Convo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='4' width='56' height='56' rx='14' fill='%230f766e'/%3E%3Crect x='14' y='22' width='32' height='22' rx='10' fill='%23fff7ec'/%3E%3Ccircle cx='23' cy='33' r='2.6' fill='%230f766e'/%3E%3Ccircle cx='30' cy='33' r='2.6' fill='%230f766e'/%3E%3Ccircle cx='37' cy='33' r='2.6' fill='%230f766e'/%3E%3C/svg%3E">
 <style>
-  :root {
-    --bg:#f6f5f2; --surface:#fff; --sunk:#f0efeb; --ink:#16181d; --muted:#5d636e; --line:#e4e2dc;
-    --accent:#3b5bdb; --accent-soft:#e8ecfc; --go:#1d8a4c; --go-soft:#e3f3e9; --warn:#9a5b0a; --warn-soft:#fbf0dc;
-    --bad:#c22f2f; --bad-soft:#fbe6e6; --them:#efeeea; --me:#e3e9fd; --on-color:#fff;
-    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --size: 18px; --radius: 16px;
-  }
-  @media (prefers-color-scheme: dark) { :root {
-    --bg:#121316; --surface:#1c1d21; --sunk:#25272c; --ink:#ececee; --muted:#a2a6af; --line:#2f3137;
-    --accent:#8ea2ff; --accent-soft:#252c47; --go:#4cc27e; --go-soft:#1a3326; --warn:#e3a54a; --warn-soft:#3a2d16;
-    --bad:#ff8080; --bad-soft:#3d1f22; --them:#2a2c31; --me:#262f4d; --on-color:#0d0f14; } }
-  :root.easy { --font: Verdana, Tahoma, sans-serif; letter-spacing: .02em; }
-  * { box-sizing: border-box; }
-  html { font-size: var(--size); }
-  body { margin: 0; font: 1rem/1.6 var(--font); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
-  button, input, textarea, select { font: inherit; color: inherit; }
-  .wrap { max-width: 820px; margin: 0 auto; padding: 0 16px 80px; }
-  .top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent);
-         backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
-  .bar { max-width: 820px; margin: 0 auto; padding: 12px 16px 0; display: flex; align-items: center; gap: 12px; }
-  .brand { font-weight: 700; font-size: 1.05rem; flex: 1; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: .8rem;
-          font-weight: 600; background: var(--sunk); color: var(--muted); white-space: nowrap; }
-  .chip.go { background: var(--go-soft); color: var(--go); } .chip.warn { background: var(--warn-soft); color: var(--warn); }
-  .chip.bad { background: var(--bad-soft); color: var(--bad); }
-  .tabs { max-width: 820px; margin: 0 auto; padding: 6px 12px 0; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
-  .tab { border: 0; background: none; padding: 10px 12px; border-bottom: 3px solid transparent; color: var(--muted);
-         font-weight: 600; cursor: pointer; white-space: nowrap; font-size: .92rem; }
-  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
-  .badge { display: inline-block; min-width: 1.5em; padding: 0 .45em; margin-left: 4px; border-radius: 999px;
-           background: var(--accent); color: var(--on-color); font-size: .72rem; line-height: 1.5em; text-align: center; }
-  h2 { font-size: 1.15rem; margin: 28px 0 10px; } h3 { font-size: 1rem; margin: 0 0 4px; } p { margin: 6px 0; }
-  .muted { color: var(--muted); font-size: .88rem; }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin: 12px 0; }
-  .hero { border-radius: var(--radius); padding: 18px 20px; margin: 20px 0 8px; background: var(--sunk); }
-  .hero.go { background: var(--go-soft); } .hero.warn { background: var(--warn-soft); } .hero.bad { background: var(--bad-soft); }
-  .hero b { display: block; font-size: 1.15rem; }
-  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } .grow { flex: 1; min-width: 0; }
-  .btn { border: 1px solid var(--line); background: var(--surface); padding: 10px 16px; border-radius: 12px; cursor: pointer;
-         font-weight: 600; font-size: .92rem; }
-  .btn:hover { border-color: var(--muted); } .btn:disabled { opacity: .45; cursor: default; }
-  .btn.go { background: var(--go); border-color: var(--go); color: var(--on-color); }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-color); }
-  .btn.danger { background: var(--bad); border-color: var(--bad); color: var(--on-color); }
-  .btn.quiet { background: none; border-color: transparent; color: var(--muted); padding: 10px 8px; }
-  .btn.big { padding: 14px 22px; font-size: 1rem; }
-  .field { width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--sunk); }
-  .field:focus, .btn:focus-visible, .tab:focus-visible { outline: 3px solid var(--accent-soft); border-color: var(--accent); }
-  .step { display: grid; grid-template-columns: 42px 1fr; gap: 14px; }
-  .num { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
-         background: var(--accent-soft); color: var(--accent); }
-  .num.done { background: var(--go-soft); color: var(--go); }
-  .bar-p { height: 8px; border-radius: 99px; background: var(--sunk); overflow: hidden; margin: 8px 0; }
-  .bar-p > i { display: block; height: 100%; background: var(--accent); }
-  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
-  @media (max-width: 560px) { .tiles { grid-template-columns: 1fr 1fr; } }
-  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
-  .tile b { display: block; font-size: 1.45rem; line-height: 1.2; } .tile span { color: var(--muted); font-size: .85rem; }
-  .who { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
-            background: var(--accent-soft); color: var(--accent); flex: none; }
-  .name { font-weight: 700; }
-  .flag { font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--sunk); color: var(--muted); }
-  .flag.star { background: var(--go-soft); color: var(--go); } .flag.bad { background: var(--bad-soft); color: var(--bad); }
-  .flag.warn { background: var(--warn-soft); color: var(--warn); }
-  .chat { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
-  .bubble { border-radius: 18px; padding: 8px 13px; max-width: 85%; }
-  .bubble.them { background: var(--them); align-self: flex-start; border-bottom-left-radius: 6px; }
-  .bubble.me { background: var(--me); align-self: flex-end; border-bottom-right-radius: 6px; }
-  .draftbox { background: var(--me); border-radius: 18px; padding: 10px 14px; margin-top: 8px; border: 2px dashed var(--accent); }
-  .draftbox textarea { width: 100%; border: 0; background: transparent; resize: vertical; min-height: 2.8em; outline: none; padding: 0; }
-  .note { font-size: .88rem; padding: 8px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); margin: 8px 0; }
-  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 4px; }
-  .pill { border: 1px solid var(--line); background: var(--surface); padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: .85rem; font-weight: 600; }
-  .pill[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-  .person { display: flex; gap: 12px; padding: 12px 4px; border-top: 1px solid var(--line); align-items: flex-start; }
-  .person:first-child { border-top: 0; }
-  .person input[type=checkbox] { width: 20px; height: 20px; margin-top: 10px; accent-color: var(--accent); }
-  .feed div { padding: 6px 0; border-top: 1px solid var(--line); font-size: .9rem; }
-  .feed .good::before { content: "✓ "; color: var(--go); } .feed .warn::before { content: "! "; color: var(--warn); font-weight: 700; }
-  .feed .problem::before { content: "✕ "; color: var(--bad); font-weight: 700; }
-  .fact { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; margin: 6px 0; }
-  .switch { display: flex; align-items: center; gap: 12px; cursor: pointer; } .switch input { width: 22px; height: 22px; accent-color: var(--accent); }
-  .empty { text-align: center; padding: 34px 16px; color: var(--muted); } .empty b { display: block; color: var(--ink); font-size: 1.05rem; }
-  #login { max-width: 440px; margin: 12vh auto; }
-  [hidden] { display: none !important; }
+/* ============================================================== design tokens */
+:root {
+  --bg: #f5f3ee; --bg-2: #efece5; --surface: #ffffff; --raised: #ffffff; --sunk: #f1eee8;
+  --ink: #12201e; --ink-2: #33433f; --muted: #5d6d69; --faint: #8a9894; --line: #e4dfd5; --line-2: #d6d0c4;
+  --accent: #0f766e; --accent-2: #0b5f58; --accent-soft: #dcf2ec; --accent-ink: #ffffff;
+  --mint: #a7f3d0; --go: #16794c; --go-soft: #dff3e8; --warn: #9a5a06; --warn-soft: #fbefd9;
+  --bad: #b8322a; --bad-soft: #fbe5e2; --go-ink: #ffffff; --bad-ink: #ffffff; --info: #2f5fb3; --info-soft: #e5edfb;
+  --them: #efece6; --me: #d9f1ea; --me-ink: #0b3d38;
+  --shadow-1: 0 1px 2px rgba(18, 32, 30, .06), 0 1px 1px rgba(18, 32, 30, .04);
+  --shadow-2: 0 10px 30px -12px rgba(18, 32, 30, .25), 0 2px 6px rgba(18, 32, 30, .06);
+  --shadow-3: 0 24px 60px -20px rgba(10, 30, 28, .45);
+  --radius: 18px; --radius-s: 12px; --radius-xs: 8px;
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --size: 17px; --lh: 1.6; --track: 0;
+  --sidebar: 248px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}
+:root[data-theme="dark"] {
+  --bg: #0c1514; --bg-2: #101c1a; --surface: #14211f; --raised: #182725; --sunk: #0f1a19;
+  --ink: #e6efec; --ink-2: #c3d2ce; --muted: #9aaea9; --faint: #6f8580; --line: #233431; --line-2: #2e4440;
+  --accent: #5eead4; --accent-2: #99f6e4; --accent-soft: #123a35; --accent-ink: #04201d;
+  --mint: #1f5e52; --go: #4ade80; --go-soft: #12301f; --warn: #fbbf24; --warn-soft: #33270c;
+  --bad: #fb8b80; --bad-soft: #3a1714; --go-ink: #04210f; --bad-ink: #2a0705; --info: #93b4f5; --info-soft: #172640;
+  --them: #1d2c2a; --me: #134a43; --me-ink: #d7fbf3;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 12px 30px -12px rgba(0, 0, 0, .7); --shadow-3: 0 24px 60px -18px rgba(0, 0, 0, .8);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0c1514; --bg-2: #101c1a; --surface: #14211f; --raised: #182725; --sunk: #0f1a19;
+  --ink: #e6efec; --ink-2: #c3d2ce; --muted: #9aaea9; --faint: #6f8580; --line: #233431; --line-2: #2e4440;
+  --accent: #5eead4; --accent-2: #99f6e4; --accent-soft: #123a35; --accent-ink: #04201d;
+  --mint: #1f5e52; --go: #4ade80; --go-soft: #12301f; --warn: #fbbf24; --warn-soft: #33270c;
+  --bad: #fb8b80; --bad-soft: #3a1714; --go-ink: #04210f; --bad-ink: #2a0705; --info: #93b4f5; --info-soft: #172640;
+  --them: #1d2c2a; --me: #134a43; --me-ink: #d7fbf3;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 12px 30px -12px rgba(0, 0, 0, .7); --shadow-3: 0 24px 60px -18px rgba(0, 0, 0, .8);
+} }
+:root.easy { --font: Verdana, "Trebuchet MS", Tahoma, sans-serif; --font-display: Verdana, Tahoma, sans-serif; --lh: 1.75; --track: .015em; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ============================================================== base */
+* { box-sizing: border-box; }
+html { font-size: var(--size); background: var(--bg); }
+body { margin: 0; font: 400 1rem/var(--lh) var(--font); letter-spacing: var(--track); color: var(--ink); background: var(--bg);
+       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }
+a { color: var(--accent); }
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -.01em; line-height: 1.25; margin: 0; }
+h1 { font-size: 1.65rem; font-weight: 700; } h2 { font-size: 1.15rem; font-weight: 650; } h3 { font-size: 1rem; font-weight: 650; }
+p { margin: .35em 0; } small, .small { font-size: .84rem; }
+.muted { color: var(--muted); } .faint { color: var(--faint); }
+[hidden] { display: none !important; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; border-radius: 10px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+svg.i { width: 1.15em; height: 1.15em; flex: none; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; vertical-align: -.2em; }
+
+/* ============================================================== shell */
+.shell { display: grid; grid-template-columns: var(--sidebar) 1fr; min-height: 100vh; }
+.side { position: sticky; top: 0; height: 100vh; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px;
+        background: linear-gradient(180deg, var(--bg-2), var(--bg)); border-right: 1px solid var(--line); }
+.logo { display: flex; align-items: center; gap: 11px; padding: 4px 10px 18px; }
+.logo-mark { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+             background: linear-gradient(140deg, #0b3d3a, #2dbe96); box-shadow: var(--shadow-1); }
+.logo-mark i { display: flex; gap: 3px; background: #fff7ec; padding: 6px 7px; border-radius: 9px; }
+.logo-mark i b { width: 4px; height: 4px; border-radius: 50%; background: #0f766e; }
+.logo strong { font-family: var(--font-display); font-size: 1.2rem; letter-spacing: -.02em; }
+.logo > div { min-width: 0; }
+.logo span { display: block; font-size: .74rem; color: var(--muted); margin-top: -3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.logo span span { display: inline; }
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav button { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: none; cursor: pointer;
+              padding: 10px 12px; border-radius: 12px; color: var(--ink-2); font-weight: 560; text-align: left; transition: background .15s var(--ease); }
+.nav button:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.nav button[aria-current="page"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+.nav button[aria-current="page"] svg.i { color: var(--accent); }
+.nav .count { margin-left: auto; min-width: 1.6em; padding: 0 .5em; border-radius: 99px; font-size: .74rem; font-weight: 700;
+              line-height: 1.6em; text-align: center; background: var(--accent); color: var(--accent-ink); }
+.nav-sep { height: 1px; background: var(--line); margin: 10px 8px; }
+.side-foot { margin-top: auto; display: grid; gap: 10px; padding: 8px 4px 0; }
+.status { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--surface);
+          border: 1px solid var(--line); font-size: .85rem; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: none; }
+.dot.go { background: var(--go); box-shadow: 0 0 0 4px color-mix(in srgb, var(--go) 18%, transparent); animation: pulse 1.6s infinite; }
+.dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+@keyframes pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--go) 5%, transparent); } }
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+.top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 14px 32px;
+       background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: saturate(1.4) blur(14px);
+       border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.top h1 { font-size: 1.25rem; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.askbar { display: flex; align-items: center; gap: 8px; width: min(360px, 38vw); padding: 8px 12px; border-radius: 12px;
+          border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: text; }
+.askbar kbd { margin-left: auto; font: 600 .72rem var(--font); padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); }
+.content { padding: 26px 32px 80px; max-width: 1080px; width: 100%; }
+.page { animation: rise .35s var(--ease); } @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+
+.practice-band { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 32px; font-size: .9rem;
+                 background: repeating-linear-gradient(-45deg, var(--warn-soft), var(--warn-soft) 14px, color-mix(in srgb, var(--warn-soft) 70%, var(--bg)) 14px 28px);
+                 border-bottom: 1px solid color-mix(in srgb, var(--warn) 25%, transparent); color: var(--ink); }
+.practice-band b { color: var(--warn); }
+
+/* ============================================================== components */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow-1); }
+.card + .card, .stack > * + * { margin-top: 14px; }
+.grid-2 > *, .grid-3 > * { margin-top: 0 !important; }
+.card.flat { box-shadow: none; } .card.sunk { background: var(--sunk); box-shadow: none; }
+.section { margin-top: 30px; } .section > h2 { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; } .grow { flex: 1; min-width: 0; }
+.between { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; } .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line-2); background: var(--surface);
+       color: var(--ink); padding: 9px 16px; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: .92rem; white-space: nowrap;
+       transition: transform .08s, background .15s, border-color .15s, box-shadow .15s; }
+.btn:hover { border-color: var(--faint); } .btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
+.btn.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+.btn.go { background: var(--go); border-color: var(--go); color: var(--go-ink); }
+.btn.danger { background: var(--bad); border-color: var(--bad); color: var(--bad-ink); }
+.btn.danger-soft { background: var(--bad-soft); border-color: transparent; color: var(--bad); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
+.btn.ghost:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.btn.big { padding: 13px 22px; font-size: 1rem; border-radius: 14px; } .btn.small { padding: 6px 11px; font-size: .84rem; border-radius: 10px; }
+.btn.stop { background: #c2372d; border-color: #c2372d; color: #fff; box-shadow: 0 6px 16px -8px #c2372d; }
+.btn.stop:hover { filter: brightness(1.06); }
+.field { width: 100%; padding: 10px 13px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--raised); color: var(--ink);
+         transition: border-color .15s, box-shadow .15s; }
+.field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
+textarea.field { resize: vertical; line-height: 1.55; }
+select.field { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+               background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 34px; }
+.label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: 6px; }
+.hint { color: var(--muted); font-size: .84rem; margin-top: 6px; }
+.setting { display: grid; grid-template-columns: 1fr minmax(160px, 260px); gap: 16px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line); }
+.setting:first-child { border-top: 0; padding-top: 0; } .setting:last-child { padding-bottom: 0; }
+.toggle { position: relative; width: 48px; height: 28px; flex: none; }
+.toggle input { position: absolute; inset: 0; opacity: 0; cursor: pointer; margin: 0; z-index: 1; }
+.toggle span { position: absolute; inset: 0; border-radius: 99px; background: var(--line-2); transition: background .2s var(--ease); }
+.toggle span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff;
+                      box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s var(--ease); }
+.toggle input:checked + span { background: var(--accent); } .toggle input:checked + span::after { transform: translateX(20px); }
+.toggle input:focus-visible + span { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { border: 1px solid var(--line-2); background: var(--surface); padding: 6px 13px; border-radius: 99px; cursor: pointer; font-size: .86rem; font-weight: 600; color: var(--ink-2); }
+.pill[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.pill .n { opacity: .65; margin-left: 4px; font-weight: 700; }
+.tag { display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; font-weight: 700; padding: 3px 9px; border-radius: 99px;
+       background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.tag.go { background: var(--go-soft); color: var(--go); } .tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.bad { background: var(--bad-soft); color: var(--bad); } .tag.info { background: var(--info-soft); color: var(--info); }
+.tag.accent { background: var(--accent-soft); color: var(--accent); }
+.note { display: flex; gap: 10px; align-items: flex-start; padding: 10px 13px; border-radius: 12px; font-size: .9rem; background: var(--warn-soft); color: var(--ink); }
+.note svg.i { color: var(--warn); margin-top: .2em; } .note.bad { background: var(--bad-soft); } .note.bad svg.i { color: var(--bad); }
+.note.info { background: var(--info-soft); } .note.info svg.i { color: var(--info); }
+.avatar { --h: 170; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 700; font-size: .95rem;
+          background: hsl(var(--h) 55% 88%); color: hsl(var(--h) 45% 28%); }
+:root[data-theme="dark"] .avatar { background: hsl(var(--h) 30% 24%); color: hsl(var(--h) 60% 82%); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .avatar { background: hsl(var(--h) 30% 24%); color: hsl(var(--h) 60% 82%); } }
+.avatar.big { width: 58px; height: 58px; font-size: 1.25rem; }
+.who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.who .name { font-weight: 650; } .who .handle { color: var(--muted); font-size: .88rem; }
+.progress { height: 8px; border-radius: 99px; background: var(--sunk); overflow: hidden; }
+.progress > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--mint)); transition: width .4s var(--ease); }
+.progress.warn > i { background: var(--warn); } .progress.bad > i { background: var(--bad); }
+.skeleton { border-radius: var(--radius); background: linear-gradient(90deg, var(--sunk), var(--bg-2), var(--sunk)); background-size: 300% 100%; animation: shimmer 1.4s infinite; }
+@keyframes shimmer { to { background-position: -150% 0; } }
+.empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+.empty .art { width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 20px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.empty .art svg.i { width: 30px; height: 30px; }
+.empty b { display: block; color: var(--ink); font-size: 1.05rem; margin-bottom: 4px; }
+
+/* ============================================================== today */
+.hero { position: relative; overflow: hidden; border-radius: 24px; padding: 28px 30px; color: #f1fffb;
+        background: radial-gradient(120% 140% at 0% 0%, #1d8f7f 0%, #0d4f49 45%, #0a2f2c 100%); box-shadow: var(--shadow-2); }
+.hero::after { content: ""; position: absolute; right: -60px; top: -80px; width: 280px; height: 280px; border-radius: 50%;
+               background: radial-gradient(circle, rgba(167, 243, 208, .35), transparent 65%); }
+.hero.bad { background: radial-gradient(120% 140% at 0% 0%, #b6463c 0%, #6f211b 55%, #3c1210 100%); }
+.hero.warn { background: radial-gradient(120% 140% at 0% 0%, #b7791f 0%, #6b430a 55%, #3a2405 100%); }
+.hero small { text-transform: uppercase; letter-spacing: .08em; font-weight: 700; opacity: .75; font-size: .74rem; }
+.hero h2 { font-size: 1.7rem; margin: 6px 0 6px; color: #fff; } .hero p { margin: 0; opacity: .9; max-width: 60ch; }
+.hero .row { margin-top: 18px; position: relative; z-index: 1; }
+.hero .btn { border-color: rgba(255,255,255,.35); background: rgba(255,255,255,.12); color: #fff; backdrop-filter: blur(6px); }
+.hero .btn:hover { background: rgba(255,255,255,.2); }
+.hero .btn.light { background: #fff; color: #0b3d38; border-color: #fff; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow-1); }
+.stat b { display: block; font-family: var(--font-display); font-size: 1.55rem; line-height: 1.15; letter-spacing: -.02em; }
+.stat span { color: var(--muted); font-size: .82rem; }
+.stat .progress { margin-top: 8px; height: 6px; }
+.steps { display: grid; gap: 12px; }
+.step { display: grid; grid-template-columns: 44px 1fr; gap: 16px; align-items: start; }
+.num { width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; font-weight: 800; font-family: var(--font-display);
+       background: var(--accent-soft); color: var(--accent); }
+.num.done { background: var(--go-soft); color: var(--go); } .num.now { background: var(--accent); color: var(--accent-ink); }
+.live { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.live img { width: 100%; border-radius: 14px; border: 1px solid var(--line); background: var(--sunk); aspect-ratio: 16 / 10; object-fit: cover; }
+.feed { display: grid; }
+.feed > div { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; padding: 10px 2px; border-top: 1px solid var(--line); font-size: .92rem; align-items: start; }
+.feed > div:first-child { border-top: 0; }
+.feed .k { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; background: var(--sunk); color: var(--muted); margin-top: 1px; }
+.feed .good .k { background: var(--go-soft); color: var(--go); } .feed .warn .k { background: var(--warn-soft); color: var(--warn); }
+.feed .problem .k { background: var(--bad-soft); color: var(--bad); }
+.feed time { color: var(--faint); font-size: .8rem; white-space: nowrap; }
+.peoplelist > button { display: flex; width: 100%; align-items: center; gap: 12px; text-align: left; border: 0; background: none; cursor: pointer;
+                       padding: 10px 8px; border-radius: 12px; }
+.peoplelist > button:hover { background: var(--sunk); }
+
+/* ============================================================== messages */
+.msg { padding: 0; overflow: hidden; }
+.msg-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px 0; }
+.msg-body { padding: 10px 20px 18px; }
+.msg-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 20px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--sunk) 60%, var(--surface)); }
+.msg.approved { border-color: color-mix(in srgb, var(--go) 45%, var(--line)); }
+.msg.look { border-left: 4px solid var(--warn); }
+.chat { display: flex; flex-direction: column; gap: 5px; margin: 10px 0 4px; }
+.bubble { max-width: 80%; padding: 8px 14px; border-radius: 20px; font-size: .95rem; line-height: 1.45; word-wrap: break-word; }
+.bubble.them { align-self: flex-start; background: var(--them); border-bottom-left-radius: 6px; }
+.bubble.me { align-self: flex-end; background: var(--me); color: var(--me-ink); border-bottom-right-radius: 6px; }
+.bubble time { display: block; font-size: .7rem; opacity: .55; margin-top: 2px; }
+.draft { margin-top: 10px; border-radius: 18px; padding: 10px 14px 6px; background: var(--me); border: 2px dashed color-mix(in srgb, var(--accent) 55%, transparent); }
+.draft label { font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.draft textarea { width: 100%; border: 0; background: transparent; resize: vertical; min-height: 2.6em; outline: none; padding: 2px 0; color: var(--me-ink); line-height: 1.5; }
+.translate { font-size: .86rem; color: var(--muted); margin-top: 6px; }
+
+/* ============================================================== people + drawer */
+.plist { display: grid; }
+.prow { display: grid; grid-template-columns: 26px 42px 1fr auto; gap: 12px; align-items: center; padding: 12px 6px; border-top: 1px solid var(--line); }
+.prow:first-child { border-top: 0; }
+.prow input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+.prow .open { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; min-width: 0; }
+.prow .sum { color: var(--muted); font-size: .86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scrim { position: fixed; inset: 0; z-index: 60; background: rgba(6, 18, 16, .38); backdrop-filter: blur(2px); animation: fade .2s; }
+@keyframes fade { from { opacity: 0; } }
+.drawer { position: fixed; right: 0; top: 0; bottom: 0; z-index: 61; width: min(560px, 100vw); background: var(--bg); box-shadow: var(--shadow-3);
+          display: flex; flex-direction: column; animation: slide .28s var(--ease); }
+@keyframes slide { from { transform: translateX(40px); opacity: 0; } }
+.drawer header { padding: 22px 24px 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.drawer .body { padding: 18px 24px 40px; overflow-y: auto; flex: 1; }
+.drawer .close { position: absolute; top: 16px; right: 16px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: .92rem; } .kv dt { color: var(--muted); } .kv dd { margin: 0; }
+.report li { margin: 3px 0; } .report h3 { margin-top: 14px; font-size: .9rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+/* ============================================================== ask */
+.ask-wrap { display: grid; grid-template-rows: 1fr auto; min-height: calc(100vh - 190px); }
+.thread { display: flex; flex-direction: column; gap: 14px; padding-bottom: 20px; }
+.say { max-width: 78%; padding: 12px 16px; border-radius: 20px; line-height: 1.5; }
+.say.you { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 6px; }
+.say.convo { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 6px; box-shadow: var(--shadow-1); }
+.say .meta { display: block; font-size: .74rem; opacity: .65; margin-top: 4px; }
+.composer { position: sticky; bottom: 0; padding: 12px 0 4px; background: linear-gradient(transparent, var(--bg) 30%); }
+.composer form { display: flex; gap: 10px; padding: 8px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line-2); box-shadow: var(--shadow-2); }
+.composer input { flex: 1; border: 0; background: transparent; padding: 8px 10px; outline: none; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.chip { border: 1px solid var(--line-2); background: var(--surface); border-radius: 99px; padding: 6px 13px; font-size: .85rem; cursor: pointer; color: var(--ink-2); }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.typing { display: inline-flex; gap: 4px; } .typing b { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); animation: bob 1s infinite; }
+.typing b:nth-child(2) { animation-delay: .15s; } .typing b:nth-child(3) { animation-delay: .3s; }
+@keyframes bob { 50% { transform: translateY(-4px); opacity: .5; } }
+
+/* ============================================================== overlays */
+.palette { position: fixed; z-index: 70; left: 50%; top: 14vh; transform: translateX(-50%); width: min(620px, calc(100vw - 32px));
+           background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-3); border: 1px solid var(--line); overflow: hidden; animation: pop .2s var(--ease); }
+@keyframes pop { from { transform: translateX(-50%) scale(.97); opacity: 0; } }
+.palette form { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.palette input { flex: 1; border: 0; background: transparent; outline: none; font-size: 1.08rem; }
+.palette .out { padding: 16px 20px; max-height: 50vh; overflow: auto; }
+.modal { position: fixed; z-index: 80; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(480px, calc(100vw - 32px));
+         background: var(--surface); border-radius: 22px; padding: 24px; box-shadow: var(--shadow-3); animation: pop2 .2s var(--ease); }
+@keyframes pop2 { from { transform: translate(-50%, -48%) scale(.98); opacity: 0; } }
+.modal h2 { margin-bottom: 8px; } .modal .row { margin-top: 18px; justify-content: flex-end; }
+.toasts { position: fixed; z-index: 90; left: 50%; bottom: 24px; transform: translateX(-50%); display: grid; gap: 8px; width: min(520px, calc(100vw - 32px)); }
+.toast { display: flex; gap: 10px; align-items: center; padding: 12px 16px; border-radius: 14px; background: var(--ink); color: var(--bg);
+         box-shadow: var(--shadow-3); font-size: .93rem; animation: rise .25s var(--ease); }
+.toast.bad { background: #c2372d; color: #fff; }
+
+#gate { max-width: 420px; margin: 16vh auto; text-align: center; }
+
+/* ============================================================== small screens */
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .side { position: fixed; z-index: 30; bottom: 0; top: auto; left: 0; right: 0; height: auto; flex-direction: row; padding: 6px 8px;
+          border-right: 0; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(12px); }
+  .logo, .nav-sep, .side-foot, .nav .label-long { display: none; }
+  .nav { flex-direction: row; width: 100%; justify-content: space-around; overflow-x: auto; }
+  .nav button { flex-direction: column; gap: 2px; padding: 6px 8px; font-size: .68rem; width: auto; }
+  .nav button svg.i { width: 1.4em; height: 1.4em; }
+  .nav .count { position: absolute; margin: -4px 0 0 18px; font-size: .62rem; }
+  .nav .extra { display: none; }
+  .top { padding: 12px 16px; } .askbar { display: none; }
+  .content { padding: 18px 16px 110px; }
+  .stats { grid-template-columns: 1fr 1fr; } .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .setting { grid-template-columns: 1fr; }
+  .practice-band { padding: 10px 16px; }
+}
 </style>
 </head>
 <body>
-<div id="login" class="card" hidden>
-  <h3>Instagram assistant</h3>
-  <p class="muted">Start it with <b>bash start.sh</b> and this page logs in by itself. Or paste the password from <code>data/dashboard-token</code>.</p>
-  <input id="tok" class="field" type="password" autocomplete="off" placeholder="Password">
-  <p><button class="btn primary" onclick="saveToken()">Open</button></p>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-reply" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M7 11V6.5a1.5 1.5 0 0 1 3 0V11M10 10V4.5a1.5 1.5 0 0 1 3 0V10M13 10V5.5a1.5 1.5 0 0 1 3 0V12M16 9.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1a6 6 0 0 1-4.6-2.2L3.6 15a1.6 1.6 0 0 1 2.5-2L7 14"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6 6 0 0 1 3.5 6"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 4.9L18.7 9.7 13.8 11.5 12 16.4 10.2 11.5 5.3 9.7 10.2 7.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.4-2.5 3.9M12 17h.01"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21.5 2.5 11 13M21.5 2.5 15 21l-4-8-8-4z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-moon2" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6L4.5 18.5A1.8 1.8 0 0 0 6 21h12a1.8 1.8 0 0 0 1.5-2.5L14 9V3M7 15h10"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+  <symbol id="i-minus-user" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 11h6"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8M6.3 6.3a8 8 0 1 0 11.4 0"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></symbol>
+</svg>
+
+<div id="gate" hidden>
+  <div class="logo" style="justify-content:center"><span class="logo-mark"><i><b></b><b></b><b></b></i></span><div style="text-align:left"><strong>Convo</strong><span>Your Instagram assistant</span></div></div>
+  <div class="card" style="text-align:left">
+    <h2>Open Convo from its app</h2>
+    <p class="muted">Convo opens itself already signed in. If you came here another way, paste the password from <code>data/dashboard-token</code>.</p>
+    <form class="row" style="margin-top:12px" onsubmit="event.preventDefault(); saveToken()">
+      <input id="tok" class="field grow" type="password" autocomplete="off" placeholder="Password" aria-label="Password">
+      <button class="btn primary">Open</button></form>
+  </div>
 </div>
 
-<div id="app" hidden>
-<div class="top">
-  <div class="bar"><div class="brand">Instagram assistant</div><span id="chip" class="chip">Ready</span></div>
-  <nav class="tabs">
-    <button class="tab" data-tab="today">Today</button>
-    <button class="tab" data-tab="replies">Replies<span id="b-replies" class="badge" hidden></span></button>
-    <button class="tab" data-tab="hellos">Hellos<span id="b-hellos" class="badge" hidden></span></button>
-    <button class="tab" data-tab="people">People</button>
-    <button class="tab" data-tab="about">About me</button>
-    <button class="tab" data-tab="settings">Settings</button>
-    <button class="tab" data-tab="help">Help</button>
-  </nav>
+<div id="app" class="shell" hidden>
+  <aside class="side" aria-label="Main">
+    <div class="logo"><span class="logo-mark" aria-hidden="true"><i><b></b><b></b><b></b></i></span><div><strong>Convo</strong><span>for @<span id="me"></span></span></div></div>
+    <nav class="nav" id="nav">
+      <button data-page="today"><svg class="i"><use href="#i-sun"/></svg><span>Today</span></button>
+      <button data-page="replies"><svg class="i"><use href="#i-reply"/></svg><span>Replies</span><span class="count" id="c-replies" hidden></span></button>
+      <button data-page="hellos"><svg class="i"><use href="#i-wave"/></svg><span>Hellos</span><span class="count" id="c-hellos" hidden></span></button>
+      <button data-page="people"><svg class="i"><use href="#i-users"/></svg><span>People</span></button>
+      <button data-page="ask"><svg class="i"><use href="#i-spark"/></svg><span>Ask</span></button>
+      <div class="nav-sep"></div>
+      <button data-page="activity" class="extra"><svg class="i"><use href="#i-list"/></svg><span>Activity</span></button>
+      <button data-page="about" class="extra"><svg class="i"><use href="#i-user"/></svg><span>About me</span></button>
+      <button data-page="settings"><svg class="i"><use href="#i-gear"/></svg><span>Settings</span></button>
+      <button data-page="help" class="extra"><svg class="i"><use href="#i-help"/></svg><span>Help</span></button>
+    </nav>
+    <div class="side-foot">
+      <div class="status" role="status" aria-live="polite"><span class="dot" id="dot"></span><span id="statusline">Ready</span></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="practice-band" id="practiceband" hidden>
+      <svg class="i"><use href="#i-flask"/></svg>
+      <span class="grow"><b>Practice.</b> A pretend Instagram with made-up people. Nothing here touches your real account.</span>
+      <label class="row" style="gap:10px"><span class="toggle"><input type="checkbox" id="autosend" onchange="setAuto(this.checked)"><span></span></span>
+        <span><b style="color:inherit">Automatic</b> <span class="muted">approve and send by itself</span></span></label>
+    </div>
+    <header class="top">
+      <h1 id="title">Today</h1>
+      <button class="askbar" onclick="openPalette()" aria-label="Ask Convo"><svg class="i"><use href="#i-spark"/></svg><span>Ask or tell Convo…</span><kbd>⌘K</kbd></button>
+      <button class="btn stop" id="stopbtn" onclick="stopNow()" title="Stop all sending and writing straight away"><svg class="i"><use href="#i-stop"/></svg>Stop now</button>
+    </header>
+    <main class="content" id="content" tabindex="-1"></main>
+  </div>
 </div>
-<div class="wrap">
 
-<!-- TODAY -->
-<section data-page="today">
-  <div id="hero" class="hero"></div>
-  <div class="card step"><span id="n1" class="num">1</span><div>
-    <h3>Load today's Instagram download</h3>
-    <p class="muted" id="s1"></p>
-    <div class="row"><button class="btn primary" id="loadbtn" onclick="loadDownload()">Load from Downloads</button></div></div></div>
-  <div class="card step"><span id="n2" class="num">2</span><div>
-    <h3>Replies get written</h3>
-    <p class="muted" id="s2"></p>
-    <div id="jobbar"></div>
-    <div class="row"><button class="btn" id="thinkbtn" onclick="writeReplies()">Write replies now</button>
-      <button class="btn quiet" id="stopjob" onclick="post('/api/job/stop')" hidden>Stop</button></div></div></div>
-  <div class="card step"><span id="n3" class="num">3</span><div>
-    <h3>Check, then send</h3>
-    <p class="muted" id="s3"></p>
-    <div class="row">
-      <button class="btn" onclick="openTab('replies')">Check replies</button>
-      <button class="btn" onclick="openTab('hellos')">Check hellos</button></div>
-    <div class="row" style="margin-top:12px">
-      <button class="btn go big" id="sendbtn" onclick="startSending()">Send everything I approved</button>
-      <button class="btn" id="onebtn" onclick="startSending(true)">Send just one first</button>
-      <button class="btn" id="pausebtn" onclick="post('/api/send/pause')">Pause</button></div>
-    <p class="muted" id="sendstatus"></p></div></div>
-  <div class="card" id="livecard" hidden>
-    <h3>Watch it work</h3>
-    <p class="muted" id="livenote">What Claude sees on Instagram, updated every couple of seconds.</p>
-    <img id="liveimg" alt="The Instagram page Claude is looking at" style="width:100%;border-radius:10px;border:1px solid var(--line)"></div>
-  <div class="tiles" id="tiles"></div>
-  <h2>What's been happening</h2>
-  <div class="card feed" id="feed"></div>
-</section>
-
-<!-- REPLIES -->
-<section data-page="replies" hidden>
-  <div class="row" style="margin-top:20px"><h2 class="grow" style="margin:0">Replies</h2>
-    <button class="btn go" onclick="approveAll('reply')">Approve all ready ones</button></div>
-  <p class="muted">Each one is a chat where they wrote last. Change the words if you like, then Approve. Ones marked "have a look" need you to approve them one by one.</p>
-  <div class="filters" id="rfilters"></div>
-  <div id="rlist"></div>
-  <div class="row"><button class="btn" id="rmore" onclick="loadReplies(true)" hidden>Show more</button></div>
-</section>
-
-<!-- HELLOS -->
-<section data-page="hellos" hidden>
-  <div class="row" style="margin-top:20px"><h2 class="grow" style="margin:0">Hellos</h2>
-    <button class="btn go" onclick="approveAll('hello')">Approve all hellos</button></div>
-  <p class="muted">People you follow who you've never messaged. Each gets one of your own hellos. Right before sending, the app checks the chat is still empty.</p>
-  <div class="filters" id="hfilters"></div>
-  <div id="hlist"></div>
-  <div class="row"><button class="btn" id="hmore" onclick="loadHellos(true)" hidden>Show more</button></div>
-</section>
-
-<!-- PEOPLE -->
-<section data-page="people" hidden>
-  <h2>People</h2>
-  <div class="filters" id="pfilters"></div>
-  <div class="card">
-    <input id="pq" class="field" placeholder="Search a name" oninput="loadPeople(0)">
-    <div id="plist" style="margin-top:6px"></div>
-    <div class="row" style="margin-top:10px"><button class="btn" id="pprev" onclick="loadPeople(POFF - 50)">Previous</button>
-      <button class="btn" id="pnext" onclick="loadPeople(POFF + 50)">Next</button><span class="muted grow" id="ppage"></span></div>
-  </div>
-  <div class="row"><button class="btn" onclick="unfollowTicked()">Unfollow ticked</button><span class="grow"></span>
-    <button class="btn quiet" onclick="cancelUnfollows()">Cancel unfollows not done yet</button>
-    <button class="btn danger" onclick="unfollowEveryone()">Unfollow everyone</button></div>
-  <p class="muted" id="unfinfo"></p>
-</section>
-
-<!-- ABOUT ME -->
-<section data-page="about" hidden>
-  <h2>About me</h2>
-  <p class="muted">What the AI knows about you. It only ever mentions things on this list, and never the ones marked private.</p>
-  <div class="card"><div id="facts"></div>
-    <div class="row" style="margin-top:8px"><input id="newfact" class="field grow" placeholder="Add something, e.g. I've started playing football">
-      <button class="btn" onclick="addFact()">Add</button></div></div>
-  <h2>Your hellos</h2>
-  <p class="muted">One of these goes to each new person. One per line.</p>
-  <div class="card"><textarea id="hellos" class="field" rows="4"></textarea></div>
-  <h2>How you write</h2>
-  <p class="muted">The AI copies this, plus how you write in your own chats.</p>
-  <div class="card"><textarea id="voice" class="field" rows="8"></textarea></div>
-  <h2>Never message</h2>
-  <p class="muted">One username per line. No hello, no reply, ever.</p>
-  <div class="card"><textarea id="never" class="field" rows="4"></textarea></div>
-  <div class="row"><button class="btn primary big" onclick="saveAbout()">Save About me</button></div>
-</section>
-
-<!-- SETTINGS -->
-<section data-page="settings" hidden>
-  <h2>AI replies</h2><div class="card" id="ai"></div>
-  <h2>Pace and daily limits</h2>
-  <div class="card">
-    <div class="row"><span class="grow">Messages a day (max 300)</span><input id="dm" class="field" style="width:110px" type="number" min="0" max="300"></div>
-    <div class="row" style="margin-top:8px"><span class="grow">Seconds between messages</span><input id="gm" class="field" style="width:110px" type="number" min="0" max="600"></div>
-    <div class="row" style="margin-top:8px"><span class="grow">Unfollows a day (max 300)</span><input id="du" class="field" style="width:110px" type="number" min="0" max="300"></div>
-    <div class="row" style="margin-top:8px"><span class="grow">Seconds between unfollows</span><input id="gu" class="field" style="width:110px" type="number" min="0" max="600"></div>
-    <div class="row" style="margin-top:8px"><span class="grow">Reply to chats from the last how many days</span><input id="rw" class="field" style="width:110px" type="number" min="1"></div>
-    <div class="row" style="margin-top:8px"><span class="grow">AI spending limit per day, in US dollars</span><input id="bud" class="field" style="width:110px" type="number" min="0.5" max="100" step="0.5"></div>
-    <p class="muted">Instagram blocks accounts that send or unfollow too much in one day, so these stay numbers. When today's number is reached, the rest go tomorrow by themselves. The AI limit stops writing and sending for the day once that much has been spent.</p>
-    <button class="btn primary" onclick="saveSettings()">Save</button>
-  </div>
-  <h2>Instagram window</h2>
-  <div class="card"><label class="switch"><input type="checkbox" id="tuck" onchange="post('/api/settings', {tuck_window: this.checked})">
-    <span><b>Tuck it away</b><br><span class="muted">Minimises the Instagram window to the Dock. It keeps working while you use your laptop. If sending ever seems stuck while it's tucked away, turn this off.</span></span></label></div>
-  <h2>Reading</h2>
-  <div class="card"><div class="row"><span class="grow">Text size</span><button class="btn" onclick="size(-1)">A-</button><button class="btn" onclick="size(1)">A+</button></div>
-    <label class="switch" style="margin-top:12px"><input type="checkbox" id="easy" onchange="setEasy(this.checked)"><span><b>Easy-read font</b></span></label></div>
-  <p class="muted" id="ver"></p>
-</section>
-
-<!-- HELP -->
-<section data-page="help" hidden>
-  <h2>Your daily routine</h2>
-  <div class="card">
-    <p><b>Evening.</b> Request your download in Instagram (Accounts Center, Your information and permissions, Download your information: Messages and Followers and following, JSON, All time). When the email comes, download the file into Downloads, then press <b>Load from Downloads</b>. The app reads it and writes replies by itself.</p>
-    <p><b>Morning.</b> Open Replies and Hellos, change anything you want, approve, then press <b>Send everything I approved</b> (or <b>Send just one first</b> to watch one go and check it in Instagram). It sends one at a time at a steady pace and you can carry on using your laptop.</p>
-  </div>
-  <h2>When something goes wrong</h2>
-  <div class="card">
-    <p>The app sorts every problem into one of four kinds and tells you on the Today page:</p>
-    <p><b>Try again later</b>: Instagram didn't load. It waits 10 minutes and carries on.</p>
-    <p><b>Skip this person</b>: their account is private, gone, or doesn't take messages. Everyone else carries on.</p>
-    <p><b>Take a break</b>: Instagram showed "try again later". It stops for 6 hours, then carries on by itself.</p>
-    <p><b>Stop and tell you</b>: Instagram wants you to sign in again, the AI key or credit needs looking at, or Claude couldn't finish three times in a row. You get a Mac notification. Run <b>bash check.sh</b> and send Claude the check.txt.</p>
-  </div>
-  <h2>How sending works</h2>
-  <div class="card">
-    <p>For each message, Claude looks at the Instagram page and clicks through to the chat, like you would. It checks it's the right person, that a hello goes into an empty chat, and that they haven't written again since your download.</p>
-    <p>Claude can't type. The app types the exact message you approved, checks it letter for letter in the message box, then presses Enter and checks it appeared in the chat.</p>
-  </div>
-</section>
-</div>
-</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div id="overlay"></div>
 
 <script>
-if (location.hash.startsWith('#token=')) { sessionStorage.setItem('tok', decodeURIComponent(location.hash.slice(7))); history.replaceState(null, '', location.pathname); }
-let TOKEN = sessionStorage.getItem('tok') || '', S = null, POFF = 0;
-const F = {replies: 'draft', hellos: 'draft', people: 'following', sort: 'recent'};
-const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const when = iso => iso ? new Date(iso).toLocaleString([], {weekday: 'short', hour: 'numeric', minute: '2-digit'}) : '';
-const money = n => !n ? '$0.00' : n < 0.01 ? 'under 1c' : '$' + n.toFixed(2);
-const initial = s => esc(((s || '?').replace(/[^\p{L}\p{N}]/gu, '')[0] || '?').toUpperCase());
-function saveToken() { TOKEN = document.getElementById('tok').value.trim(); sessionStorage.setItem('tok', TOKEN); boot(); }
+'use strict';
+/* ============================================================== plumbing */
+if (location.hash.startsWith('#token=')) { sessionStorage.setItem('tok', decodeURIComponent(location.hash.slice(7))); history.replaceState(null, '', location.pathname + '#/today'); }
+let TOKEN = sessionStorage.getItem('tok') || '', S = null, PAGE = null;
+const prefs = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const icon = (n, cls = '') => `<svg class="i ${cls}"><use href="#i-${n}"/></svg>`;
+const plural = (n, one, many) => `${n} ${n === 1 ? one : (many || one + 's')}`;
+const money = n => !n ? '$0.00' : n < 0.01 ? 'under 1¢' : '$' + n.toFixed(2);
+const cents = n => n < 0.001 ? 'under 0.1¢' : n < 0.01 ? (n * 100).toFixed(1) + '¢' : n < 1 ? Math.round(n * 100) + '¢' : '$' + n.toFixed(2);
+const hue = s => [...String(s || '?')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+const initial = s => esc(((String(s || '?').replace(/[^\p{L}\p{N}]/gu, '')[0]) || '?').toUpperCase());
+const avatar = (name, big) => `<span class="avatar${big ? ' big' : ''}" style="--h:${hue(name)}" aria-hidden="true">${initial(name)}</span>`;
+function ago(iso) {
+  if (!iso) return '';
+  const t = typeof iso === 'number' ? iso : Date.parse(iso), s = (Date.now() - t) / 1000;
+  if (s < 60) return 'just now'; if (s < 3600) return Math.floor(s / 60) + ' min ago'; if (s < 86400) return Math.floor(s / 3600) + ' h ago';
+  return new Date(t).toLocaleDateString([], {weekday: 'short', day: 'numeric', month: 'short'});
+}
+const clock = ms => new Date(ms).toLocaleString([], {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
+
 async function api(path, opts = {}) {
-  const r = await fetch(path, {...opts, headers: {'X-Agent-Token': TOKEN, 'content-type': 'application/json'}});
-  if (r.status === 401) { sessionStorage.removeItem('tok'); show(false); throw new Error('auth'); }
-  const j = await r.json(); if (!r.ok) { alert(j.detail || 'Something went wrong'); throw new Error(j.detail); } return j;
+  const r = await fetch(path, {...opts, headers: {'X-Agent-Token': TOKEN, 'content-type': 'application/json', ...(opts.headers || {})}});
+  if (r.status === 401) { sessionStorage.removeItem('tok'); gate(true); throw new Error('auth'); }
+  const ct = r.headers.get('content-type') || '';
+  const body = ct.includes('json') ? await r.json() : await r.text();
+  if (!r.ok) { const msg = (body && body.detail) || 'Something went wrong'; toast(msg, 'bad'); throw new Error(msg); }
+  return body;
 }
 const post = (path, body) => api(path, {method: 'POST', body: JSON.stringify(body || {})}).then(r => { refresh(); return r; });
-function show(ok) { document.getElementById('login').hidden = ok; document.getElementById('app').hidden = !ok; }
-function size(d) { let v = Math.min(26, Math.max(14, parseInt(store.get('sz', '18')) + d)); store.set('sz', v); document.documentElement.style.setProperty('--size', v + 'px'); }
-function setEasy(on) { document.documentElement.classList.toggle('easy', on); store.set('easy', on ? '1' : ''); }
-size(0); setEasy(!!store.get('easy', '')); document.getElementById('easy').checked = !!store.get('easy', '');
 
-function openTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === name));
-  document.querySelectorAll('[data-page]').forEach(p => p.hidden = p.dataset.page !== name);
-  store.set('tab', name);
-  ({replies: () => loadReplies(), hellos: () => loadHellos(), people: () => loadPeople(0), about: loadAbout})[name]?.();
+function toast(text, kind = '') {
+  const el = document.createElement('div'); el.className = 'toast ' + kind; el.setAttribute('role', kind === 'bad' ? 'alert' : 'status');
+  el.innerHTML = icon(kind === 'bad' ? 'alert' : 'check') + `<span>${esc(text)}</span>`;
+  $('#toasts').append(el); setTimeout(() => el.remove(), kind === 'bad' ? 7000 : 4200);
 }
-document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => openTab(t.dataset.tab)));
-function pills(id, key, opts, reload) {
-  document.getElementById(id).innerHTML = opts.map(([v, label]) => `<button class="pill" aria-pressed="${F[key] === v}" data-v="${v}">${esc(label)}</button>`).join('');
-  document.getElementById(id).onclick = e => { const b = e.target.closest('.pill'); if (!b) return; F[key] = b.dataset.v; pills(id, key, opts, reload); reload(); };
+function closeOverlay() { $('#overlay').innerHTML = ''; document.removeEventListener('keydown', escClose); }
+function escClose(e) { if (e.key === 'Escape') closeOverlay(); }
+function overlay(html, focus) { $('#overlay').innerHTML = html; document.addEventListener('keydown', escClose); setTimeout(() => { const f = focus && $(focus); f && f.focus(); }, 30); }
+function confirmBox({title, text, ok = 'OK', danger = false, typed = null}) {
+  return new Promise(res => {
+    window.__res = v => { closeOverlay(); res(v); };
+    overlay(`<div class="scrim" onclick="__res(false)"></div><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt">
+      <h2 id="mt">${esc(title)}</h2><p class="muted">${esc(text)}</p>
+      ${typed ? `<input id="typed" class="field" style="margin-top:12px" placeholder="Type ${esc(typed)}" autocomplete="off">` : ''}
+      <div class="row"><button class="btn ghost" onclick="__res(false)">Cancel</button>
+      <button class="btn ${danger ? 'danger' : 'primary'}" id="okbtn" onclick="__res(${typed ? `$('#typed').value` : 'true'})">${esc(ok)}</button></div></div>`, typed ? '#typed' : '#okbtn');
+  });
+}
+function gate(on) { $('#gate').hidden = !on; $('#app').hidden = on; }
+function saveToken() { TOKEN = $('#tok').value.trim(); sessionStorage.setItem('tok', TOKEN); boot(); }
+
+/* reading preferences */
+function applyPrefs() {
+  document.documentElement.style.setProperty('--size', prefs.get('sz', '17') + 'px');
+  document.documentElement.classList.toggle('easy', prefs.get('easy', '') === '1');
+  const th = prefs.get('theme', 'system');
+  if (th === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = th;
+}
+applyPrefs();
+
+/* ============================================================== routing */
+const TITLES = {today: 'Today', replies: 'Replies', hellos: 'Hellos', people: 'People', ask: 'Ask Convo', activity: 'Activity',
+                about: 'About me', settings: 'Settings', help: 'Help'};
+const PAGES = {};
+function go(page) { location.hash = '#/' + page; }
+function route() {
+  const page = (location.hash.match(/^#\/(\w+)/) || [])[1] || prefs.get('page', 'today');
+  PAGE = TITLES[page] ? page : 'today'; prefs.set('page', PAGE);
+  document.querySelectorAll('#nav button').forEach(b => b.setAttribute('aria-current', b.dataset.page === PAGE ? 'page' : 'false'));
+  $('#title').textContent = TITLES[PAGE];
+  const c = $('#content'); c.innerHTML = `<div class="page" id="page-${PAGE}"></div>`;
+  PAGES[PAGE].mount($('#page-' + PAGE));
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('#nav button').forEach(b => b.addEventListener('click', () => go(b.dataset.page)));
+window.addEventListener('hashchange', () => { if (S) route(); });
+
+/* ============================================================== state + chrome */
+async function refresh() {
+  S = await api('/api/state');
+  $('#me').textContent = S.you;
+  const c = S.counts, snd = S.sender;
+  const cr = $('#c-replies'); cr.hidden = !c.replies_to_check; cr.textContent = c.replies_to_check;
+  const ch = $('#c-hellos'); ch.hidden = !c.hellos_to_check; ch.textContent = c.hellos_to_check;
+  let dot = '', line = 'Ready';
+  if (snd.active) { dot = 'go'; line = snd.status; }
+  else if (S.job.name) { dot = 'go'; line = cap(S.job.name) + '…'; }
+  else if (snd.stopped) { dot = 'bad'; line = 'Stopped by you'; }
+  else if (snd.status.startsWith('Stopped')) { dot = 'bad'; line = 'Stopped: needs you'; }
+  else if (snd.waiting_until || snd.quiet_until) { dot = 'warn'; line = snd.status; }
+  else if (S.overnight) { dot = 'go'; line = `Writing ${S.overnight.count} replies overnight`; }
+  $('#dot').className = 'dot ' + dot; $('#statusline').textContent = line;
+  $('#practiceband').hidden = !S.practice; $('#autosend').checked = !!S.auto_send;
+  document.title = S.practice ? 'Convo · Practice' : (c.replies_to_check + c.hellos_to_check ? `Convo (${c.replies_to_check + c.hellos_to_check})` : 'Convo');
+  PAGES[PAGE] && PAGES[PAGE].update && PAGES[PAGE].update();
+}
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+async function stopNow() { await post('/api/stop'); toast('Stopped. Nothing else goes until you press Send.'); }
+async function setAuto(on) {
+  if (on && !await confirmBox({title: 'Automatic sending (practice)', text: 'In practice, replies and hellos will be approved and sent as soon as they are written. Your real Instagram is never touched.', ok: 'Turn on'})) { $('#autosend').checked = false; return; }
+  await post('/api/settings', {auto_send: on});
 }
 
-// ---------------------------------------------------------------- today
-async function loadDownload() { await post('/api/import', {}); }
-async function writeReplies() { await post('/api/think'); }
-async function startSending(justOne) {
-  if (!S.counts.approved && !S.counts.unfollow_queued) return alert('Nothing approved yet. Check your replies and hellos first.');
-  await post('/api/send/start', {just_one: !!justOne});
+/* ============================================================== today */
+PAGES.today = {
+  mount(el) {
+    el.innerHTML = `<section class="hero" id="hero"></section>
+      <div class="stats" id="stats"></div>
+      <div class="section"><h2>Your day</h2><div class="steps" id="steps"></div></div>
+      <div class="section" id="livesec" hidden><h2>${icon('eye')} Watch it work</h2>
+        <div class="card live"><img id="liveimg" alt="The Instagram page Claude is looking at"><p class="muted small" id="livenote"></p></div></div>
+      <div class="grid-2 section" id="peoplecards"></div>
+      <div class="section"><div class="between"><h2>What's been happening</h2><button class="btn ghost small" onclick="go('activity')">See everything</button></div>
+        <div class="card"><div class="feed" id="feed"></div></div></div>`;
+    this.update();
+  },
+  update() {
+    const s = S, c = s.counts, snd = s.sender, job = s.job, b = s.briefing, li = s.last_import;
+    const hour = new Date().getHours(), hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    let cls = '', kicker = hello + ', Luke', head, sub, actions = '';
+    const waiting = c.replies_to_check + c.hellos_to_check;
+    if (snd.status.startsWith('Stopped') && !snd.stopped) { cls = 'bad'; head = 'Sending stopped'; sub = snd.status.replace('Stopped: ', ''); actions = `<button class="btn light" onclick="go('settings')">Open Settings</button><button class="btn" onclick="go('help')">What this means</button>`; }
+    else if (snd.stopped) { cls = 'bad'; head = 'Stopped by you'; sub = 'Nothing goes until you press Send again.'; actions = c.approved ? `<button class="btn light" onclick="startSend()">${icon('send')} Carry on sending</button>` : ''; }
+    else if (snd.active) { head = 'Sending now'; sub = snd.status + '. You can use your laptop meanwhile.'; actions = `<button class="btn light" onclick="post('/api/send/pause')">${icon('pause')} Pause</button>`; }
+    else if (snd.waiting_until || snd.quiet_until) { cls = 'warn'; head = snd.quiet_until ? 'Quiet hours' : 'Taking a break'; sub = snd.status; }
+    else if (job.name) { head = cap(job.name) + '…'; sub = 'This keeps going if you close the window.'; }
+    else if (s.overnight) { head = `Writing ${plural(s.overnight.count, 'reply', 'replies')} at half price`; sub = 'Usually ready within the hour, always by tomorrow. You\'ll get a notification.'; actions = `<button class="btn" onclick="writeNow()">Write them now instead</button>`; }
+    else if (waiting) { head = `${plural(waiting, 'message')} ready for you`; sub = `${plural(c.replies_to_check, 'reply', 'replies')} and ${plural(c.hellos_to_check, 'hello')} to check.` + (c.replies_need_look ? ` ${c.replies_need_look} need a proper look.` : '');
+      actions = `<button class="btn light" onclick="go('${c.replies_to_check ? 'replies' : 'hellos'}')">${icon('check')} Start checking</button>`; }
+    else if (c.approved) { head = `${plural(c.approved, 'message')} approved`; sub = 'Ready to go when you are.'; actions = `<button class="btn light" onclick="startSend()">${icon('send')} Send everything</button><button class="btn" onclick="startSend(true)">Send just one first</button>`; }
+    else if (!li) { head = 'Let\'s start with your Instagram download'; sub = 'Convo reads it to know who you follow and every chat. It\'s step 1 below.'; }
+    else { head = 'All caught up'; sub = 'Nothing waiting on you right now.'; }
+    const hero = $('#hero'); hero.className = 'hero ' + cls;
+    hero.innerHTML = `<small>${esc(kicker)}</small><h2>${esc(head)}</h2><p>${esc(sub)}</p>${actions ? `<div class="row">${actions}</div>` : ''}`;
+
+    const spent = s.ai.spend_today, limit = s.settings.daily_ai_budget_usd, pct = Math.min(100, 100 * spent / limit);
+    $('#stats').innerHTML = [
+      [b.new_messages_24h, 'new messages in 24 h'], [b.waiting_on_you, 'chats waiting on you'],
+      [`${c.sent_today}<span class="faint" style="font-size:.9rem"> / ${s.settings.daily_messages}</span>`, 'sent today', true],
+    ].map(([n, l, raw]) => `<div class="stat"><b>${raw ? n : esc(n)}</b><span>${esc(l)}</span></div>`).join('') +
+      `<div class="stat"><b>${money(spent)}</b><span>AI today, of ${money(limit)}</span><div class="progress ${pct > 90 ? 'bad' : pct > 70 ? 'warn' : ''}"><i style="width:${pct}%"></i></div></div>`;
+
+    const writing = job.name === 'writing replies' || !!s.overnight;
+    const steps = [
+      [li ? 'done' : 'now', 'Load your Instagram download',
+       li ? `Last loaded ${ago(li.at)}: ${li.following ?? '?'} people you follow, ${li.conversations} chats, ${li.new_messages} new messages.` : 'When Instagram emails you, save the file in Downloads, then press Load.',
+       `<button class="btn ${li ? '' : 'primary'}" ${job.name ? 'disabled' : ''} onclick="post('/api/import').then(() => toast('Loading your download…'))">${icon('down')} ${S.practice ? 'Make a new practice download' : 'Load from Downloads'}</button>`],
+      [writing ? 'now' : c.replies_to_check ? 'done' : '', 'Replies get written',
+       !s.ai.on ? 'AI is off, so reply boxes are left for you. Add your key in Settings.' :
+       s.overnight ? `${plural(s.overnight.count, 'reply', 'replies')} being written at half price.` :
+       job.name === 'writing replies' ? `Writing ${job.total ? job.done + ' of ' + job.total : '…'}` :
+       `Happens by itself after loading${s.settings.write_overnight ? ', overnight at half price' : ''}. About ${cents((s.ai.estimates[s.settings.writer_model] || s.ai.estimates['claude-opus-5-5'])[s.settings.write_overnight ? 'overnight' : 'now'])} a reply.`,
+       job.name === 'writing replies' ? `<div class="progress" style="width:100%"><i style="width:${job.total ? Math.round(100 * job.done / job.total) : 6}%"></i></div><button class="btn small ghost" onclick="post('/api/job/stop')">Stop writing</button>` :
+       `<button class="btn" ${job.name || !s.ai.on ? 'disabled' : ''} onclick="writeNow()">${icon('pen')} Write replies now</button>`],
+      [snd.active ? 'now' : c.sent_today ? 'done' : '', 'Check, approve, send',
+       `${plural(c.replies_to_check, 'reply', 'replies')} and ${plural(c.hellos_to_check, 'hello')} to check, ${c.approved} approved.` +
+       (s.settings.send_at ? ` Sends by itself at ${s.settings.send_at}.` : '') + ` About ${cents(s.ai.send_estimate)} to send each.`,
+       snd.active ? `<button class="btn" onclick="post('/api/send/pause')">${icon('pause')} Pause</button>` :
+       `<button class="btn go" ${c.approved || c.unfollow_queued ? '' : 'disabled'} onclick="startSend()">${icon('send')} Send everything I approved${c.approved ? ` (${c.approved})` : ''}</button>
+        <button class="btn" ${c.approved ? '' : 'disabled'} onclick="startSend(true)">Send just one first</button>`],
+    ];
+    $('#steps').innerHTML = steps.map(([st, h, p, act], i) => `<div class="card step"><span class="num ${st}">${st === 'done' ? icon('check') : i + 1}</span>
+      <div><h3>${esc(h)}</h3><p class="muted">${esc(p)}</p><div class="row" style="margin-top:10px">${act}</div></div></div>`).join('');
+
+    const top = b.top || [], careful = b.careful || [];
+    $('#peoplecards').innerHTML = `<div class="card"><h2 style="margin-bottom:8px">${icon('star')} You'd probably click with</h2>${top.length ? `<div class="peoplelist">${top.map(p =>
+        `<button onclick="openPerson('${esc(p.username)}')">${avatar(p.display_name || p.username)}<span class="grow"><b>@${esc(p.username)}</b><br><span class="muted small">${esc(p.interest_why || p.summary || '')}</span></span></button>`).join('')}</div>` : '<p class="muted">After replies are written, people you\'d get on with show up here.</p>'}</div>
+      <div class="card"><h2 style="margin-bottom:8px">${icon('alert')} Worth a closer look</h2>${careful.length ? `<div class="peoplelist">${careful.map(p =>
+        `<button onclick="openPerson('${esc(p.username)}')">${avatar(p.username)}<span class="grow"><b>@${esc(p.username)}</b><br><span class="muted small">${esc(p.concern_why || '')}</span></span></button>`).join('')}</div>` : '<p class="muted">Nothing worrying. Chats that need care show up here.</p>'}</div>`;
+
+    $('#feed').innerHTML = feedHtml(s.activity.slice(0, 7));
+    $('#livesec').hidden = !snd.active;
+  },
+};
+function feedHtml(items) {
+  const ic = {good: 'check', warn: 'alert', problem: 'x', info: 'list'};
+  return items.length ? items.map(a => `<div class="${esc(a.kind)}"><span class="k">${icon(ic[a.kind] || 'list')}</span><span>${esc(a.text)}</span><time>${esc(ago(a.at))}</time></div>`).join('')
+    : '<p class="muted" style="padding:6px 2px">Nothing yet.</p>';
+}
+async function startSend(one) { await post('/api/send/start', {just_one: !!one}); toast(one ? 'Sending one. Check it in Instagram, then send the rest.' : 'Sending. You can use your laptop meanwhile.'); }
+async function writeNow() {
+  if (S.overnight && !await confirmBox({title: 'Write them now?', text: 'Writing straight away costs twice as much as overnight. The overnight ones are cancelled.', ok: 'Write now'})) return;
+  await post('/api/think', {now: true}); toast('Writing replies…');
 }
 async function refreshLive() {
-  const card = document.getElementById('livecard');
-  if (document.hidden || !S || !S.sender.active) { card.hidden = true; return; }
-  const lv = await api('/api/live');
-  if (!lv.image) return;
-  document.getElementById('liveimg').src = 'data:image/png;base64,' + lv.image;
-  document.getElementById('livenote').textContent = lv.status + (lv.note ? ' · ' + lv.note : '');
-  card.hidden = false;
+  if (!S || !S.sender.active || PAGE !== 'today' || document.hidden) return;
+  const lv = await api('/api/live'); const img = $('#liveimg'); if (!img || !lv.image) return;
+  img.src = 'data:image/png;base64,' + lv.image; $('#livenote').textContent = lv.status + (lv.note ? ' · ' + lv.note : '');
 }
 
-function renderToday(s) {
-  const c = s.counts, li = s.last_import, job = s.job, snd = s.sender;
-  let cls = 'go', title = 'All good', sub = '';
-  if (snd.status.startsWith('Stopped')) { cls = 'bad'; title = 'Sending stopped'; sub = snd.status.replace('Stopped: ', ''); }
-  else if (snd.waiting_until) { cls = 'warn'; title = 'Taking a break'; sub = snd.status; }
-  else if (job.name) { title = job.name[0].toUpperCase() + job.name.slice(1) + '...'; sub = 'You can close this page; it keeps going.'; cls = ''; }
-  else if (snd.active) { title = 'Sending'; sub = snd.status; }
-  else if (c.replies_to_check + c.hellos_to_check) { cls = ''; title = 'Ready for you to check'; sub = `${c.replies_to_check} replies and ${c.hellos_to_check} hellos waiting.`; }
-  else if (!li) { cls = ''; title = 'Start with your Instagram download'; sub = 'Step 1 below.'; }
-  else { sub = 'Nothing waiting on you right now.'; }
-  const hero = document.getElementById('hero'); hero.className = 'hero ' + cls; hero.innerHTML = `<b>${esc(title)}</b><span class="muted">${esc(sub)}</span>`;
-  const chip = document.getElementById('chip');
-  chip.className = 'chip ' + (cls === 'bad' ? 'bad' : cls === 'warn' ? 'warn' : snd.active || job.name ? 'go' : '');
-  chip.textContent = snd.active ? 'Sending' : job.name ? 'Working' : cls === 'bad' ? 'Stopped' : 'Ready';
-  document.getElementById('n1').className = 'num' + (li ? ' done' : '');
-  document.getElementById('s1').textContent = li ? `Last loaded ${when(li.at)}: ${li.following ?? '?'} people you follow, ${li.conversations} chats, ${li.new_messages} new messages.`
-    : 'When Instagram emails you, download the file into your Downloads folder, then press the button.';
-  const writing = job.name === 'writing replies';
-  document.getElementById('n2').className = 'num' + (!writing && li && !c.replies_to_check && !job.name ? '' : '') + (c.replies_to_check && !writing ? ' done' : '');
-  document.getElementById('s2').textContent = s.ai.on ? 'Happens by itself after loading. About 1 to 3 cents to write a reply, and about 1 cent to send each message.' :
-    'AI replies are off, so reply boxes are left empty for you (turn them on in Settings).';
-  document.getElementById('jobbar').innerHTML = job.name ? `<div class="bar-p"><i style="width:${job.total ? Math.round(100 * job.done / job.total) : 5}%"></i></div>
-    <p class="muted">${esc(job.name)}${job.total ? `: ${job.done} of ${job.total}` : ''}</p>` : (job.error ? `<div class="note">${esc(job.error)}</div>` : '');
-  ['loadbtn', 'thinkbtn'].forEach(id => document.getElementById(id).disabled = !!job.name);
-  document.getElementById('stopjob').hidden = !writing;
-  document.getElementById('s3').textContent = `${c.replies_to_check} replies to check${c.replies_need_look ? ` (${c.replies_need_look} need a proper look)` : ''}, ${c.hellos_to_check} hellos to check, ${c.approved} approved and ready to send.`;
-  document.getElementById('sendbtn').textContent = c.approved ? `Send everything I approved (${c.approved})` : 'Send everything I approved';
-  document.getElementById('pausebtn').hidden = !snd.active;
-  document.getElementById('sendstatus').textContent = snd.active || snd.waiting_until ? snd.status : '';
-  document.getElementById('tiles').innerHTML = [
-    [`${c.sent_today}/${s.settings.daily_messages}`, 'sent in the last 24 hours'], [c.sent_total, 'sent in total'],
-    [c.unfollow_queued, 'still to unfollow'], [c.interesting, 'people you\'d probably click with'],
-    [c.concerning, 'chats worth a closer look'], [money(s.ai.spend_today), 'AI cost today']]
-    .map(([n, l]) => `<div class="tile"><b>${esc(n)}</b><span>${esc(l)}</span></div>`).join('');
-  document.getElementById('feed').innerHTML = s.activity.length ? s.activity.slice(0, 25).map(a =>
-    `<div class="${esc(a.kind)}"><span class="muted">${esc(when(a.at))}</span> ${esc(a.text)}</div>`).join('') : '<p class="muted">Nothing yet.</p>';
-  const b1 = document.getElementById('b-replies'); b1.hidden = !c.replies_to_check; b1.textContent = c.replies_to_check;
-  const b2 = document.getElementById('b-hellos'); b2.hidden = !c.hellos_to_check; b2.textContent = c.hellos_to_check;
+/* ============================================================== replies + hellos */
+const F = {reply: prefs.get('f-reply', 'draft'), hello: prefs.get('f-hello', 'draft'), people: 'following', sort: 'recent', q: ''};
+function draftsPage(kind) {
+  const isReply = kind === 'reply';
+  const filters = isReply ? [['draft', 'To check'], ['look', 'Needs a look'], ['interesting', 'Interesting'], ['approved', 'Approved'], ['sent', 'Sent'], ['other', 'Skipped or unsure']]
+                          : [['draft', 'To check'], ['approved', 'Approved'], ['sent', 'Sent'], ['skipped', 'Skipped']];
+  let items = [], total = 0;
+  const page = {
+    mount(el) {
+      el.innerHTML = `<div class="between"><p class="muted grow" style="max-width:62ch">${isReply ? 'Chats where they wrote last. Change the words if you like, then approve. The ones marked “needs a look” are for you to do one by one.'
+          : 'People you follow and have never messaged. Each gets one of your own hellos. Right before sending, Claude checks the chat is still empty.'}</p>
+        <button class="btn go" onclick="approveAll('${kind}')">${icon('check')} Approve all ready</button></div>
+        <div id="banner"></div>
+        <div class="pills" style="margin:14px 0" role="group" aria-label="Show">${filters.map(([v, l]) => `<button class="pill" data-v="${v}" aria-pressed="${F[kind] === v}">${esc(l)}</button>`).join('')}</div>
+        <div id="list" class="stack"><div class="skeleton" style="height:160px"></div><div class="skeleton" style="height:160px"></div></div>
+        <div class="row" style="justify-content:center;margin-top:16px"><button class="btn" id="more" hidden>Show more</button></div>`;
+      el.querySelectorAll('.pill').forEach(p => p.onclick = () => { F[kind] = p.dataset.v; prefs.set('f-' + kind, F[kind]); el.querySelectorAll('.pill').forEach(x => x.setAttribute('aria-pressed', x === p)); this.load(); });
+      $('#more').onclick = () => this.load(true);
+      this.load(); this.update();
+    },
+    update() {
+      const b = $('#banner'); if (!b) return;
+      b.innerHTML = isReply && S.overnight ? `<div class="note info" style="margin-top:14px">${icon('clock')}<span class="grow">${plural(S.overnight.count, 'reply is', 'replies are')} being written overnight at half price. They appear here when ready, usually within the hour.</span><button class="btn small" onclick="writeNow()">Write now</button></div>` : '';
+    },
+    async load(more) {
+      const f = F[kind], status = {look: 'draft', interesting: 'draft'}[f] || f, only = {look: 'look', interesting: 'interesting'}[f] || '';
+      const r = await api(`/api/drafts?kind=${kind}&status=${status}&only=${only}&offset=${more ? items.length : 0}&limit=40`);
+      items = more ? items.concat(r.items) : r.items; total = r.total;
+      const list = $('#list'); if (!list) return;
+      list.innerHTML = items.length ? items.map(d => isReply ? replyCard(d) : helloCard(d)).join('') : emptyState(kind, f);
+      $('#more').hidden = items.length >= total;
+    },
+  };
+  return page;
 }
-
-// ---------------------------------------------------------------- replies
-let RITEMS = [];
-async function loadReplies(more) {
-  pills('rfilters', 'replies', [['draft', 'All to check'], ['look', 'Needs a look'], ['interesting', 'Interesting'], ['approved', 'Approved'], ['sent', 'Sent'], ['other', 'Skipped / not sure']], () => loadReplies());
-  const status = {look: 'draft', interesting: 'draft', draft: 'draft', approved: 'approved', sent: 'sent'}[F.replies] || 'other';
-  const only = {look: 'look', interesting: 'interesting'}[F.replies] || '';
-  const r = await api(`/api/drafts?kind=reply&status=${status}&only=${only}&offset=${more ? RITEMS.length : 0}&limit=60`);
-  const items = RITEMS = more ? RITEMS.concat(r.items) : r.items;
-  const shown = items;
-  document.getElementById('rlist').innerHTML = shown.length ? shown.map(replyCard).join('') :
-    `<div class="empty"><b>Nothing here</b>${F.replies === 'look' ? 'No replies need a special look.' : 'Load a download and replies appear here.'}</div>`;
-  document.getElementById('rmore').hidden = items.length >= r.total;
+function emptyState(kind, f) {
+  const t = f === 'draft' ? (kind === 'reply' ? ['All caught up', 'Load a download and replies appear here.'] : ['No hellos waiting', 'Hellos appear after you load a download.'])
+          : ['Nothing here', 'Try another filter.'];
+  return `<div class="card empty"><div class="art">${icon(kind === 'reply' ? 'reply' : 'wave')}</div><b>${t[0]}</b>${t[1]}</div>`;
+}
+function draftButtons(d) {
+  if (d.status === 'draft') return `<button class="btn go" onclick="act(${d.id}, 'approve')">${icon('check')} Approve</button><button class="btn ghost" onclick="act(${d.id}, 'skip')">Skip</button>`;
+  if (d.status === 'approved') return `<span class="tag go">${icon('check')} Approved</span><button class="btn ghost small" onclick="act(${d.id}, 'unapprove')">Undo</button>`;
+  if (d.status === 'sent') return `<span class="tag go">${icon('send')} Sent ${esc(ago(d.sent_at))}</span>`;
+  if (d.status === 'sending') return `<span class="tag accent">Sending…</span>`;
+  return `<span class="tag">${esc(d.status === 'unsure' ? 'Not sure it went' : d.status === 'failed' ? 'Couldn\'t send' : 'Skipped')}</span><button class="btn ghost small" onclick="act(${d.id}, 'restore')">Back to check</button>`;
 }
 function replyCard(d) {
-  const c = d.context || {}, name = d.username ? '@' + d.username : (d.other_name || 'Someone');
-  const interest = c.interest ?? d.interest, concern = c.concern ?? d.concern;
-  const flags = [interest >= 3 ? '<span class="flag star">You\'d click</span>' : interest === 2 ? '<span class="flag star">Interesting</span>' : '',
-    concern === 'high' ? '<span class="flag bad">Careful</span>' : concern === 'low' ? '<span class="flag warn">Have a look</span>' : ''].join(' ');
-  const chat = (d.recent || []).map(m => `<div class="bubble ${m.from_me ? 'me' : 'them'}">${esc(m.text)}</div>`).join('');
-  const english = c.their_message_english && c.language && c.language.toLowerCase() !== 'english' ? `<p class="muted">In English: ${esc(c.their_message_english)}</p>` : '';
-  const editable = ['draft', 'approved', 'skipped', 'unsure', 'failed'].includes(d.status) && d.status !== 'sent';
-  const buttons = d.status === 'draft' ? `<button class="btn go" onclick="act(${d.id}, 'approve')">Approve</button><button class="btn" onclick="act(${d.id}, 'skip')">Skip</button>`
-    : d.status === 'approved' ? `<button class="btn" onclick="act(${d.id}, 'unapprove')">Unapprove</button>`
-    : d.status === 'sent' ? `<span class="muted">Sent ${esc(when(d.sent_at))}</span>`
-    : `<button class="btn" onclick="act(${d.id}, 'restore')">Back to check</button>`;
-  return `<div class="card"><div class="who"><span class="avatar">${initial(d.other_name || d.username)}</span>
-      <span class="grow"><span class="name">${esc(d.other_name || name)}</span> <span class="muted">${esc(d.username ? '@' + d.username : '')}</span></span>${flags}</div>
-    ${c.summary ? `<p class="muted">${esc(c.summary)}${c.interest_why ? ' · ' + esc(c.interest_why) : ''}</p>` : ''}
-    ${d.note ? `<div class="note">${esc(d.note)}</div>` : ''}${concern === 'high' && c.concern_why ? `<div class="note">${esc(c.concern_why)}</div>` : ''}
-    <div class="chat">${chat}</div>${english}
-    <div class="draftbox"><textarea id="t${d.id}" rows="2" ${editable ? '' : 'readonly'} placeholder="Type your reply" onchange="saveText(${d.id})">${esc(d.text)}</textarea></div>
-    ${c.reply_english && c.language && c.language.toLowerCase() !== 'english' ? `<p class="muted">Your reply means: ${esc(c.reply_english)}</p>` : ''}
-    <div class="row" style="margin-top:10px">${buttons}</div></div>`;
+  const c = d.context || {}, interest = c.interest ?? d.interest, concern = c.concern ?? d.concern, name = d.other_name || d.username || 'Someone';
+  const look = c.needs_look || c.manual;
+  const tags = [interest >= 3 ? `<span class="tag go">${icon('star')} You'd click</span>` : interest === 2 ? '<span class="tag go">Interesting</span>' : '',
+    concern === 'high' ? '<span class="tag bad">Careful</span>' : concern === 'low' ? '<span class="tag warn">Have a look</span>' : '',
+    c.direct ? '<span class="tag info">Your own</span>' : '', look && d.status === 'draft' ? '<span class="tag warn">Needs a look</span>' : ''].join('');
+  const chat = (d.recent || []).map(m => `<div class="bubble ${m.from_me ? 'me' : 'them'}">${esc(m.text)}<time>${esc(ago(m.at))}</time></div>`).join('');
+  const foreign = c.language && c.language.toLowerCase() !== 'english';
+  const editable = !['sent', 'sending'].includes(d.status);
+  return `<article class="card msg ${d.status === 'approved' ? 'approved' : ''} ${look && d.status === 'draft' ? 'look' : ''}">
+    <div class="msg-head">${avatar(name)}<div class="grow who" style="display:block"><span class="name">${esc(name)}</span>
+      ${d.username ? `<button class="btn ghost small" style="padding:2px 6px" onclick="openPerson('${esc(d.username)}')">@${esc(d.username)}</button>` : ''}</div><div class="row" style="gap:6px">${tags}</div></div>
+    <div class="msg-body">
+      ${c.summary ? `<p class="muted small">${esc(c.summary)}${c.interest_why ? ' · ' + esc(c.interest_why) : ''}</p>` : ''}
+      ${d.note ? `<div class="note" style="margin-top:8px">${icon('alert')}<span>${esc(d.note)}</span></div>` : ''}
+      <div class="chat">${chat}</div>
+      ${foreign && c.their_message_english ? `<p class="translate">In English: ${esc(c.their_message_english)}</p>` : ''}
+      <div class="draft"><label for="t${d.id}">Your reply</label><textarea id="t${d.id}" rows="2" ${editable ? '' : 'readonly'} placeholder="Type your reply" onchange="saveText(${d.id})">${esc(d.text)}</textarea></div>
+      ${foreign && c.reply_english ? `<p class="translate">Your reply means: ${esc(c.reply_english)}</p>` : ''}
+    </div>
+    <div class="msg-foot">${draftButtons(d)}</div></article>`;
 }
+function helloCard(d) {
+  return `<article class="card msg ${d.status === 'approved' ? 'approved' : ''}"><div class="msg-head">${avatar(d.username)}
+    <div class="grow"><button class="btn ghost small" style="padding:2px 0;font-weight:650" onclick="openPerson('${esc(d.username)}')">@${esc(d.username)}</button></div></div>
+    <div class="msg-body">${d.note ? `<div class="note">${icon('alert')}<span>${esc(d.note)}</span></div>` : ''}
+      <div class="draft"><label for="t${d.id}">Your hello</label><textarea id="t${d.id}" rows="1" ${d.status === 'sent' ? 'readonly' : ''} onchange="saveText(${d.id})">${esc(d.text)}</textarea></div></div>
+    <div class="msg-foot">${draftButtons(d)}</div></article>`;
+}
+PAGES.replies = draftsPage('reply');
+PAGES.hellos = draftsPage('hello');
 async function act(id, action) {
-  const t = document.getElementById('t' + id);
+  const t = $('#t' + id);
   await api(`/api/drafts/${id}`, {method: 'POST', body: JSON.stringify({action, text: t ? t.value : null})});
-  refresh(); const tab = store.get('tab'); tab === 'hellos' ? loadHellos() : loadReplies();
+  await refresh(); PAGES[PAGE].load && PAGES[PAGE].load();
 }
-async function saveText(id) { const t = document.getElementById('t' + id); await api(`/api/drafts/${id}`, {method: 'POST', body: JSON.stringify({action: 'save', text: t.value})}); }
+async function saveText(id) { const t = $('#t' + id); await api(`/api/drafts/${id}`, {method: 'POST', body: JSON.stringify({action: 'save', text: t.value})}); toast('Saved'); }
 async function approveAll(kind) {
   const n = kind === 'hello' ? S.counts.hellos_to_check : S.counts.replies_to_check - S.counts.replies_need_look;
-  if (!n) return alert('Nothing ready to approve.');
-  if (!confirm(`Approve ${n} ${kind === 'hello' ? 'hellos' : 'replies'} as they are?` + (kind === 'reply' && S.counts.replies_need_look ? ` The ${S.counts.replies_need_look} that need a look stay for you to do one by one.` : ''))) return;
-  const r = await post('/api/drafts/all/' + kind); alert(`Approved ${r.approved}. Press Send on the Today page when you're ready.`);
-  kind === 'hello' ? loadHellos() : loadReplies();
+  if (!n) return toast('Nothing ready to approve.');
+  const extra = kind === 'reply' && S.counts.replies_need_look ? ` The ${S.counts.replies_need_look} that need a look stay for you.` : '';
+  if (!await confirmBox({title: `Approve ${plural(n, kind === 'hello' ? 'hello' : 'reply', kind === 'hello' ? 'hellos' : 'replies')}?`, text: 'They go as they are when you press Send.' + extra, ok: 'Approve'})) return;
+  const r = await post('/api/drafts/all/' + kind); toast(`Approved ${r.approved}. Press Send on Today when you're ready.`);
+  PAGES[PAGE].load && PAGES[PAGE].load();
 }
 
-// ---------------------------------------------------------------- hellos
-let HITEMS = [];
-async function loadHellos(more) {
-  pills('hfilters', 'hellos', [['draft', 'To check'], ['approved', 'Approved'], ['sent', 'Sent'], ['skipped', 'Skipped']], () => loadHellos());
-  const r = await api(`/api/drafts?kind=hello&status=${F.hellos}&offset=${more ? HITEMS.length : 0}&limit=100`);
-  HITEMS = more ? HITEMS.concat(r.items) : r.items;
-  document.getElementById('hlist').innerHTML = HITEMS.length ? '<div class="card">' + HITEMS.map(d => `
-    <div class="person"><span class="avatar">${initial(d.username)}</span><div class="grow"><span class="name">@${esc(d.username)}</span>
-      ${d.note ? `<div class="note">${esc(d.note)}</div>` : ''}
-      <div class="draftbox"><textarea id="t${d.id}" rows="1" ${d.status === 'sent' ? 'readonly' : ''} onchange="saveText(${d.id})">${esc(d.text)}</textarea></div>
-      <div class="row" style="margin-top:6px">${d.status === 'draft' ? `<button class="btn go" onclick="act(${d.id}, 'approve')">Approve</button><button class="btn quiet" onclick="act(${d.id}, 'skip')">Skip</button>`
-        : d.status === 'approved' ? `<button class="btn quiet" onclick="act(${d.id}, 'unapprove')">Unapprove</button>`
-        : d.status === 'sent' ? `<span class="muted">Sent ${esc(when(d.sent_at))}</span>` : `<button class="btn quiet" onclick="act(${d.id}, 'restore')">Back to check</button>`}</div></div></div>`).join('') + '</div>'
-    : `<div class="empty"><b>Nothing here</b>Hellos appear after you load a download.</div>`;
-  document.getElementById('hmore').hidden = HITEMS.length >= r.total;
+/* ============================================================== people */
+let POFF = 0;
+PAGES.people = {
+  mount(el) {
+    const views = [['following', 'Following'], ['followers', 'Followers'], ['chats', 'Chatted'], ['interesting', 'Interesting'], ['concerning', 'Closer look'], ['all', 'Everyone']];
+    el.innerHTML = `<div class="between"><div class="row grow" style="max-width:420px"><span class="grow" style="position:relative">
+        <input id="pq" class="field" placeholder="Search a name or username" value="${esc(F.q)}" style="padding-left:38px" aria-label="Search people">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--faint)">${icon('search')}</span></span></div>
+      <div class="row"><button class="btn" onclick="downloadCsv()">${icon('file')} Spreadsheet</button></div></div>
+      <div class="pills" style="margin:14px 0">${views.map(([v, l]) => `<button class="pill" data-v="${v}" aria-pressed="${F.people === v}">${esc(l)}</button>`).join('')}</div>
+      <div class="card"><div class="plist" id="plist"><div class="skeleton" style="height:240px"></div></div>
+        <div class="between" style="margin-top:12px"><span class="muted small" id="ppage"></span>
+        <div class="row"><button class="btn small" id="pprev">Previous</button><button class="btn small" id="pnext">Next</button></div></div></div>
+      <div class="section"><h2>Unfollowing</h2><div class="card"><div class="between"><p class="muted grow" id="unfinfo"></p>
+        <div class="row"><button class="btn" onclick="unfollowTicked()">${icon('minus-user')} Unfollow ticked</button>
+        <button class="btn ghost" onclick="cancelUnfollows()">Cancel waiting ones</button>
+        <button class="btn danger-soft" onclick="unfollowEveryone()">Unfollow everyone…</button></div></div></div></div>`;
+    el.querySelectorAll('.pill').forEach(p => p.onclick = () => { F.people = p.dataset.v; el.querySelectorAll('.pill').forEach(x => x.setAttribute('aria-pressed', x === p)); this.load(0); });
+    let t; $('#pq').oninput = e => { F.q = e.target.value; clearTimeout(t); t = setTimeout(() => this.load(0), 220); };
+    $('#pprev').onclick = () => this.load(POFF - 50); $('#pnext').onclick = () => this.load(POFF + 50);
+    this.load(0); this.update();
+  },
+  update() { const u = $('#unfinfo'); if (u) u.textContent = `${S.counts.unfollow_queued} waiting to unfollow, ${S.counts.unfollowed_total} done. Up to ${S.settings.daily_unfollows} a day.`; },
+  async load(off) {
+    POFF = Math.max(0, off || 0);
+    const sort = F.people === 'interesting' ? 'interest' : 'recent';
+    const r = await api(`/api/people?show=${F.people}&sort=${sort}&q=${encodeURIComponent(F.q)}&offset=${POFF}`);
+    const list = $('#plist'); if (!list) return;
+    list.innerHTML = r.items.length ? r.items.map(p => {
+      const tags = [p.interest >= 3 ? `<span class="tag go">${icon('star')} You'd click</span>` : p.interest === 2 ? '<span class="tag go">Interesting</span>' : '',
+        p.concern === 'high' ? '<span class="tag bad">Careful</span>' : p.concern === 'low' ? '<span class="tag warn">Have a look</span>' : '',
+        p.unfollow === 'done' ? '<span class="tag">Unfollowed</span>' : p.unfollow ? '<span class="tag">Unfollow waiting</span>' : '',
+        p.hello === 'sent' ? '<span class="tag accent">Hello sent</span>' : ''].join(' ');
+      return `<div class="prow"><input type="checkbox" class="psel" data-u="${esc(p.username)}" aria-label="Select @${esc(p.username)}">${avatar(p.display_name || p.username)}
+        <button class="open" onclick="openPerson('${esc(p.username)}')"><span class="who" style="display:block"><span class="name">${esc(p.display_name || p.username)}</span> <span class="handle">@${esc(p.username)}</span></span>
+        <span class="sum" style="display:block">${esc(p.summary || (p.i_follow && p.follows_me ? 'You follow each other' : p.i_follow ? 'You follow them' : 'Follows you'))}</span></button>
+        <span class="row" style="gap:6px;justify-content:flex-end">${tags}</span></div>`; }).join('')
+      : `<div class="empty"><div class="art">${icon('users')}</div><b>Nobody here</b>Load a download first, or try another filter.</div>`;
+    $('#ppage').textContent = r.total ? `${POFF + 1}–${Math.min(POFF + 50, r.total)} of ${r.total}` : '';
+    $('#pprev').disabled = POFF === 0; $('#pnext').disabled = POFF + 50 >= r.total;
+  },
+};
+async function downloadCsv() {
+  const r = await fetch('/api/people.csv', {headers: {'X-Agent-Token': TOKEN}}); const blob = await r.blob();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'convo-people.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
-
-// ---------------------------------------------------------------- people
-async function loadPeople(off) {
-  pills('pfilters', 'people', [['following', 'Following'], ['followers', 'Followers'], ['chats', 'You\'ve chatted'], ['interesting', 'Interesting'], ['concerning', 'Worth a closer look']], () => loadPeople(0));
-  POFF = Math.max(0, off || 0);
-  const sort = F.people === 'interesting' ? 'interest' : 'recent';
-  const r = await api(`/api/people?show=${F.people}&sort=${sort}&q=${encodeURIComponent(document.getElementById('pq').value)}&offset=${POFF}`);
-  document.getElementById('plist').innerHTML = r.items.length ? r.items.map(p => {
-    const tags = [p.interest >= 3 ? '<span class="flag star">You\'d click</span>' : p.interest === 2 ? '<span class="flag star">Interesting</span>' : '',
-      p.concern === 'high' ? '<span class="flag bad">Careful</span>' : p.concern === 'low' ? '<span class="flag warn">Have a look</span>' : '',
-      p.unfollow === 'done' ? '<span class="flag">Unfollowed</span>' : p.unfollow ? '<span class="flag">Unfollow waiting</span>' : '',
-      p.hello === 'sent' ? '<span class="flag">Hello sent</span>' : ''].join(' ');
-    return `<div class="person"><input type="checkbox" class="psel" data-u="${esc(p.username)}"><span class="avatar">${initial(p.display_name || p.username)}</span>
-      <div class="grow"><span class="name">@${esc(p.username)}</span> ${tags}
-        ${p.summary ? `<p class="muted">${esc(p.summary)}${p.interest_why ? ' · ' + esc(p.interest_why) : ''}</p>` : ''}
-        ${p.concern_why && p.concern !== 'none' ? `<div class="note">${esc(p.concern_why)}</div>` : ''}
-        ${p.memory.length ? `<p class="muted">Remembers: ${esc(p.memory.slice(-3).join(' · '))}</p>` : ''}
-        <input class="field" style="margin-top:6px" placeholder="Your note about them" value="${esc(p.note || '')}" onchange="noteFor('${esc(p.username)}', this.value)"></div></div>`; }).join('')
-    : `<div class="empty"><b>Nobody here</b>Load a download first.</div>`;
-  document.getElementById('ppage').textContent = r.total ? `${POFF + 1} to ${Math.min(POFF + 50, r.total)} of ${r.total}` : '';
-  document.getElementById('pprev').disabled = POFF === 0; document.getElementById('pnext').disabled = POFF + 50 >= r.total;
-}
-async function noteFor(u, note) { await api(`/api/people/${encodeURIComponent(u)}/note`, {method: 'POST', body: JSON.stringify({note})}); }
 async function unfollowTicked() {
   const names = [...document.querySelectorAll('.psel:checked')].map(e => e.dataset.u);
-  if (!names.length) return alert('Tick some people first.');
-  if (!confirm(`Unfollow ${names.length}? You'd have to follow them again by hand.`)) return;
-  const r = await post('/api/unfollow', {usernames: names}); alert(`${r.queued} added. Press Send on the Today page to start.`); loadPeople(POFF);
+  if (!names.length) return toast('Tick some people first.');
+  if (!await confirmBox({title: `Unfollow ${plural(names.length, 'person', 'people')}?`, text: 'It happens when sending runs. You\'d have to follow them again by hand.', ok: 'Unfollow', danger: true})) return;
+  const r = await post('/api/unfollow', {usernames: names}); toast(`${r.queued} added. They go when you press Send.`); PAGES.people.load(POFF);
 }
 async function unfollowEveryone() {
-  const typed = prompt(`This unfollows all ${S.counts.following} people you follow, ${S.settings.daily_unfollows} a day. You'd have to follow them again by hand, and hellos that haven't gone out are cancelled.\n\nType UNFOLLOW EVERYONE to go ahead:`);
-  if (typed === null) return;
-  const r = await post('/api/unfollow', {everyone: true, confirm: typed}); alert(`${r.queued} added. Press Send on the Today page to start.`); loadPeople(POFF);
+  const typed = await confirmBox({title: 'Unfollow everyone?', text: `This unfollows all ${S.counts.following} people you follow, ${S.settings.daily_unfollows} a day, and cancels hellos that haven't gone. You'd have to follow them again by hand.`,
+    ok: 'Unfollow everyone', danger: true, typed: 'UNFOLLOW EVERYONE'});
+  if (!typed) return;
+  const r = await post('/api/unfollow', {everyone: true, confirm: typed}); toast(`${r.queued} added. They go when you press Send.`); PAGES.people.load(POFF);
 }
-async function cancelUnfollows() { const r = await post('/api/unfollow/cancel'); alert(`Cancelled ${r.cancelled}.`); loadPeople(POFF); }
+async function cancelUnfollows() { const r = await post('/api/unfollow/cancel'); toast(`Cancelled ${r.cancelled}.`); PAGES.people.load(POFF); }
 
-// ---------------------------------------------------------------- about me
+/* person drawer */
+async function openPerson(u) {
+  overlay(`<div class="scrim" onclick="closeOverlay()"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="@${esc(u)}"><div class="body"><div class="skeleton" style="height:120px"></div></div></aside>`);
+  let p; try { p = await api('/api/people/' + encodeURIComponent(u)); } catch (e) { closeOverlay(); return; }
+  renderPerson(p);
+}
+function renderPerson(p) {
+  const name = p.display_name || p.username, r = p.report;
+  const msgs = p.chats.flatMap(c => c.messages).slice(-40);
+  const rel = p.i_follow && p.follows_me ? 'You follow each other' : p.i_follow ? 'You follow them' : p.follows_me ? 'They follow you' : '';
+  const list = a => a && a.length ? `<ul>${a.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="muted">Nothing.</p>';
+  overlay(`<div class="scrim" onclick="closeOverlay()"></div><aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="pname">
+    <header><button class="btn ghost small close" onclick="closeOverlay()" aria-label="Close">${icon('x')}</button>
+      <div class="who">${avatar(name, true)}<div><h2 id="pname">${esc(name)}</h2><span class="muted">@${esc(p.username)}${rel ? ' · ' + esc(rel) : ''}</span></div></div>
+      <div class="row" style="margin-top:12px;gap:6px">${p.interest >= 3 ? `<span class="tag go">${icon('star')} You'd click</span>` : ''}${p.concern === 'high' ? '<span class="tag bad">Careful</span>' : p.concern === 'low' ? '<span class="tag warn">Have a look</span>' : ''}${p.never ? '<span class="tag bad">Never message</span>' : ''}${p.unfollow ? `<span class="tag">${p.unfollow.status === 'done' ? 'Unfollowed' : 'Unfollow waiting'}</span>` : ''}</div>
+      <div class="row" style="margin-top:14px"><button class="btn primary small" onclick="messagePerson('${esc(p.username)}')">${icon('send')} Message</button>
+        <button class="btn small" id="repbtn" onclick="makeReport('${esc(p.username)}')">${icon('spark')} ${r ? 'New report' : 'Write a report'}</button>
+        <button class="btn small ghost" onclick="toggleNever('${esc(p.username)}', ${!p.never})">${icon('ban')} ${p.never ? 'Allow messages' : 'Never message'}</button>
+        ${p.i_follow && !p.unfollow ? `<button class="btn small ghost" onclick="unfollowOne('${esc(p.username)}')">${icon('minus-user')} Unfollow</button>` : ''}</div></header>
+    <div class="body stack">
+      ${p.summary ? `<p>${esc(p.summary)}${p.interest_why ? ` <span class="muted">· ${esc(p.interest_why)}</span>` : ''}</p>` : ''}
+      ${p.concern_why && p.concern !== 'none' ? `<div class="note bad">${icon('alert')}<span>${esc(p.concern_why)}</span></div>` : ''}
+      <div class="card report" id="report">${r ? `<div class="between"><h2>${icon('spark')} Report</h2><span class="faint small">${esc(ago(r.at))}</span></div>
+        <p>${esc(r.overview)}</p><h3>They talk about</h3>${list(r.talks_about)}<h3>In common with you</h3>${list(r.common_ground)}
+        <h3>Their questions you haven't answered</h3>${list(r.open_questions)}${r.careful && r.careful.length ? `<h3>Be careful about</h3>${list(r.careful)}` : ''}
+        ${r.next_idea ? `<h3>An idea for next</h3><div class="bubble me" style="max-width:100%">${esc(r.next_idea)}</div>` : ''}`
+        : `<p class="muted">A report sums up who they are, what you have in common and anything to be careful about. It costs about ${cents(0.01)}.</p>`}</div>
+      <div><label class="label" for="pnote">Your note about them</label><textarea id="pnote" class="field" rows="2" placeholder="Only you see this. The AI reads it when writing to them." onchange="saveNote('${esc(p.username)}', this.value)">${esc(p.note || '')}</textarea></div>
+      ${p.memory.length ? `<div><h3>What Convo remembers</h3><ul>${p.memory.slice(-10).map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>` : ''}
+      <div><h3>Chat ${msgs.length ? `<span class="faint small">(last ${msgs.length})</span>` : ''}</h3>${msgs.length ? `<div class="chat">${msgs.map(m => `<div class="bubble ${m.from_me ? 'me' : 'them'}">${esc(m.text)}<time>${esc(clock(m.at))}</time></div>`).join('')}</div>` : '<p class="muted">No chat yet.</p>'}</div>
+      ${p.drafts.length ? `<div><h3>Messages from Convo</h3>${p.drafts.map(d => `<p class="small"><span class="tag">${esc(d.status)}</span> ${esc(d.text || '(empty)')}</p>`).join('')}</div>` : ''}
+    </div></aside>`);
+}
+async function makeReport(u) {
+  const b = $('#repbtn'); b.disabled = true; b.innerHTML = '<span class="typing"><b></b><b></b><b></b></span> Writing…';
+  try { await api(`/api/people/${encodeURIComponent(u)}/report`, {method: 'POST', body: '{}'}); renderPerson(await api('/api/people/' + encodeURIComponent(u))); refresh(); }
+  catch (e) { b.disabled = false; b.textContent = 'Write a report'; }
+}
+async function saveNote(u, note) { await api(`/api/people/${encodeURIComponent(u)}/note`, {method: 'POST', body: JSON.stringify({note})}); toast('Note saved'); }
+async function toggleNever(u, on) { await post(`/api/people/${encodeURIComponent(u)}/never`, {on}); toast(on ? `@${u} won't get messages from Convo.` : `@${u} can get messages again.`); renderPerson(await api('/api/people/' + encodeURIComponent(u))); }
+async function unfollowOne(u) {
+  if (!await confirmBox({title: `Unfollow @${u}?`, text: 'It happens when sending runs.', ok: 'Unfollow', danger: true})) return openPerson(u);
+  await post('/api/unfollow', {usernames: [u]}); toast(`@${u} will be unfollowed when sending runs.`); openPerson(u);
+}
+function messagePerson(u) {
+  window.__send = async approve => {
+    const text = $('#mtext').value.trim(); if (!text) return;
+    try { const r = await post('/api/message', {username: u, text, approve}); closeOverlay(); toast(approve ? 'Approved. It goes when you press Send.' : 'Saved in Replies for you to check.'); }
+    catch (e) {}
+  };
+  overlay(`<div class="scrim" onclick="closeOverlay()"></div><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt">
+    <h2 id="mt">Message @${esc(u)}</h2><p class="muted small">Your own words. It goes into your chat with them as it is.</p>
+    <textarea id="mtext" class="field" rows="3" style="margin-top:10px" placeholder="Write your message"></textarea>
+    <div class="row"><button class="btn ghost" onclick="closeOverlay()">Cancel</button><button class="btn" onclick="__send(false)">Save for later</button>
+    <button class="btn primary" onclick="__send(true)">${icon('check')} Approve</button></div></div>`, '#mtext');
+}
+
+/* ============================================================== ask */
+const ASKLOG = [];
+const EXAMPLES = ['What\'s waiting on me?', 'Who\'s interesting this week?', 'What did @… say last?', 'Write a reply to @… about football', 'Send “see you at 6” to @…', 'Stop now'];
+PAGES.ask = {
+  mount(el) {
+    el.innerHTML = `<div class="ask-wrap"><div class="thread" id="thread"></div>
+      <div class="composer"><div class="chips">${EXAMPLES.map(e => `<button class="chip" type="button">${esc(e)}</button>`).join('')}</div>
+      <form id="askform"><input id="askin" placeholder="Ask or tell Convo anything" autocomplete="off" aria-label="Ask Convo">
+        <button class="btn primary">${icon('send')} Ask</button></form>
+      <p class="faint small" style="margin:8px 4px 0">Simple ones (stop, pause, send, send one, status) are free. Others cost about 1 to 2¢. Convo only sends exact words you type, to people you name.</p></div></div>`;
+    el.querySelectorAll('.chip').forEach(c => c.onclick = () => { const i = $('#askin'); i.value = c.textContent.replace('…', ''); i.focus(); });
+    $('#askform').onsubmit = e => { e.preventDefault(); const v = $('#askin').value.trim(); if (v) { $('#askin').value = ''; askConvo(v); } };
+    this.render(); setTimeout(() => $('#askin').focus(), 50);
+  },
+  render() {
+    const t = $('#thread'); if (!t) return;
+    t.innerHTML = ASKLOG.length ? ASKLOG.map(m => `<div class="say ${m.who}">${m.pending ? '<span class="typing"><b></b><b></b><b></b></span>' : esc(m.text)}${m.meta ? `<span class="meta">${esc(m.meta)}</span>` : ''}</div>`).join('')
+      : `<div class="empty"><div class="art">${icon('spark')}</div><b>Ask or tell Convo</b>Questions about people, what's waiting, or things to do, like "stop now" or "write a reply to @maya about baking".</div>`;
+    window.scrollTo(0, document.body.scrollHeight);
+  },
+};
+async function askConvo(text) {
+  ASKLOG.push({who: 'you', text}); const pending = {who: 'convo', pending: true}; ASKLOG.push(pending); PAGES.ask.render && PAGE === 'ask' && PAGES.ask.render();
+  try {
+    const r = await api('/api/ask', {method: 'POST', body: JSON.stringify({text})});
+    Object.assign(pending, {pending: false, text: r.answer, meta: [r.actions && r.actions.length ? 'Did: ' + r.actions.join(', ') : '', r.cost ? cents(r.cost) : ''].filter(Boolean).join(' · ')});
+    refresh(); return r;
+  } catch (e) { Object.assign(pending, {pending: false, text: 'That didn\'t work. ' + e.message}); }
+  finally { if (PAGE === 'ask') PAGES.ask.render(); }
+}
+function openPalette() {
+  overlay(`<div class="scrim" onclick="closeOverlay()"></div><div class="palette" role="dialog" aria-modal="true" aria-label="Ask Convo">
+    <form onsubmit="event.preventDefault(); paletteAsk()">${icon('spark')}<input id="pal" placeholder="Ask or tell Convo… (stop now, what did @anna say?)" autocomplete="off"><kbd class="faint small">Enter</kbd></form>
+    <div class="out" id="palout"><p class="muted small">Try: <b>status</b>, <b>stop now</b>, <b>send one</b>, <b>who's waiting on me?</b></p></div></div>`, '#pal');
+}
+async function paletteAsk() {
+  const v = $('#pal').value.trim(); if (!v) return; $('#palout').innerHTML = '<span class="typing"><b></b><b></b><b></b></span>';
+  const r = await askConvo(v); const out = $('#palout');
+  if (out) out.innerHTML = r ? `<p>${esc(r.answer)}</p><p class="faint small">${r.cost ? cents(r.cost) : 'free'} · <a href="#/ask" onclick="closeOverlay()">Open the full chat</a></p>` : '<p>That didn\'t work.</p>';
+}
+document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } });
+
+/* ============================================================== activity */
+PAGES.activity = {
+  mount(el) { el.innerHTML = `<div class="card"><div class="feed" id="feedall"></div></div>`; this.update(); },
+  update() { const f = $('#feedall'); if (f) f.innerHTML = feedHtml(S.activity); },
+};
+
+/* ============================================================== about me */
 let FACTS = [];
-async function loadAbout() {
-  const a = await api('/api/about'); FACTS = a.facts;
-  renderFacts();
-  document.getElementById('hellos').value = a.hellos.join('\n');
-  document.getElementById('voice').value = a.voice; document.getElementById('never').value = a.never;
-}
+PAGES.about = {
+  async mount(el) {
+    el.innerHTML = `<p class="muted" style="max-width:64ch">What the AI knows about you. It only ever mentions things on this list, and never the ones marked private.</p>
+      <div class="section"><h2>Facts about you</h2><div class="card"><div id="facts" class="stack"></div>
+        <form class="row" style="margin-top:14px" onsubmit="event.preventDefault(); addFact()"><input id="newfact" class="field grow" placeholder="Add something, e.g. I've started playing football again"><button class="btn">Add</button></form></div></div>
+      <div class="grid-2 section"><div><h2 style="margin-bottom:12px">Your hellos</h2><div class="card"><textarea id="hellos" class="field" rows="6"></textarea><p class="hint">One per line. One of these goes to each new person.</p></div></div>
+        <div><h2 style="margin-bottom:12px">Never message</h2><div class="card"><textarea id="never" class="field" rows="6"></textarea><p class="hint">One username per line. No hello and no reply, ever.</p></div></div></div>
+      <div class="section"><h2>How you write</h2><div class="card"><textarea id="voice" class="field" rows="9"></textarea><p class="hint">The AI copies this, plus how you write in your own chats.</p></div></div>
+      <div class="row section"><button class="btn primary big" onclick="saveAbout()">${icon('check')} Save About me</button></div>`;
+    const a = await api('/api/about'); FACTS = a.facts;
+    $('#hellos').value = a.hellos.join('\n'); $('#voice').value = a.voice; $('#never').value = a.never; renderFacts();
+  },
+};
 function renderFacts() {
-  document.getElementById('facts').innerHTML = FACTS.map((f, i) => `<div class="fact">
-    <input class="field" value="${esc(f.text)}" onchange="FACTS[${i}].text = this.value">
-    <label class="switch muted"><input type="checkbox" ${f.private ? 'checked' : ''} onchange="FACTS[${i}].private = this.checked"> private</label>
-    <button class="btn quiet" onclick="FACTS.splice(${i}, 1); renderFacts()">Remove</button></div>`).join('');
+  $('#facts').innerHTML = FACTS.length ? FACTS.map((f, i) => `<div class="row"><input class="field grow" value="${esc(f.text)}" aria-label="Fact" onchange="FACTS[${i}].text = this.value">
+    <label class="row" style="gap:8px" title="Private facts are never used in messages"><span class="toggle"><input type="checkbox" ${f.private ? 'checked' : ''} onchange="FACTS[${i}].private = this.checked"><span></span></span>${icon('lock')}<span class="small">Private</span></label>
+    <button class="btn ghost small" onclick="FACTS.splice(${i}, 1); renderFacts()" aria-label="Remove">${icon('x')}</button></div>`).join('') : '<p class="muted">No facts yet.</p>';
 }
-function addFact() { const v = document.getElementById('newfact').value.trim(); if (!v) return; FACTS.push({text: v, private: false}); document.getElementById('newfact').value = ''; renderFacts(); }
+function addFact() { const v = $('#newfact').value.trim(); if (!v) return; FACTS.push({text: v, private: false}); $('#newfact').value = ''; renderFacts(); }
 async function saveAbout() {
-  await post('/api/about', {facts: FACTS, hellos: document.getElementById('hellos').value.split('\n'),
-    voice: document.getElementById('voice').value, never: document.getElementById('never').value});
-  alert('Saved.'); loadAbout();
+  await post('/api/about', {facts: FACTS, hellos: $('#hellos').value.split('\n'), voice: $('#voice').value, never: $('#never').value});
+  toast('Saved your About me.');
 }
 
-// ---------------------------------------------------------------- settings
-function renderSettings(s) {
-  const ai = document.getElementById('ai');
-  if (ai.dataset.on !== String(s.ai.on)) {
-    ai.dataset.on = String(s.ai.on);
-    ai.innerHTML = s.ai.on ? `<p><b>On.</b> Replies are written from your About me, your writing style, and how you write in your chats.</p>
-        <p class="muted" id="spent"></p>
-        <p style="margin-top:12px"><b>How Claude uses Instagram</b><br><span class="muted">Claude looks at the Instagram page and clicks, like you would. It never types: the app types only the message you approved.</span></p>
-        <div class="row"><select id="eyes" class="field grow" onchange="post('/api/settings', {eyes_model: this.value})">
-          <option value="claude-haiku-5-5">Haiku: about 1 cent per message or unfollow (recommended)</option>
-          <option value="claude-sonnet-5-5">Sonnet: steadier on unusual pages, about 10 to 20 cents each</option></select></div>`
-      : `<p><b>Off.</b> Paste your Anthropic API key to have replies written for you. It stays on this Mac.</p>
-        <div class="row"><input id="aikey" class="field grow" type="password" placeholder="sk-ant-api03-..." autocomplete="off">
-        <button class="btn primary" onclick="post('/api/settings', {ai_key: document.getElementById('aikey').value}).then(() => alert('AI replies are on.'))">Save</button></div>`;
-  }
-  const sp = document.getElementById('spent');
-  if (sp) sp.textContent = `Spent so far: ${money(s.ai.spend_total)}. Writing ${s.ai.drafts} replies: ${money(s.ai.drafts_usd)}. ` +
-    `Using Instagram (${s.ai.web_steps} looks): ${money(s.ai.web_usd)}. Hellos are written from your own wording and cost nothing to write.`;
-  const ey = document.getElementById('eyes');
-  if (ey && document.activeElement !== ey) ey.value = s.settings.eyes_model;
-  const set = (id, v) => { const e = document.getElementById(id); if (document.activeElement !== e) e.value = v; };
-  set('dm', s.settings.daily_messages); set('gm', s.settings.message_gap_s); set('du', s.settings.daily_unfollows);
-  set('gu', s.settings.unfollow_gap_s); set('rw', s.settings.reply_window_days); set('bud', s.settings.daily_ai_budget_usd);
-  document.getElementById('tuck').checked = !!s.settings.tuck_window;
-  document.getElementById('ver').textContent = `Version ${s.version}, set up for @${s.you}`;
+/* ============================================================== settings */
+const WRITER = {'claude-opus-5-5': 'Opus: the best writer', 'claude-sonnet-5-5': 'Sonnet: very good, half the price', 'claude-haiku-5-5': 'Haiku: quick and very cheap, plainer'};
+PAGES.settings = {
+  mount(el) {
+    const s = S.settings, ai = S.ai;
+    el.innerHTML = `
+      <div class="section" style="margin-top:0"><h2>${icon('spark')} AI</h2><div class="card">
+        ${ai.on || S.practice ? '' : `<div class="note info" style="margin-bottom:14px">${icon('lock')}<span class="grow">Paste your Anthropic API key to turn on writing and sending. It stays on this Mac.</span></div>`}
+        <div class="setting"><div><span class="label">API key</span><span class="hint">${ai.on ? 'Saved on this Mac. Paste a new one to replace it.' : 'From console.anthropic.com, API keys. Starts with sk-ant-api03-'}</span></div>
+          <form class="row" onsubmit="event.preventDefault(); saveKey()"><input id="aikey" class="field grow" type="password" placeholder="${ai.on ? '•••••••• saved' : 'sk-ant-api03-…'}" autocomplete="off" aria-label="API key"><button class="btn">Save</button></form></div>
+        <div class="setting"><div><span class="label">Who writes your replies</span><span class="hint" id="writerhint"></span></div>
+          <select id="writer" class="field" onchange="saveSetting({writer_model: this.value})">${Object.entries(WRITER).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>
+        <div class="setting"><div><span class="label">Write overnight, half price</span><span class="hint">Replies go to Anthropic's batch service. Usually ready within the hour, always by tomorrow.</span></div>
+          <span class="toggle"><input type="checkbox" id="overnight" onchange="saveSetting({write_overnight: this.checked})"><span></span></span></div>
+        <div class="setting"><div><span class="label">How Claude uses Instagram</span><span class="hint">Claude looks at the page and clicks like you would. It never types: the app types only what you approved.</span></div>
+          <select id="eyes" class="field" onchange="saveSetting({eyes_model: this.value})"><option value="claude-haiku-5-5">Haiku: about 1¢ a message (recommended)</option><option value="claude-sonnet-5-5">Sonnet: steadier on odd pages, about 15¢</option></select></div>
+        <div class="setting"><div><span class="label">Daily AI limit</span><span class="hint">Writing and sending pause for the day once this much is spent. A good coffee is about $5.</span></div>
+          <div class="row"><span class="faint">$</span><input id="budget" class="field grow" type="number" min="0.5" max="100" step="0.5" onchange="saveSetting({daily_ai_budget_usd: Number(this.value)})"></div></div>
+        <p class="hint" id="spent" style="margin-top:14px"></p></div></div>
+
+      <div class="section"><h2>${icon('send')} Sending</h2><div class="card">
+        <div class="setting"><div><span class="label">Messages a day</span><span class="hint">Instagram limits accounts that send too much. The rest go tomorrow by themselves.</span></div><input id="dm" class="field" type="number" min="0" max="300"></div>
+        <div class="setting"><div><span class="label">Seconds between messages</span></div><input id="gm" class="field" type="number" min="0" max="600"></div>
+        <div class="setting"><div><span class="label">Unfollows a day</span></div><input id="du" class="field" type="number" min="0" max="300"></div>
+        <div class="setting"><div><span class="label">Seconds between unfollows</span></div><input id="gu" class="field" type="number" min="0" max="600"></div>
+        <div class="setting"><div><span class="label">Reply to chats from the last</span><span class="hint">Days</span></div><input id="rw" class="field" type="number" min="1"></div>
+        <div class="setting"><div><span class="label">Send by itself at</span><span class="hint">Each day at this time, it sends what you've approved. Leave empty for off.</span></div><input id="sendat" class="field" type="time"></div>
+        <div class="setting"><div><span class="label">Quiet hours</span><span class="hint">Nothing is sent between these times.</span></div>
+          <div class="row"><input id="qf" class="field grow" type="time" aria-label="From"><span class="faint">to</span><input id="qt" class="field grow" type="time" aria-label="To"></div></div>
+        <div class="row" style="margin-top:14px"><button class="btn primary" id="savesending" onclick="saveSending()">${icon('check')} Save</button></div></div></div>
+
+      <div class="section"><h2>${icon('users')} Instagram</h2><div class="card">
+        <div class="setting"><div><span class="label">Sign in</span><span class="hint">Opens Instagram in Convo's own browser. Sign in there (with any code Instagram sends), then press Done.</span></div>
+          <div class="row"><button class="btn" onclick="signIn()">Open sign-in</button><button class="btn ghost" onclick="signInDone()">Done</button></div></div>
+        <div class="setting"><div><span class="label">Self-check</span><span class="hint">Claude tries every step on your account without sending anything. About 5¢.</span></div>
+          <div class="row"><button class="btn" id="checkbtn" onclick="runCheck()">${icon('refresh')} Run the check</button></div></div>
+        <pre id="checkout" class="card sunk small" style="white-space:pre-wrap;margin-top:10px" hidden></pre>
+        <div class="setting"><div><span class="label">Keep the Instagram window tucked away</span><span class="hint">Minimised to the Dock while it works. If sending ever seems stuck, turn this off.</span></div>
+          <span class="toggle"><input type="checkbox" id="tuck" onchange="saveSetting({tuck_window: this.checked})"><span></span></span></div></div></div>
+
+      ${S.practice ? '' : `<div class="section"><h2>${icon('flask')} Practice</h2><div class="card">
+        <p>Try everything on a pretend Instagram with made-up people, including automatic sending. Your real account is never touched.</p>
+        <div class="row" style="margin-top:12px"><button class="btn primary" onclick="practice(false)">${icon('play')} Open practice (free)</button>
+          <button class="btn" ${ai.on ? '' : 'disabled'} onclick="practice(true)">With real Claude (about 10¢)</button></div></div></div>`}
+
+      <div class="section"><h2>${icon('eye')} Reading</h2><div class="card">
+        <div class="setting"><div><span class="label">Text size</span></div><div class="row"><button class="btn" onclick="textSize(-1)" aria-label="Smaller">A−</button><button class="btn" onclick="textSize(1)" aria-label="Bigger">A+</button></div></div>
+        <div class="setting"><div><span class="label">Easy-read font</span><span class="hint">Wider letters and more space between lines.</span></div><span class="toggle"><input type="checkbox" id="easy" onchange="prefs.set('easy', this.checked ? '1' : ''); applyPrefs()"><span></span></span></div>
+        <div class="setting"><div><span class="label">Look</span></div><select id="theme" class="field" onchange="prefs.set('theme', this.value); applyPrefs()"><option value="system">Same as my Mac</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></div>
+
+      <div class="section"><div class="card between"><span class="muted" id="ver"></span><button class="btn danger-soft" onclick="quitApp()">${icon('power')} Quit Convo</button></div></div>`;
+    this.update(true);
+  },
+  update(first) {
+    const s = S.settings, ai = S.ai;
+    const set = (id, v) => { const e = $('#' + id); if (e && (first || document.activeElement !== e)) e.value = v ?? ''; };
+    set('writer', s.writer_model); set('eyes', s.eyes_model); set('budget', s.daily_ai_budget_usd);
+    if (first) { set('dm', s.daily_messages); set('gm', s.message_gap_s); set('du', s.daily_unfollows); set('gu', s.unfollow_gap_s); set('rw', s.reply_window_days);
+                 set('sendat', s.send_at); set('qf', s.quiet_from); set('qt', s.quiet_to); }
+    const ov = $('#overnight'); if (ov) ov.checked = !!s.write_overnight; const tk = $('#tuck'); if (tk) tk.checked = !!s.tuck_window;
+    const ez = $('#easy'); if (ez) ez.checked = prefs.get('easy', '') === '1'; const th = $('#theme'); if (th && first) th.value = prefs.get('theme', 'system');
+    const e = ai.estimates[s.writer_model] || ai.estimates['claude-opus-5-5'];
+    const wh = $('#writerhint'); if (wh) wh.textContent = `About ${cents(e.overnight)} a reply overnight, ${cents(e.now)} straight away.`;
+    const sp = $('#spent'); if (sp) sp.textContent = `Spent so far: ${money(ai.spend_total)} in total, ${money(ai.spend_today)} today. Writing ${plural(ai.drafts, 'reply', 'replies')}: ${money(ai.drafts_usd)}. Using Instagram (${plural(ai.web_steps, 'look')}): ${money(ai.web_usd)}. Reports and Ask: ${money(ai.other_usd)}. Hellos use your own words and cost nothing to write.`;
+    const v = $('#ver'); if (v) v.textContent = `Convo ${S.version} for @${S.you}${S.practice ? ' (practice)' : ''}`;
+    const cb = $('#checkbtn'); if (cb) { cb.disabled = S.check.running; cb.innerHTML = S.check.running ? '<span class="typing"><b></b><b></b><b></b></span> Checking…' : icon('refresh') + ' Run the check'; }
+    if (S.check.summary && !S.check.running) { const o = $('#checkout'); if (o && o.hidden) { api('/api/check').then(r => { if (r.report) { o.textContent = r.report.split('\n\n== ')[0]; o.hidden = false; } }); } }
+  },
+};
+async function saveSetting(body) { await post('/api/settings', body); toast('Saved'); }
+async function saveKey() { const k = $('#aikey').value.trim(); if (!k) return; await post('/api/settings', {ai_key: k}); $('#aikey').value = ''; toast('Key saved. AI is on.'); route(); }
+async function saveSending() {
+  const n = id => Number($('#' + id).value);
+  await post('/api/settings', {daily_messages: n('dm'), message_gap_s: n('gm'), daily_unfollows: n('du'), unfollow_gap_s: n('gu'), reply_window_days: n('rw'),
+    send_at: $('#sendat').value, quiet_from: $('#qf').value, quiet_to: $('#qt').value});
+  toast('Saved');
 }
-async function saveSettings() {
-  const n = id => Number(document.getElementById(id).value);
-  await post('/api/settings', {daily_messages: n('dm'), message_gap_s: n('gm'), daily_unfollows: n('du'), unfollow_gap_s: n('gu'), reply_window_days: n('rw'), daily_ai_budget_usd: n('bud')});
-  alert('Saved.');
+async function signIn() { toast('Opening Instagram…'); await post('/api/instagram/login'); toast('Sign in in the Instagram window, then press Done.'); }
+async function signInDone() { const r = await post('/api/instagram/login/done'); toast(r.signed_in ? 'Signed in to Instagram.' : 'Instagram still shows the sign-in page.', r.signed_in ? '' : 'bad'); }
+async function runCheck() { $('#checkout').hidden = true; await post('/api/check'); toast('Running the check. It takes a couple of minutes.'); }
+async function practice(real) { toast('Opening practice…'); const r = await post('/api/practice/start', {real_ai: real}); window.open(r.url, '_blank'); }
+function textSize(d) { const v = Math.min(24, Math.max(14, parseInt(prefs.get('sz', '17')) + d)); prefs.set('sz', v); applyPrefs(); }
+async function quitApp() {
+  if (!await confirmBox({title: 'Quit Convo?', text: 'Sending and overnight checks stop until you open Convo again.', ok: 'Quit', danger: true})) return;
+  await api('/api/quit', {method: 'POST', body: '{}'}); document.body.innerHTML = '<div style="text-align:center;margin-top:30vh;font:1.1rem system-ui">Convo has quit. You can close this window.</div>';
 }
 
-async function refresh() { S = await api('/api/state'); renderToday(S); renderSettings(S); }
+/* ============================================================== help */
+PAGES.help = {
+  mount(el) {
+    const card = (ic, h, body) => `<div class="card"><h2 style="margin-bottom:8px">${icon(ic)} ${esc(h)}</h2>${body}</div>`;
+    el.innerHTML = `<div class="grid-2">${[
+      card('sun', 'Your day', `<p><b>Evening.</b> In Instagram: Accounts Center, Your information and permissions, Download your information. Pick Messages and Followers and following, format JSON, All time. When the email comes, save the file in Downloads and press <b>Load</b> on Today.</p>
+        <p><b>Overnight.</b> Replies get written at half price.</p><p><b>Morning.</b> Check Replies and Hellos, approve, then <b>Send</b>. Or set a time in Settings and it sends by itself.</p>`),
+      card('stop', 'Stop now', `<p>The red button at the top stops everything straight away: Claude stops at its next click, and nothing else goes until you press Send again. You can also type <b>stop</b> in Ask.</p>`),
+      card('spark', 'Ask', `<p>Press ⌘K anywhere. Ask about people ("what did @maya say?"), get things done ("write a reply to @tom about sunday"), or control it ("send one", "pause").</p>
+        <p>It only sends exact words you type, to people you name. Everything else waits for your approval.</p>`),
+      card('send', 'How sending works', `<p>For each message, Claude looks at the Instagram page and clicks to the chat like you would. It checks it's the right person, that a hello goes into an empty chat, and that they haven't written again.</p>
+        <p>Claude can't type. The app types your approved words, checks them letter by letter, presses Enter and checks the message appeared.</p>`),
+      card('alert', 'When something goes wrong', `<p><b>Try again later:</b> Instagram didn't load. It waits 10 minutes.</p><p><b>Skip this person:</b> private, gone, or can't be messaged.</p>
+        <p><b>Take a break:</b> Instagram said "try again later". 6 hours, then it carries on.</p><p><b>Stop and tell you:</b> sign in again, the AI key or credit, or three problems in a row. Run the self-check in Settings.</p>`),
+      card('lock', 'Costs and privacy', `<p>About 1¢ to write a reply overnight with Opus, about 1¢ to send each message, hellos free to write. The daily limit in Settings keeps it to what you choose.</p>
+        <p>Everything stays on this Mac. Only the chat being written to and the page Claude is looking at go to Anthropic.</p>`),
+    ].join('')}</div>`;
+  },
+};
+
+/* ============================================================== boot */
 async function boot() {
-  if (!TOKEN) return show(false);
-  try { await refresh(); show(true); openTab(store.get('tab', 'today')); setInterval(() => refresh().catch(() => {}), 3000); setInterval(() => refreshLive().catch(() => {}), 2000); } catch (e) { show(false); }
+  if (!TOKEN) return gate(true);
+  try { await refresh(); } catch (e) { return gate(true); }
+  gate(false); route();
+  setInterval(() => refresh().catch(() => {}), 3000);
+  setInterval(() => refreshLive().catch(() => {}), 2000);
 }
 boot();
 </script>

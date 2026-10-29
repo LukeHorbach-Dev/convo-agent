@@ -12,3 +12,7 @@ data/*.log
 data/scheduler.lock
 data/never.txt
 data/intro-list.txt
+dist/
+data/practice/
+data/window/
+data/logs/

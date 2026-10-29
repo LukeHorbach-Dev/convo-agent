@@ -6,10 +6,13 @@ it decides, and says in plain words, whether to try again later, skip that perso
 from __future__ import annotations
 
 import logging
+import json
+import queue
 import re
 import threading
 import time
 from collections.abc import Callable
+from concurrent.futures import Future
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 
@@ -47,7 +50,9 @@ def classify(e: Exception) -> tuple[str, str, float]:
             skip (this person only), page (the page looked different; try again once, then skip)."""
     if isinstance(e, AuthenticationRequired):
         return "stop", "Instagram wants you to sign in again. Stop the app, run the sign-in step, then start it again.", 0
-    if isinstance(e, (OperatorStop, InterventionRequired)):
+    if isinstance(e, OperatorStop):
+        return "stop", "Stopped by you. Nothing else goes until you press Send again.", 0
+    if isinstance(e, InterventionRequired):
         return "stop", str(e), 0
     if isinstance(e, RateLimited):
         return "cooldown", "Instagram asked to slow down. Taking a 6 hour break, then carrying on by itself.", 6 * 3600
@@ -74,7 +79,9 @@ class Sender:
         self.wait_until = 0.0
         self.page_failures = 0                  # consecutive "page looked different" problems, across people
         self._stop = threading.Event()
-        self._sleep = sleep or (lambda s: self._stop.wait(s))
+        self.halt = threading.Event()           # Stop now: checked between every click Claude makes
+        self._sleep = sleep or self._wait
+        self.tasks: queue.Queue = queue.Queue() # one-off jobs that need the browser (sign in, self-check)
         self._thread: threading.Thread | None = None
         self.identity_ok = False
         self._reset = False
@@ -88,9 +95,27 @@ class Sender:
         return self
 
     def go(self, just_one: bool = False) -> None:
+        self.halt.clear()
         self.active, self.wait_until, self.page_failures = True, 0.0, 0
         self.just_one = just_one
         self.status = "Starting"
+
+    def stop_now(self) -> None:
+        """Stop straight away: the current step ends at Claude's next click, and nothing else starts."""
+        self.halt.set()
+        self.active, self.just_one = False, False
+        self.status = "Stopped by you. Nothing else goes until you press Send again."
+
+    def run_on_browser(self, fn: Callable[[object], object]) -> Future:
+        """Run fn(web) on this thread, which owns the browser. Returns a Future with its result."""
+        fut: Future = Future()
+        self.tasks.put((fn, fut))
+        return fut
+
+    def _wait(self, seconds: float) -> None:
+        end = time.time() + seconds
+        while time.time() < end and not self._stop.is_set() and not self.halt.is_set():
+            self._stop.wait(min(1.0, end - time.time()))
 
     def pause(self, why: str = "Paused") -> None:
         self.active = False
@@ -109,8 +134,10 @@ class Sender:
     def _loop(self) -> None:
         try:
             while not self._stop.is_set():
+                self._run_tasks()
+                self._maybe_scheduled_start()
                 if not self.active or time.time() < self.wait_until:
-                    self._stop.wait(2)
+                    self._stop.wait(1)
                     continue
                 try:
                     did = self.step()
@@ -127,8 +154,55 @@ class Sender:
                 except Exception:
                     pass
 
+    def _run_tasks(self) -> None:
+        while True:
+            try:
+                fn, fut = self.tasks.get_nowait()
+            except queue.Empty:
+                return
+            if not fut.set_running_or_notify_cancel():
+                continue
+            try:
+                if self.web is None:
+                    self.web = self.make_web()
+                fut.set_result(fn(self.web))
+            except BaseException as e:            # handed back to whoever asked
+                fut.set_exception(e)
+
+    def _maybe_scheduled_start(self) -> None:
+        """Send at a set time each day (Settings), for what Luke has already approved."""
+        at = getattr(self.s, "send_at", None)
+        if self.active or not at or self.halt.is_set():
+            return
+        now = datetime.now()
+        today = now.strftime("%Y-%m-%d")
+        if now.strftime("%H:%M") < at or self.store.get("scheduled_run") == today:
+            return
+        self.store.set("scheduled_run", today)
+        waiting = self.store.scalar("SELECT COUNT(*) FROM drafts WHERE status = 'approved'") + \
+            self.store.scalar("SELECT COUNT(*) FROM unfollows WHERE status = 'queued'")
+        if waiting:
+            self.store.log("info", f"It's {at}: started sending the {waiting} things you approved.")
+            self.go()
+
+    def quiet_until(self, now: datetime | None = None) -> str | None:
+        """The end of quiet hours if it's within them now (no sending at night), else None."""
+        a, b = getattr(self.s, "quiet_from", None), getattr(self.s, "quiet_to", None)
+        if not a or not b or a == b:
+            return None
+        t = (now or datetime.now()).strftime("%H:%M")
+        inside = (a <= t < b) if a < b else (t >= a or t < b)
+        return b if inside else None
+
     def step(self) -> bool:
         """Do one thing. Returns True if it did something."""
+        if self.halt.is_set():
+            self.active = False
+            return False
+        if (until := self.quiet_until()):
+            self.status = f"Quiet hours. Carries on at {until} by itself."
+            self.wait_until = time.time() + 300
+            return False
         pace = self.s.pace
         msg = self.store.one("SELECT * FROM drafts WHERE status = 'approved' ORDER BY kind = 'hello', tries, id LIMIT 1")
         unf = self.store.one("SELECT * FROM unfollows WHERE status = 'queued' ORDER BY tries, queued_at, username LIMIT 1")
@@ -201,7 +275,11 @@ class Sender:
         spent_before = getattr(self.web, "total_usd", 0.0)
         try:
             chat = self._open_chat(d)
-            if d["kind"] == "hello":
+            # Messages Luke wrote or asked for himself skip the "empty chat / did they write again" checks.
+            direct = bool(json.loads(d.get("context") or "{}").get("direct"))
+            if direct:
+                pass
+            elif d["kind"] == "hello":
                 if not chat.empty:
                     return self._set(d, "skipped", "you already have a chat with them, so no hello", "info")
             else:
@@ -295,6 +373,10 @@ class Sender:
         log.info("problem", extra={"outcome": f"{action}: {plain[:120]}"})
         if action == "stop":
             self._requeue(draft, unfollow)
+            if isinstance(e, OperatorStop):
+                self.pause(plain)
+                self.store.log("info", plain)
+                return
             self.pause("Stopped: " + plain)
             self.identity_ok = False
             self.store.log("problem", plain)

@@ -33,6 +33,10 @@ def cost_usd(model: str, usage) -> float:
             + get("cache_creation_input_tokens") * price[3]) / 1_000_000
 
 
+# Models that take server-side refusal fallbacks ("default" form). Haiku has none.
+FALLBACK_MODELS = ("claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5")
+
+
 class AnthropicProvider:
     name = "anthropic"
 
@@ -45,33 +49,24 @@ class AnthropicProvider:
         self.cfg = cfg
         self.last_cost_usd = 0.0
 
-    def complete_json(self, system: str | list[str], user: str, schema: dict) -> dict:
-        a = self._anthropic
+    def params(self, system: str | list[str], user: str, schema: dict, *, fallbacks: bool = True) -> dict:
+        """The request, shared by straight-away calls and overnight batches (which take no fallbacks)."""
         # The first part of a two-part system prompt is identical on every call: cache it, so later drafts pay
         # about a twentieth of the price for it (prompts below the model's minimum size simply aren't cached).
         parts = [system] if isinstance(system, str) else system
         blocks = [{"type": "text", "text": t} for t in parts]
         if len(blocks) > 1:
             blocks[0]["cache_control"] = {"type": "ephemeral"}
-        try:
-            resp = self.client.messages.create(
-                model=self.cfg.model, max_tokens=self.cfg.max_tokens, system=blocks,
-                messages=[{"role": "user", "content": user}],
-                output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
-                extra_headers={"anthropic-beta": "server-side-fallback-2026-07-01"},
-                extra_body={"fallbacks": "default"},
-            )
-        except a.AuthenticationError as e:
-            raise InterventionRequired(f"model provider rejected the API key: {e}") from e
-        except a.RateLimitError as e:
-            raise ModelFailure(f"model provider rate limited: {e}", retry_after_s=60) from e
-        except (a.APITimeoutError, a.APIConnectionError) as e:
-            raise ModelFailure(f"model provider unreachable: {e}") from e
-        except a.APIStatusError as e:
-            if e.status_code >= 500:
-                raise ModelFailure(f"model provider error {e.status_code}") from e
-            raise ModelFailure(f"model request rejected ({e.status_code}): {e}", category=ErrorCategory.PERMANENT) from e
-        self.last_cost_usd = cost_usd(resp.model, resp.usage)
+        p = {"model": self.cfg.model, "max_tokens": self.cfg.max_tokens, "system": blocks,
+             "messages": [{"role": "user", "content": user}],
+             "output_config": {"effort": "low", "format": {"type": "json_schema", "schema": schema}}}
+        if fallbacks and self.cfg.model.startswith(FALLBACK_MODELS):
+            p["extra_headers"] = {"anthropic-beta": "server-side-fallback-2026-07-01"}
+            p["extra_body"] = {"fallbacks": "default"}
+        return p
+
+    def parse(self, resp) -> dict:
+        """The JSON answer from a response, or ModelFailure."""
         if resp.stop_reason == "refusal":
             raise ModelFailure("model declined to draft this message", category=ErrorCategory.OPERATOR_INTERVENTION_REQUIRED)
         if resp.stop_reason == "max_tokens":
@@ -83,6 +78,23 @@ class AnthropicProvider:
             return json.loads(text)
         except json.JSONDecodeError as e:
             raise ModelFailure(f"model returned invalid JSON: {e}") from e
+
+    def complete_json(self, system: str | list[str], user: str, schema: dict) -> dict:
+        a = self._anthropic
+        try:
+            resp = self.client.messages.create(**self.params(system, user, schema))
+        except a.AuthenticationError as e:
+            raise InterventionRequired(f"model provider rejected the API key: {e}") from e
+        except a.RateLimitError as e:
+            raise ModelFailure(f"model provider rate limited: {e}", retry_after_s=60) from e
+        except (a.APITimeoutError, a.APIConnectionError) as e:
+            raise ModelFailure(f"model provider unreachable: {e}") from e
+        except a.APIStatusError as e:
+            if e.status_code >= 500:
+                raise ModelFailure(f"model provider error {e.status_code}") from e
+            raise ModelFailure(f"model request rejected ({e.status_code}): {e}", category=ErrorCategory.PERMANENT) from e
+        self.last_cost_usd = cost_usd(resp.model, resp.usage)
+        return self.parse(resp)
 
     def health(self) -> dict:
         return {"ok": True, "provider": self.name, "model": self.cfg.model, "checked": "config only"}

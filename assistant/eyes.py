@@ -19,7 +19,7 @@ from typing import Any, Callable
 from urllib.parse import urlsplit
 
 from agent.core.errors import (AmbiguousState, AuthenticationRequired, DeliveryUnknown, InterventionRequired,
-                               PermissionRestricted, PlatformUnavailable, RateLimited, TransientError)
+                               OperatorStop, PermissionRestricted, PlatformUnavailable, RateLimited, TransientError)
 from agent.intel.llm import cost_usd
 
 log = logging.getLogger("eyes")
@@ -337,6 +337,7 @@ class Hands:
         self.on_cost, self.on_view = on_cost, on_view
         self.settle_ms = site.settle_ms if settle_ms is None else settle_ms
         self.last: Spend | None = None             # the latest task's steps, for check.txt and problems
+        self.interrupt: Callable[[], bool] = lambda: False   # Stop now: checked after every click
         self.total_usd = 0.0                       # everything Claude has cost this session (the sender logs per message)
 
     @property
@@ -362,15 +363,41 @@ class Hands:
         self.sup.goto(url, expect=".*", ready="body")
         self.page.set_viewport_size(VIEW)
 
+    def _guard(self) -> None:
+        if self.interrupt():
+            raise OperatorStop("stopped by you")
+        self.sup.check_session()
+
     def _task(self, task: str, reports: list[Report]) -> Any:
+        if self.client is None:
+            raise InterventionRequired("Sending needs your AI key, because Claude looks at Instagram's page to do it. "
+                                       "Add the key in Settings, then press Send again.")
+        if self.interrupt():
+            raise OperatorStop("stopped by you")
         eyes = self._eyes()
         try:
-            return self.sup.run("look and click", lambda: eyes.run(task, reports + [CANNOT], guard=self.sup.check_session)[0])
+            return self.sup.run("look and click", lambda: eyes.run(task, reports + [CANNOT], guard=self._guard)[0])
         except Exception:
             self.save_screenshot("eyes-problem")
             raise
         finally:
             self.last = eyes.spend
+
+    # ------------------------------------------------------------------ signing in (no AI needed)
+    def open_login(self) -> None:
+        """Show Instagram's sign-in page in the assistant's browser, in front, for Luke to sign in himself."""
+        self.sup.ensure_ready()
+        if not self.sup.cfg.headless:
+            self.sup.set_window("normal")
+        self.page.goto(self.site.url("/accounts/login/"), wait_until="domcontentloaded")
+
+    def looks_signed_in(self) -> bool:
+        """Cheap check without the AI: Luke's own profile opens without a sign-in page."""
+        try:
+            self._goto(self.site.profile_path(self.me))
+            return True
+        except AuthenticationRequired:
+            return False
 
     # ------------------------------------------------------------------ who's signed in
     def whoami(self) -> str:
