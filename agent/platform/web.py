@@ -37,7 +37,7 @@ RESERVED = {"direct", "explore", "reels", "accounts", "stories", "p", "reel", "a
 def username_from_href(href: str | None) -> str | None:
     if not href:
         return None
-    m = USERNAME.match(re.sub(r"^https?://[^/]+", "", href))
+    m = USERNAME.match(urlsplit(href).path)           # ignores the site address and any ?query or #fragment
     return m.group(1) if m and m.group(1).lower() not in RESERVED else None
 
 
@@ -211,10 +211,15 @@ class WebPlatform:
         return snaps
 
     def _read_open_thread(self, key: str) -> ThreadSnapshot:
-        def read():
+        def participants() -> set[str]:
             names = {username_from_href(a.get_attribute("href")) for a in self._visible(self.site.thread_username()).all()}
-            names.discard(None)
-            names.discard(self.me)
+            return names - {None, self.me}
+        def read():
+            # Seen live: the address changes before the conversation pane has drawn its profile links, so wait
+            # (up to the page-ready time) until the pane names exactly one other person.
+            deadline = time.monotonic() + (self.site.ready_timeout_ms or self.sup.cfg.action_timeout_ms) / 1000
+            while len(names := participants()) != 1 and time.monotonic() < deadline:
+                self.page.wait_for_timeout(250)
             if len(names) != 1:
                 raise AmbiguousState(f"thread {key}: could not identify a single other participant ({len(names)} found)")
             raw = self.page.evaluate(self.site.read_messages_js())

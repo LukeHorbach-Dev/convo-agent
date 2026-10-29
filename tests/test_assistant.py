@@ -419,3 +419,11 @@ def test_self_check_passes_on_the_mock_site_and_changes_nothing(site, store):
     report = run_check(make_web(), store, settle_ms=0)
     assert report.startswith("Self-check: 6 of 6 steps passed"), report
     assert world.sent_log == [] and world.unfollowed == set()
+
+
+def test_username_from_profile_links():
+    from agent.platform.web import username_from_href
+    assert username_from_href("/thyuki.okada/") == "thyuki.okada"
+    assert username_from_href("https://www.instagram.com/thyuki.okada/?hl=en") == "thyuki.okada"
+    assert username_from_href("/direct/t/115229139868688/") is None
+    assert username_from_href("/explore/") is None

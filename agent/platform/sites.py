@@ -140,7 +140,9 @@ class InstagramProfile(SiteProfile):
         return '[role="main"] [role="textbox"][contenteditable="true"], [role="main"] [role="grid"]'
 
     def thread_username(self):
-        return '[role="main"] header a[href^="/"], [role="main"] a[href^="/"][role="link"]'
+        # Seen live: no header; the pane has "Open the profile page of <user>" links and a "View Profile" link.
+        return ('[role="main"] header a[href^="/"], [role="main"] a[href^="/"][role="link"], '
+                '[role="main"] a[href][aria-label^="Open the profile page of"]')
 
     def message_button(self):
         # Seen live: a button reading "Message" on the profile, sometimes inside <header>, sometimes with no

@@ -78,8 +78,13 @@ def run_check(web, store: Store | None, settle_ms: int = 3000) -> str:
         if not who:
             raise RuntimeError("no one to try")
         web.sup.goto(site.url(site.profile_path(who)), expect=re.escape(f"/{who}"), ready="main")
+        # The profile's own controls (as in unfollow): Follow buttons can also belong to suggested accounts.
+        either = web._visible(", ".join([site.following_button(), site.message_button(), *site.restricted_markers()]))
+        either.first.wait_for(state="visible", timeout=site.ready_timeout_ms or web.sup.cfg.action_timeout_ms)
         btn = web._visible(site.following_button())
-        btn.first.wait_for(state="visible", timeout=site.ready_timeout_ms or web.sup.cfg.action_timeout_ms)
+        if not btn.count():
+            # Without a download the check borrows the person from step 3, who you may not follow.
+            return f"skipped: you don't follow @{who}, so there's nothing to unfollow. Load a download and run it again"
         btn.first.click()
         web._visible(site.unfollow_confirm()).first.wait_for(state="visible", timeout=web.sup.cfg.action_timeout_ms)
         web.page.keyboard.press("Escape")
