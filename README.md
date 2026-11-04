@@ -25,7 +25,8 @@ now** and it downloads, checks and installs it, backs up your data and restarts 
 back to the version before. Updates need a read-only GitHub key once (Convo, **Updates**, follow the four steps).
 
 Publishing a version (for Claude or anyone working on Convo): set `__version__` in `assistant/__init__.py`, add a
-`## <version>` section to `CHANGELOG.md`, commit, then `git tag v<version> && git push origin v<version>`.
+`## <version>` section to `CHANGELOG.md`, commit and push to main, then push the tag `v<version>` or run the
+**release** workflow (Actions, Run workflow) which makes the tag itself.
 The release workflow (`.github/workflows/release.yml`) runs the tests, builds Convo.app and publishes the release.
 Versions with a dash (`5.1.0-preview.1`) are previews.
 

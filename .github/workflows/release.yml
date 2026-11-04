@@ -1,4 +1,6 @@
-# Publishing a new Convo: push a tag like v5.0.1 (it must match assistant/__init__.py and have a CHANGELOG.md section).
+# Publishing a new Convo: set assistant/__init__.py's version and add its CHANGELOG.md section, push to main, then
+# either push a tag like v5.0.1 or run this workflow by hand ("Run workflow", or the REST API's workflow dispatch),
+# which makes the tag from the version in the code.
 # This builds the Command Centre, runs the tests, builds Convo.app, and makes a GitHub release with:
 #   Convo-<v>.zip        a fresh install (download, drag to Applications)
 #   convo-<v>.tar.gz     what Convo's "Update" button downloads
@@ -8,6 +10,7 @@ name: release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -28,7 +31,11 @@ jobs:
       - name: Check the version matches the tag
         run: |
           V="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' assistant/__init__.py)"
-          test "v$V" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME doesn't match version $V"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            test "v$V" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME doesn't match version $V"; exit 1; }
+          elif git ls-remote --exit-code --tags origin "v$V" >/dev/null; then
+            echo "v$V is already published. Change the version in assistant/__init__.py first."; exit 1
+          fi
           echo "V=$V" >> "$GITHUB_ENV"
           python scripts/release_notes.py "$V" > notes.md
       - name: Tests (everything except the slow browser ones)
@@ -43,5 +50,5 @@ jobs:
         run: |
           PRE=""
           case "$V" in *-*) PRE="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" out/Convo-$V.zip out/convo-$V.tar.gz out/SHA256SUMS.txt \
+          gh release create "v$V" --target "$GITHUB_SHA" out/Convo-$V.zip out/convo-$V.tar.gz out/SHA256SUMS.txt \
             --title "Convo $V" --notes-file notes.md $PRE
