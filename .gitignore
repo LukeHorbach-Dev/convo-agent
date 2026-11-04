@@ -16,3 +16,5 @@ dist/
 data/practice/
 data/window/
 data/logs/
+web/node_modules/
+web/*.tsbuildinfo

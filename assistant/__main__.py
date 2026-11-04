@@ -52,6 +52,9 @@ def cmd_run(args) -> int:
     s = AssistantSettings()
     setup_logging(args.log_level, None)
     a = Assistant(s)
+    if a.store.get("app_version") != __version__:      # a copy of everything before a new version first runs
+        a.store.backup(f"before-{__version__}")
+        a.store.set("app_version", __version__)
     return _serve(a, s, load_or_create_token(s.data_dir), s.dashboard_port, f"Convo {__version__} for @{s.account_username}")
 
 

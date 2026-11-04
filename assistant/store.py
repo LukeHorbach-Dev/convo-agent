@@ -10,6 +10,7 @@ activity  a plain-English log of what happened, shown on the dashboard
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
@@ -96,6 +97,48 @@ def iso_ago(**kw) -> str:
     return (datetime.now(timezone.utc) - timedelta(**kw)).isoformat(timespec="seconds")
 
 
+# Numbered, append-only changes to the database. Never edit a step that has shipped; add a new one.
+MIGRATIONS: list[tuple[int, str]] = [
+    (1, """
+CREATE TABLE IF NOT EXISTS account_groups (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL UNIQUE,
+    color         TEXT,
+    description   TEXT,
+    created_at    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS accounts (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform      TEXT NOT NULL,           -- instagram | tiktok | youtube (more can be added: see platforms.py)
+    handle        TEXT NOT NULL,
+    display_name  TEXT,
+    role          TEXT NOT NULL DEFAULT 'main',      -- main | launch | other
+    niche         TEXT,
+    purpose       TEXT,
+    notes         TEXT,
+    group_id      INTEGER REFERENCES account_groups(id) ON DELETE SET NULL,
+    referral_link TEXT,
+    connection    TEXT NOT NULL DEFAULT 'none',      -- none | download | browser | api (comma-separated)
+    status        TEXT NOT NULL DEFAULT 'not_connected',
+    status_note   TEXT,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    UNIQUE (platform, handle)
+);
+CREATE TABLE IF NOT EXISTS snapshots (
+    account_id    INTEGER NOT NULL,
+    at            TEXT NOT NULL,           -- when the numbers were true
+    source        TEXT NOT NULL,           -- download | api
+    followers     INTEGER,
+    following     INTEGER,
+    posts         INTEGER,
+    extra         TEXT NOT NULL DEFAULT '{}',
+    PRIMARY KEY (account_id, at, source)
+)
+"""),
+]
+
+
 class Store:
     def __init__(self, path: Path | str):
         if str(path) != ":memory:":
@@ -111,6 +154,60 @@ class Store:
         for col in ("chat_url", "report"):
             if col not in have:
                 self._conn.execute(f"ALTER TABLE people ADD COLUMN {col} TEXT")
+        self.path = None if str(path) == ":memory:" else Path(path)
+        self._migrate()
+
+    # ---------------------------------------------------------------- versions of the database, with backups
+    def _migrate(self) -> None:
+        """Bring the database up to date, one numbered step at a time. Before any step changes a real database file,
+        a full copy is saved in data/backups/ (so nothing Luke has is ever lost to an upgrade)."""
+        version = int(self.scalar("SELECT value FROM state WHERE key = 'schema_version'") or 0)
+        pending = [(n, sql) for n, sql in MIGRATIONS if n > version]
+        if not pending:
+            return
+        if self.path is not None and (version > 0 or self._has_data()):
+            self.backup(f"before-update-{pending[0][0]}")
+        for n, sql in pending:
+            with self._lock:
+                self._conn.execute("BEGIN IMMEDIATE")
+                try:
+                    for stmt in [s.strip() for s in sql.split(";") if s.strip()]:
+                        self._conn.execute(stmt)
+                    self._conn.execute("INSERT INTO state(key, value) VALUES ('schema_version', ?) "
+                                       "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (str(n),))
+                    self._conn.execute("COMMIT")
+                except Exception:
+                    self._conn.execute("ROLLBACK")
+                    raise
+
+    def _has_data(self) -> bool:
+        return bool(self.scalar("SELECT COUNT(*) FROM drafts") or self.scalar("SELECT COUNT(*) FROM people"))
+
+    def backup(self, label: str = "manual", keep: int = 20) -> Path | None:
+        """A complete, consistent copy of the database in data/backups/. Returns its path (None for a memory store)."""
+        if self.path is None:
+            return None
+        folder = self.path.parent / "backups"
+        folder.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+        out = folder / f"{self.path.stem}-{stamp}-{re.sub(r'[^a-z0-9-]', '', label.lower())[:40]}.db"
+        dest = sqlite3.connect(str(out))
+        try:
+            with self._lock:
+                self._conn.backup(dest)
+        finally:
+            dest.close()
+        copies = sorted(folder.glob(f"{self.path.stem}-*.db"))
+        for old in copies[:-keep]:
+            old.unlink()
+        return out
+
+    def backups(self) -> list[dict]:
+        if self.path is None:
+            return []
+        folder = self.path.parent / "backups"
+        return [{"name": p.name, "bytes": p.stat().st_size, "at": datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).isoformat(timespec="seconds")}
+                for p in sorted(folder.glob(f"{self.path.stem}-*.db"), reverse=True)] if folder.exists() else []
 
     # ---------------------------------------------------------------- basics
     def execute(self, sql: str, params: tuple | dict = ()) -> sqlite3.Cursor:

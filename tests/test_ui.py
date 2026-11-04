@@ -67,7 +67,7 @@ def test_every_page_loads_and_the_main_buttons_work(running):
         page = b.new_page(viewport={"width": 1280, "height": 860})
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
-        page.goto(url + "/#token=tok")
+        page.goto(url + "/classic#token=tok")
         page.wait_for_selector("#hero h2")
         assert "ready for you" in page.inner_text("#hero h2")
         assert page.is_visible("#practiceband")                      # practice mode shows its band
@@ -132,7 +132,7 @@ def test_window_waits_while_convo_is_not_running_and_comes_back_by_itself(runnin
     with sync_playwright() as p:
         b = p.chromium.launch()
         page = b.new_page()
-        page.goto(url + "/#token=tok")
+        page.goto(url + "/classic#token=tok")
         page.wait_for_selector("#hero h2")
         server = next(s for s in _servers if s.config.port == port)
         server.should_exit = True                                   # Convo quits

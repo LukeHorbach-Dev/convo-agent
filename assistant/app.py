@@ -178,7 +178,9 @@ class Assistant:
                 raise ExportError("no Instagram download found in Downloads (a file starting with instagram-)")
             self.store.log("info", "Loading " + ", ".join(Path(f).name for f in files) + " ...")
             data = read_export([Path(f) for f in files])
-            apply_export(self.store, data, self.s.account_username)
+            summary = apply_export(self.store, data, self.s.account_username)
+            from .hub import after_download
+            after_download(self.store, self.s.account_username, summary)
             prepare_hellos(self.store, self.profile(), self.never())
             if then_write:
                 self.job["name"] = "writing replies"
@@ -372,9 +374,20 @@ def create_api(a: Assistant, token: str) -> FastAPI:
         if not hmac.compare_digest(x_agent_token, token):
             raise HTTPException(401, "missing or wrong token")
 
+    # The Command Centre (built from web/ into web/dist) at "/", and the classic Convo screens at "/classic" while
+    # Hello Message moves across. Without a build, "/" falls back to the classic screens.
     @api.get("/", response_class=HTMLResponse)
     def index():
+        built = WEB / "dist" / "index.html"
+        return (built if built.exists() else WEB / "app.html").read_text()
+
+    @api.get("/classic", response_class=HTMLResponse)
+    def classic():
         return (WEB / "app.html").read_text()
+
+    if (WEB / "dist" / "assets").is_dir():
+        from fastapi.staticfiles import StaticFiles
+        api.mount("/assets", StaticFiles(directory=WEB / "dist" / "assets"), name="assets")
 
     @api.get("/api/health")
     def health():
@@ -842,4 +855,6 @@ def create_api(a: Assistant, token: str) -> FastAPI:
             save_env(env, a.env_path)
         return {"ok": True}
 
+    from .hub import register as register_hub
+    register_hub(api, a, auth)
     return api
