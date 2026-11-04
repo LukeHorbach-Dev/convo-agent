@@ -51,6 +51,9 @@ def cmd_run(args) -> int:
     from .app import Assistant, load_or_create_token
     s = AssistantSettings()
     setup_logging(args.log_level, None)
+    if getattr(args, "wait_for_port", False):          # restarting after an update: let the old copy finish first
+        from .window import wait_until
+        wait_until(s.dashboard_port, up=False, timeout_s=60)
     a = Assistant(s)
     if a.store.get("app_version") != __version__:      # a copy of everything before a new version first runs
         a.store.backup(f"before-{__version__}")
@@ -106,21 +109,22 @@ def cmd_practice(args) -> int:
 
 
 def cmd_app(args) -> int:
-    """What Convo.app runs: start the app in the background if needed (or restart an older version), then open its
-    window."""
+    """What Convo.app runs: start Convo in the background if needed (or restart an older version), then open its
+    window. On a Mac the window is native and this keeps running until it's closed; Convo itself keeps running
+    in the background either way."""
     from .app import load_or_create_token
-    from .window import ask_to_quit, health, open_window, wait_until
+    from .window import ask_to_quit, health, native_window, open_window, show_problem, wait_until, window_mode
     s = AssistantSettings()
     port = s.dashboard_port
     token = load_or_create_token(s.data_dir)
+    logs = Path(os.environ.get("CONVO_LOGS", s.data_dir / "logs"))
+    logs.mkdir(parents=True, exist_ok=True)
     running = health(port)
     if running and running.get("version") != __version__:
         ask_to_quit(port, token)
         wait_until(port, up=False, timeout_s=20)
         running = None
     if not running:
-        logs = Path(os.environ.get("CONVO_LOGS", s.data_dir / "logs"))
-        logs.mkdir(parents=True, exist_ok=True)
         out = open(logs / "convo.log", "ab")
         subprocess.Popen([sys.executable, "-m", "assistant", "run"], stdout=out, stderr=out, stdin=subprocess.DEVNULL,
                          start_new_session=True, env=os.environ.copy())
@@ -128,10 +132,41 @@ def cmd_app(args) -> int:
             print(f"Convo didn't start. Details are in {logs / 'convo.log'}. The last lines:", file=sys.stderr)
             lines = (logs / "convo.log").read_text(errors="replace").splitlines()[-25:]
             print("\n".join("    " + l for l in lines), file=sys.stderr)
+            show_problem("Convo couldn't start.", logs)
             return 1
-    how = open_window(f"http://127.0.0.1:{port}/#token={token}", s.data_dir / "window")
+    url = f"http://127.0.0.1:{port}/#token={token}"
+    if getattr(args, "background", False):
+        return 0
+    mode = window_mode(s.data_dir, __version__)
+    if mode == "native":
+        trying = s.data_dir / "window" / "native-trying"
+        trying.parent.mkdir(parents=True, exist_ok=True)
+        trying.write_text(__version__)
+        shown = []
+
+        def on_shown():
+            shown.append(True)
+            trying.unlink(missing_ok=True)
+        try:
+            print("Convo is open (Mac window).", file=sys.stderr)
+            native_window(url, s.data_dir / "window" / "webkit", on_shown=on_shown)
+            trying.unlink(missing_ok=True)
+            return 0
+        except Exception as e:                  # no pywebview, or it couldn't start: the Chromium window instead
+            trying.unlink(missing_ok=True)
+            if shown:                           # it worked and was closed; nothing to fall back to
+                print(f"The Mac window closed with a problem ({e!r}).", file=sys.stderr)
+                return 0
+            print(f"The Mac window couldn't open ({e!r}); using the Chromium window.", file=sys.stderr)
+            (s.data_dir / "window" / "native-failed").write_text(__version__)
+    how = open_window(url, s.data_dir / "window") if mode != "browser" else (webbrowser_open(url) or "browser")
     print(f"Convo is open ({how}).", file=sys.stderr)
     return 0
+
+
+def webbrowser_open(url: str) -> None:
+    import webbrowser
+    webbrowser.open(url)
 
 
 def cmd_import(args) -> int:
@@ -188,9 +223,12 @@ def main(argv=None) -> int:
     for name in ("run", "practice"):
         r = sub.add_parser(name)
         r.add_argument("--log-level", default="INFO")
+        if name == "run":
+            r.add_argument("--wait-for-port", action="store_true", help=argparse.SUPPRESS)
         if name == "practice":
             r.add_argument("--real-ai", action="store_true", help="use real Claude on the practice Instagram (a few cents)")
-    sub.add_parser("app")
+    ap_app = sub.add_parser("app")
+    ap_app.add_argument("--background", action="store_true", help="start Convo without opening its window")
     i = sub.add_parser("import")
     i.add_argument("files", nargs="+")
     sub.add_parser("login")

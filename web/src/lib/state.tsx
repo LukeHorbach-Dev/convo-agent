@@ -5,6 +5,7 @@ import { api } from "./api";
 
 export type AppState = {
   version: string; you: string; practice: boolean; auto_send: boolean;
+  update?: { available: boolean; version: string | null; status: string; whats_new: boolean };
   job: { name: string | null; done: number; total: number; error: string | null };
   check: { running: boolean; at: string | null; summary: string | null };
   sender: { active: boolean; status: string; stopped: boolean; waiting_until: number | null; quiet_until: string | null };

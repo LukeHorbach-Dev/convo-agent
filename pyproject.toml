@@ -1,6 +1,6 @@
 [project]
 name = "convo-agent"
-version = "4.1.1"
+version = "5.0.0-preview.1"
 description = "Local personal conversation agent with a human-approval gate for real-platform messaging"
 requires-python = ">=3.12"
 dependencies = [
@@ -11,6 +11,7 @@ dependencies = [
   "httpx==0.28.1",
   "anthropic==2.3.0",
   "playwright==1.63.0",
+  "pywebview==6.2.1; sys_platform == 'darwin'",   # the native Mac window
 ]
 
 [project.optional-dependencies]

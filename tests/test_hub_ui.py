@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 import uvicorn
 
+from assistant import __version__
 from assistant.app import Assistant, create_api
 from assistant.brain import never_list, prepare_hellos
 from assistant.config import AssistantSettings
@@ -23,7 +24,7 @@ pytestmark = pytest.mark.browser
 DIST = Path(__file__).parent.parent / "assistant" / "web" / "dist" / "index.html"
 ROUTES = ["", "strategist", "notifications", "accounts", "launch", "groups", "studio", "library", "calendar", "scheduled", "hello",
           "conversations", "contacts", "engagement", "collaborations", "analytics", "missions", "goals", "independence",
-          "automations", "automation-history", "reports", "integrations", "api-connections", "ai", "settings"]
+          "automations", "automation-history", "reports", "integrations", "api-connections", "ai", "settings", "updates"]
 
 
 def until(check, timeout_s=8.0):
@@ -63,6 +64,7 @@ def running(tmp_path):
 def test_every_page_opens_cleanly_on_desktop_and_phone(running):
     from playwright.sync_api import sync_playwright
     a, url = running
+    a.store.set("whats_new_seen", __version__)          # (the "What's new" box is checked in the next test)
     errors = []
     with sync_playwright() as p:
         b = p.chromium.launch()
@@ -91,6 +93,14 @@ def test_main_actions_work(running):
         page = b.new_page(viewport={"width": 1400, "height": 900})
         page.goto(url + "/#token=tok")
         page.wait_for_selector("text=Good")
+        # After an update, "What's new" shows once; "Got it" puts it away for good.
+        page.wait_for_selector("role=dialog >> text=What's new in Convo")
+        page.click("role=dialog >> text=Got it")
+        assert until(lambda: a.store.get("whats_new_seen") is not None)
+        page.reload()
+        page.wait_for_selector("text=Good")
+        page.wait_for_timeout(600)
+        assert not page.is_visible("role=dialog")
         # Dashboard shows real numbers from the download.
         assert "Followers" in page.inner_text("main") and "Instagram · from your download" in page.inner_text("main")
         # Launch network: add an account through the form.
@@ -137,6 +147,7 @@ def test_main_actions_work(running):
 def test_the_classic_screens_are_one_click_away(running):
     from playwright.sync_api import sync_playwright
     a, url = running
+    a.store.set("whats_new_seen", __version__)
     with sync_playwright() as p:
         b = p.chromium.launch()
         page = b.new_page()

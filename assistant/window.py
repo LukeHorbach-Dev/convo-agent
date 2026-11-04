@@ -1,13 +1,19 @@
-"""The app window: the dashboard in its own window (Chromium in app mode, the same browser the assistant already
-installed), so Convo looks and behaves like an app rather than a browser tab. Falls back to the default browser."""
+"""The app window. On a Mac, Convo opens in its own native window (WebKit, through pywebview), with Convo's name
+and icon in the Dock. If that can't start, it uses Chromium in app mode (the browser Convo already installed for
+Instagram), and failing that the default browser."""
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
 import time
 import urllib.request
 import webbrowser
 from pathlib import Path
+from typing import Callable
+
+BACKGROUND = "#0a0b0f"          # the Command Centre's background, so the window never flashes white
 
 
 def chromium_path() -> str | None:
@@ -58,3 +64,77 @@ def ask_to_quit(port: int, token: str) -> None:
         urllib.request.urlopen(req, timeout=3).read()
     except Exception:
         pass
+
+
+def show_problem(message: str, logs: Path) -> None:
+    """A Mac dialog box, so a problem is never just nothing happening."""
+    if sys.platform != "darwin":
+        print(message, file=sys.stderr)
+        return
+    script = ('on run argv\n'
+              'set msg to (item 1 of argv) & return & return & "The details are in " & (item 2 of argv) & ". Send Claude a screenshot of them."\n'
+              'set b to button returned of (display dialog msg buttons {"Show the details", "OK"} default button "OK" '
+              'with title "Convo" with icon caution)\n'
+              'if b is "Show the details" then do shell script "open " & quoted form of (item 2 of argv)\n'
+              'end run')
+    subprocess.run(["osascript", "-", message, str(logs)], input=script, text=True, capture_output=True)
+
+
+def app_icon() -> str | None:
+    bundle = os.environ.get("CONVO_BUNDLE")
+    for p in ((Path(bundle) / "Contents" / "Resources" / "AppIcon.icns") if bundle else None,
+              Path(__file__).resolve().parent.parent / "mac" / "icon.png"):
+        if p and p.exists():
+            return str(p)
+    return None
+
+
+class Bridge:
+    """What the page can ask of the window (window.pywebview.api in the page)."""
+
+    def __init__(self):
+        self._window = None          # private: pywebview only shows the page public methods
+
+    def close(self) -> None:
+        if self._window is not None:
+            self._window.destroy()
+
+
+def native_window(url: str, storage: Path, on_shown: Callable[[], None] = lambda: None) -> None:
+    """Convo in a native Mac window. Blocks until the window is closed. Raises if pywebview can't be used."""
+    import webview  # noqa: F401  (ImportError here means: use Chromium instead)
+    try:                                          # call the app "Convo" in the menu bar and Dock, not "Python"
+        from Foundation import NSBundle
+        info = NSBundle.mainBundle().localizedInfoDictionary() or NSBundle.mainBundle().infoDictionary()
+        if info is not None:
+            info["CFBundleName"] = "Convo"
+    except Exception:
+        pass
+    webview.settings["ALLOW_DOWNLOADS"] = True
+    webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True
+    bridge = Bridge()
+    win = webview.create_window("Convo", url, js_api=bridge, width=1320, height=900, min_size=(380, 560),
+                                background_color=BACKGROUND, text_select=True, zoomable=True)
+    bridge._window = win
+    win.events.loaded += lambda: on_shown()
+    storage.mkdir(parents=True, exist_ok=True)
+    webview.start(private_mode=False, storage_path=str(storage), icon=app_icon())
+
+
+def window_mode(data_dir: Path, version: str) -> str:
+    """'native' on a Mac unless the native window failed on this version before (then 'chromium')."""
+    forced = os.environ.get("CONVO_WINDOW")
+    if forced in ("native", "chromium", "browser"):
+        return forced
+    if sys.platform != "darwin":
+        return "chromium"
+    failed = data_dir / "window" / "native-failed"
+    trying = data_dir / "window" / "native-trying"
+    if trying.exists():                       # the last native window died before it showed: don't try it again
+        failed.parent.mkdir(parents=True, exist_ok=True)
+        failed.write_text(trying.read_text())
+        trying.unlink(missing_ok=True)
+    try:
+        return "chromium" if failed.read_text().strip() == version else "native"
+    except OSError:
+        return "native"

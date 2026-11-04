@@ -31,6 +31,7 @@ from .export import ExportError, apply_export, describe_export, find_downloads, 
 from .reports import briefing, people_csv, person, write_report
 from .sender import Sender
 from .store import Store, now_iso
+from .updates import TOKEN_RX, UpdateError, Updates, changelog_notes, restart_into
 from .writer import FakeBatches, Overnight, RealBatches, estimate_usd
 
 WEB = Path(__file__).parent / "web"
@@ -56,6 +57,12 @@ def load_or_create_token(data_dir: Path) -> str:
     return token
 
 
+def _update_brief(a: "Assistant") -> dict:
+    u = a.updates.summary()
+    return {"available": u["available"], "version": (u["latest"] or {}).get("version"), "status": u["status"],
+            "whats_new": a.store.get("whats_new_seen") != __version__ and changelog_notes(__version__) is not None}
+
+
 def policy_problems(text: str) -> list[str]:
     return [name for rx, name in POLICY_VIOLATIONS if rx.search(text)]
 
@@ -78,6 +85,12 @@ class Assistant:
         self.check = {"running": False, "report": None, "at": None}
         self.auto_send = False                    # practice mode only: approve and send as soon as replies are written
         self.on_quit = None
+        home = os.environ.get("CONVO_HOME")
+        self.updates = Updates(
+            Path(home) if home and practice is None else None,
+            token=lambda: self.s.github_token.get_secret_value() if self.s.github_token else None,
+            previews=lambda: self.s.update_previews, repo=self.s.update_repo, log=self.store.log, backup=self.store.backup,
+            restart=lambda code: restart_into(code, Path(home), self.s.dashboard_port, lambda: self.on_quit and self.on_quit()))
         self._job_lock = threading.Lock()
         self._stop_job = threading.Event()
         self._bg_stop = threading.Event()
@@ -129,6 +142,8 @@ class Assistant:
     def start_background(self) -> None:
         self.sender.start()
         threading.Thread(target=self._background, name="overnight", daemon=True).start()
+        if self.updates.can_install:
+            threading.Thread(target=self.updates.watch, args=(self._bg_stop,), name="updates", daemon=True).start()
 
     def _background(self) -> None:
         while not self._bg_stop.wait(60):
@@ -348,6 +363,8 @@ class SettingsBody(BaseModel):
     quiet_from: str | None = None
     quiet_to: str | None = None
     auto_send: bool | None = None    # practice mode only
+    github_token: str | None = None  # "" removes it
+    update_previews: bool | None = None
 
 
 HHMM = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
@@ -410,6 +427,7 @@ def create_api(a: Assistant, token: str) -> FastAPI:
         model = a.s.llm.model
         return {
             "version": __version__, "you": a.s.account_username, "last_import": st.get("last_import"),
+            "update": _update_brief(a),
             "practice": a.practice is not None, "auto_send": a.auto_send,
             "job": a.job, "check": {"running": a.check["running"], "at": a.check["at"],
                                     "summary": (a.check["report"] or "").split("\n\n== ")[0] or None},
@@ -846,6 +864,16 @@ def create_api(a: Assistant, token: str) -> FastAPI:
                 raise HTTPException(400, f"{field.replace('_', ' ')} must be a time like 09:00")
             setattr(a.s, field, v or None)
             env[key] = v or None
+        if body.github_token is not None:
+            key = body.github_token.strip()
+            if key and not TOKEN_RX.match(key):
+                raise HTTPException(400, "That doesn't look like a GitHub key (it starts with github_pat_).")
+            a.s.github_token = SecretStr(key) if key else None
+            env["AGENT_GITHUB_TOKEN"] = key or None
+            st.log("good" if key else "info", "GitHub key saved; Convo will look for updates." if key else "GitHub key removed.")
+        if body.update_previews is not None:
+            a.s.update_previews = body.update_previews
+            env["AGENT_UPDATE_PREVIEWS"] = "true" if body.update_previews else "false"
         if body.auto_send is not None:
             if a.practice is None:
                 raise HTTPException(400, "Automatic sending is only in practice mode. Real messages wait for your approval.")
@@ -853,6 +881,35 @@ def create_api(a: Assistant, token: str) -> FastAPI:
             st.log("info", f"Automatic sending (practice) {'on' if body.auto_send else 'off'}.")
         if env:
             save_env(env, a.env_path)
+        return {"ok": True}
+
+    # -------------------------------------------------- updates (GitHub)
+    def _upd(fn):
+        try:
+            return fn()
+        except UpdateError as e:
+            raise HTTPException(400, str(e))
+
+    @api.get("/api/updates", dependencies=[Depends(auth)])
+    def updates_state():
+        return {**a.updates.summary(), "notes_current": changelog_notes(__version__),
+                "seen": st.get("whats_new_seen"), "previews": a.s.update_previews}
+
+    @api.post("/api/updates/check", dependencies=[Depends(auth)])
+    def updates_check():
+        return a.updates.check()
+
+    @api.post("/api/updates/install", dependencies=[Depends(auth)])
+    def updates_install():
+        return _upd(a.updates.start_install)
+
+    @api.post("/api/updates/undo", dependencies=[Depends(auth)])
+    def updates_undo():
+        return _upd(a.updates.undo)
+
+    @api.post("/api/updates/seen", dependencies=[Depends(auth)])
+    def updates_seen():
+        st.set("whats_new_seen", __version__)
         return {"ok": True}
 
     from .hub import register as register_hub

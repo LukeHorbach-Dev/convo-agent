@@ -5,7 +5,8 @@
 #   - moves your data across from an older convo-agent folder, if there is one (nothing is deleted there)
 # Everything goes in ~/Library/Application Support/Convo. Nothing is installed system-wide.
 set -euo pipefail
-APP="${1:?usage: setup.sh /path/to/Convo.app/Contents/Resources/app}"
+APP="${1:?usage: setup.sh /path/to/convo-code [/Applications/Convo.app]}"
+BUNDLE="${2:-}"
 SUPPORT="$HOME/Library/Application Support/Convo"
 LOGS="$HOME/Library/Logs/Convo"
 VERSION="$(cat "$APP/VERSION")"
@@ -42,6 +43,7 @@ if [ ! -x "$SUPPORT/venv/bin/python" ] || ! "$SUPPORT/venv/bin/python" -c 'impor
   "$UV" venv -q -p 3.12 "$SUPPORT/venv"
 fi
 "$UV" pip install -q -p "$SUPPORT/venv/bin/python" -r "$APP/requirements.lock"
+shasum -a 256 "$APP/requirements.lock" | cut -d' ' -f1 > "$SUPPORT/venv/.convo-lock"   # updates skip this when unchanged
 
 # 3. The browser
 say "Installing the browser Convo uses for Instagram (about 150 MB the first time)"
@@ -72,6 +74,11 @@ done
 for f in profile.json never.txt intro-list.txt; do
   if [ ! -f "$SUPPORT/data/$f" ] && [ -f "$APP/seed/$f" ]; then cp "$APP/seed/$f" "$SUPPORT/data/$f"; echo "  added $f"; fi
 done
+if [ ! -f "$SUPPORT/data/profile.json" ] && [ -f "$APP/seed/profile.example.json" ]; then
+  cp "$APP/seed/profile.example.json" "$SUPPORT/data/profile.json"
+  echo "  No About me was found, so Convo started a blank one. Fill it in under AI preferences, About me."
+fi
+if [ -f "$SUPPORT/data/assistant.db" ]; then echo "  Your conversations, people and hellos are here."; fi
 if [ ! -f "$SUPPORT/.env" ]; then touch "$SUPPORT/.env"; chmod 600 "$SUPPORT/.env"; fi
 
 # 5. A quick look that it all starts
@@ -82,6 +89,10 @@ PYTHONPATH="$APP" "$SUPPORT/venv/bin/python" -c 'import assistant.app, playwrigh
 echo "$VERSION" > "$SUPPORT/.installed"
 trap - ERR
 say "All set. Opening Convo."
-PYTHONPATH="$APP" CONVO_LOGS="$LOGS" "$SUPPORT/venv/bin/python" -m assistant app
+if [ -n "$BUNDLE" ] && [ -d "$BUNDLE" ]; then
+  open "$BUNDLE"
+else
+  (PYTHONPATH="$APP" CONVO_LOGS="$LOGS" CONVO_HOME="$SUPPORT" "$SUPPORT/venv/bin/python" -m assistant app &)
+fi
 echo
-echo "You can close this window. Next time, just open Convo."
+echo "You can close this window. Next time, just open Convo from Applications or the Dock."

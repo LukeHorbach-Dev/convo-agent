@@ -1,10 +1,10 @@
 import {
   AtSign, BarChart3, Bell, Brain, CalendarDays, Clapperboard, Clock, FileText, FolderKanban, Hand, Handshake, History,
   KeyRound, LayoutDashboard, Library, MessageCircleReply, MessagesSquare, Plug, Rocket, Settings, Sparkles, Sprout, Target,
-  Trophy, Users, Workflow,
+  Trophy, Users, Workflow, ArrowUpCircle,
 } from "lucide-react";
 
-export type NavItem = { path: string; label: string; icon: any; badge?: "replies" | "hellos" };
+export type NavItem = { path: string; label: string; icon: any; badge?: "replies" | "hellos" | "update" };
 export type NavSection = { title: string; items: NavItem[] };
 
 // The sidebar, exactly as in the brief. Every item opens a working page.
@@ -48,6 +48,7 @@ export const NAV: NavSection[] = [
     { path: "/api-connections", label: "API Connections", icon: KeyRound },
     { path: "/ai", label: "AI Preferences", icon: Brain },
     { path: "/settings", label: "Account Settings", icon: Settings },
+    { path: "/updates", label: "Updates", icon: ArrowUpCircle, badge: "update" },
   ] },
 ];
 

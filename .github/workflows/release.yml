@@ -1,0 +1,47 @@
+# Publishing a new Convo: push a tag like v5.0.1 (it must match assistant/__init__.py and have a CHANGELOG.md section).
+# This builds the Command Centre, runs the tests, builds Convo.app, and makes a GitHub release with:
+#   Convo-<v>.zip        a fresh install (download, drag to Applications)
+#   convo-<v>.tar.gz     what Convo's "Update" button downloads
+#   SHA256SUMS.txt       checksums Convo checks the download against
+# Tags with a dash (v5.1.0-preview.1) become pre-releases, offered only to copies that ask for previews.
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the Command Centre
+        run: cd web && npm ci && npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check the version matches the tag
+        run: |
+          V="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' assistant/__init__.py)"
+          test "v$V" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME doesn't match version $V"; exit 1; }
+          echo "V=$V" >> "$GITHUB_ENV"
+          python scripts/release_notes.py "$V" > notes.md
+      - name: Tests (everything except the slow browser ones)
+        run: |
+          pip install -q -r requirements.lock
+          python -m pytest -q -m "not browser"
+      - name: Build Convo.app and the update download
+        run: python mac/build_app.py out
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRE=""
+          case "$V" in *-*) PRE="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" out/Convo-$V.zip out/convo-$V.tar.gz out/SHA256SUMS.txt \
+            --title "Convo $V" --notes-file notes.md $PRE

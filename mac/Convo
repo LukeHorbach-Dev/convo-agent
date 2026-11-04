@@ -1,46 +1,23 @@
 #!/bin/bash
-# Convo.app's program: opens Convo, setting it up first if this version hasn't been set up yet.
-# Your data lives in ~/Library/Application Support/Convo, so replacing the app with a newer one keeps everything.
+# Convo.app's program. It only chooses which copy of Convo to run, then hands over to that copy's mac/start.sh:
+#   - the copy inside this app, or
+#   - a newer copy that Convo downloaded from GitHub (in ~/Library/Application Support/Convo/versions).
+# Putting a new Convo.app in Applications by hand always wins over downloaded updates.
+# This file is kept tiny on purpose: everything else can be updated from GitHub.
 set -u
 CONTENTS="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$CONTENTS/Resources/app"
+BUNDLED="$CONTENTS/Resources/app"
 SUPPORT="$HOME/Library/Application Support/Convo"
-LOGS="$HOME/Library/Logs/Convo"
-VERSION="$(cat "$APP/VERSION")"
-mkdir -p "$SUPPORT" "$LOGS"
-
-show_problem() {
-  # Something went wrong: say so in a box instead of nothing happening.
-  osascript - "$1" "$LOGS" <<'OSA' >/dev/null 2>&1
-on run argv
-  set msg to (item 1 of argv) & return & return & "The details are in " & (item 2 of argv) & ". Send Claude a screenshot of them."
-  set b to button returned of (display dialog msg buttons {"Show the details", "OK"} default button "OK" with title "Convo" with icon caution)
-  if b is "Show the details" then do shell script "open " & quoted form of (item 2 of argv)
-end run
-OSA
-}
-
-if [ "$(cat "$SUPPORT/.installed" 2>/dev/null)" != "$VERSION" ] || [ ! -x "$SUPPORT/venv/bin/python" ]; then
-  # First time (or a new version): set up in a Terminal window, so you can see it working and any problem.
-  SETUP="$APP/mac/setup.sh"
-  if ! osascript - "$SETUP" "$APP" >>"$LOGS/launcher.log" 2>&1 <<'OSA'
-on run argv
-  set cmd to "bash " & quoted form of (item 1 of argv) & " " & quoted form of (item 2 of argv)
-  tell application "Terminal"
-    activate
-    do script cmd
-  end tell
-end run
-OSA
-  then
-    show_problem "Convo needs to open Terminal to set itself up, and your Mac didn't let it. In System Settings, Privacy & Security, Automation, turn on Terminal under Convo, then open Convo again."
-  fi
-  exit 0
+mkdir -p "$SUPPORT"
+BV="$(cat "$BUNDLED/VERSION")"
+if [ "$(cat "$SUPPORT/bundled" 2>/dev/null)" != "$BV" ]; then
+  echo "$BV" > "$SUPPORT/bundled"
+  rm -f "$SUPPORT/current"
 fi
-
-cd "$SUPPORT"
-export PYTHONPATH="$APP" CONVO_LOGS="$LOGS" PYTHONDONTWRITEBYTECODE=1
-echo "--- $(date) opening Convo $VERSION" >> "$LOGS/launcher.log"
-if ! "$SUPPORT/venv/bin/python" -m assistant app >> "$LOGS/launcher.log" 2>&1; then
-  show_problem "Convo couldn't start."
+CODE="$BUNDLED"
+CUR="$(cat "$SUPPORT/current" 2>/dev/null || true)"
+if [ -n "$CUR" ] && [ -f "$SUPPORT/versions/$CUR/mac/start.sh" ]; then
+  CODE="$SUPPORT/versions/$CUR"
 fi
+export CONVO_BUNDLE="$(dirname "$CONTENTS")"
+exec /bin/bash "$CODE/mac/start.sh" "$CODE" "$@"

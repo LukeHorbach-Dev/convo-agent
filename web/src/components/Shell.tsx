@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Bell, ChevronDown, ChevronsLeft, ChevronsRight, Download, FlaskConical, Menu, PenLine, Plus, Send, Sparkles, Square, X,
+  ArrowUpCircle, Bell, ChevronDown, ChevronsLeft, ChevronsRight, Download, FlaskConical, LayoutTemplate, Menu, PenLine, Plus, Send, Sparkles, Square, X,
 } from "lucide-react";
-import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { Component, ErrorInfo, ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { api, onConnection, post } from "../lib/api";
 import { ago, money } from "../lib/format";
 import { MOBILE_TABS, NAV, titleFor } from "../lib/nav";
 import { prefs, useAccount, useAppState } from "../lib/state";
+import { Notes, useUpdates } from "../pages/Updates";
 import { Avatar, Button, cx, Dot, IconButton, Modal, useConfirm, useToast } from "./ui";
 
 // ------------------------------------------------------------------------------------------------ the logo
@@ -25,7 +26,8 @@ export function Logo({ small }: { small?: boolean }) {
 // ------------------------------------------------------------------------------------------------ sidebar
 function SideNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const st = useAppState().data;
-  const badge = (b?: string) => (b === "replies" ? st?.counts.replies_to_check : b === "hellos" ? st?.counts.hellos_to_check : 0) || 0;
+  const badge = (b?: string) => (b === "replies" ? st?.counts.replies_to_check : b === "hellos" ? st?.counts.hellos_to_check
+    : b === "update" ? (st?.update?.available ? 1 : 0) : 0) || 0;
   return (
     <nav aria-label="Main" className="flex flex-col gap-5 px-3 pb-6">
       {NAV.map((sec) => (
@@ -46,6 +48,7 @@ function SideNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
                     {!collapsed && <span className="truncate">{it.label}</span>}
                     {n > 0 && (collapsed
                       ? <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-violet" />
+                      : it.badge === "update" ? <span className="ml-auto rounded-full bg-cyan-soft px-1.5 text-[11px] font-semibold text-cyan">New</span>
                       : <span className="ml-auto rounded-full bg-violet-soft px-1.5 text-[11px] font-semibold text-violet-2 tabular">{n > 999 ? "999+" : n}</span>)}
                   </>)}
                 </NavLink>
@@ -230,6 +233,7 @@ export function Shell({ children }: { children: ReactNode }) {
   }, []);
   const toggle = () => { setCollapsed(!collapsed); prefs.write("convo.collapsed", collapsed ? "" : "1"); };
   const title = titleFor(loc.pathname);
+  useEffect(() => { document.title = loc.pathname === "/" ? "Convo" : `${title} · Convo`; }, [title, loc.pathname]);
   return (
     <div className="app-glow min-h-dvh">
       {/* desktop sidebar */}
@@ -242,6 +246,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <div className="grow overflow-y-auto pt-2"><SideNav collapsed={collapsed} /></div>
         <div className="grid gap-2 border-t border-line p-3">
           <StatusPill collapsed={collapsed} />
+          {!collapsed && <AppFooter />}
           <button onClick={toggle} className="flex h-8 items-center justify-center gap-2 rounded-lg text-[12px] text-faint hover:bg-hover hover:text-ink"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
             {collapsed ? <ChevronsRight className="size-4" /> : <><ChevronsLeft className="size-4" />Collapse</>}
@@ -257,7 +262,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <div className="flex h-16 items-center gap-3 px-5"><Logo /><span className="grow text-[15px] font-semibold">Convo</span>
               <IconButton icon={X} label="Close menu" onClick={() => setDrawer(false)} /></div>
             <div className="grow overflow-y-auto"><SideNav collapsed={false} onNavigate={() => setDrawer(false)} /></div>
-            <div className="border-t border-line p-3"><StatusPill collapsed={false} /></div>
+            <div className="grid gap-2 border-t border-line p-3"><StatusPill collapsed={false} /><AppFooter /></div>
           </aside>
         </div>
       )}
@@ -280,8 +285,9 @@ export function Shell({ children }: { children: ReactNode }) {
           <QuickActions onAsk={() => setAsk(true)} />
           <StopNow />
         </header>
+        <UpdateBanner />
         <main className="mx-auto w-full max-w-[1320px] px-4 pt-6 pb-28 lg:px-8 lg:pb-12" key={loc.pathname}>
-          <div className="animate-rise">{children}</div>
+          <div className="animate-rise"><PageBoundary>{children}</PageBoundary></div>
         </main>
       </div>
 
@@ -302,9 +308,73 @@ export function Shell({ children }: { children: ReactNode }) {
       </nav>
 
       <AskPalette open={ask} onClose={() => setAsk(false)} />
+      <WhatsNew />
       <ConnectionWatch onAuth={() => nav("/")} />
     </div>
   );
+}
+
+// ------------------------------------------------------------------------------------------------ version, updates, what's new
+function AppFooter() {
+  const st = useAppState().data;
+  return (
+    <div className="flex items-center justify-between gap-2 px-1 text-[11.5px] text-faint">
+      <NavLink to="/updates" className="truncate hover:text-ink" title="Updates">Convo {st?.version || ""}</NavLink>
+      <a href="/classic" className="flex shrink-0 items-center gap-1 hover:text-ink" title="The classic Convo screens"><LayoutTemplate className="size-3.5" />Classic screens</a>
+    </div>
+  );
+}
+
+function UpdateBanner() {
+  const st = useAppState().data;
+  const loc = useLocation();
+  const [hidden, setHidden] = useState(() => prefs.read("convo.update-hidden", ""));
+  const v = st?.update?.version;
+  if (!st?.update?.available || !v || hidden === v || loc.pathname === "/updates") return null;
+  return (
+    <div className="mx-auto mt-4 flex w-full max-w-[1320px] px-4 lg:px-8">
+      <div className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-cyan/25 bg-cyan-soft px-4 py-3 text-[13.5px] text-ink-2">
+        <ArrowUpCircle className="size-5 shrink-0 text-cyan" />
+        <span className="grow"><b className="text-ink">Convo {v} is ready.</b> It installs in about a minute and keeps all your data.</span>
+        <NavLink to="/updates"><Button size="sm" variant="cyan">See what's new</Button></NavLink>
+        <IconButton icon={X} label="Hide until the next version" onClick={() => { prefs.write("convo.update-hidden", v); setHidden(v); }} />
+      </div>
+    </div>
+  );
+}
+
+function WhatsNew() {
+  const st = useAppState().data;
+  const want = !!st?.update?.whats_new;
+  const { data } = useUpdates();
+  const [closed, setClosed] = useState(false);
+  const qc = useQueryClient();
+  if (!want || closed || !data?.notes_current) return null;
+  const done = () => { setClosed(true); post("/api/updates/seen").then(() => qc.invalidateQueries({ queryKey: ["state"] })).catch(() => {}); };
+  return (
+    <Modal open onClose={done} title={`What's new in Convo ${data.current}`} wide
+      footer={<Button variant="primary" onClick={done}>Got it</Button>}>
+      <Notes text={data.notes_current} />
+    </Modal>
+  );
+}
+
+/** One page going wrong shows a message on that page instead of a blank window. */
+class PageBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.warn("Page problem:", error, info.componentStack); }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="mx-auto mt-10 max-w-md rounded-2xl border border-line bg-surface p-6 text-center">
+        <h1 className="text-[18px] font-semibold">This page hit a problem</h1>
+        <p className="mt-2 text-[13.5px] text-muted">The rest of Convo is fine, and nothing was sent or changed. Try again, or send Claude a screenshot of this.</p>
+        <p className="mt-3 rounded-lg bg-bg-2 px-3 py-2 text-left font-mono text-[12px] text-faint">{this.state.error.message}</p>
+        <Button className="mt-4" variant="primary" onClick={() => this.setState({ error: null })}>Try again</Button>
+      </div>
+    );
+  }
 }
 
 // ------------------------------------------------------------------------------------------------ when Convo isn't running

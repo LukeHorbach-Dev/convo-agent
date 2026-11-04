@@ -21,6 +21,7 @@ import Hello from "./pages/Hello";
 import Reports from "./pages/Reports";
 import { AccountSettings, AIPreferences, ApiConnections, Integrations } from "./pages/Settings";
 import Strategist from "./pages/Strategist";
+import Updates from "./pages/Updates";
 
 captureToken();
 
@@ -77,6 +78,7 @@ function App() {
         <Route path="/api-connections" element={<ApiConnections />} />
         <Route path="/ai" element={<AIPreferences />} />
         <Route path="/settings" element={<AccountSettings />} />
+        <Route path="/updates" element={<Updates />} />
         <Route path="*" element={<Dashboard />} />
       </Routes>
     </Shell>

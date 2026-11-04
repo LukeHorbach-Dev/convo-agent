@@ -1,7 +1,7 @@
-CONVO __VERSION__ - your Instagram assistant
+CONVO __VERSION__ - your Instagram assistant and personal brand command centre
 
 INSTALL (once)
-1. Drag Convo into your Applications folder.
+1. Drag Convo into your Applications folder (choose Replace if it asks).
 2. Open Terminal, paste this line and press Enter (it tells your Mac you trust this app):
 
      xattr -cr /Applications/Convo.app
@@ -15,10 +15,11 @@ and press "Open Anyway" next to Convo. Then double-click Convo again.
 
 EVERY DAY
 Just open Convo from Applications or the Dock. It keeps working in the background when you close its
-window. To stop it completely, use "Quit Convo" in its Settings page.
+window. To stop it completely, use "Quit Convo" in Account Settings.
 
-UPDATING
-Download the new Convo, drag it into Applications and choose Replace. Your data, sign-in and settings
-are kept (they live in ~/Library/Application Support/Convo).
+UPDATES
+You don't need to download Convo again. When there's a new version, Convo says "Convo x.y.z is ready".
+Press Update now: it installs, backs up your data and restarts by itself. The first time, Convo asks for a
+GitHub key (Updates page, four short steps).
 
-Your old convo-agent folder in Downloads is copied across the first time (and left as it is).
+Your data, Instagram sign-in and settings live in ~/Library/Application Support/Convo and are always kept.

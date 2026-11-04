@@ -1,18 +1,33 @@
-# Convo, your Instagram assistant (version 4)
+# Convo, your personal brand command centre (version 5 preview)
 
 Convo is a Mac app. It reads **Instagram's own data download** to know exactly who you follow, who follows you and
 every conversation. Claude writes hellos and replies in your voice, sorts people into "you'd click", "worth a
 closer look" and the rest, and remembers what they told you. You check, approve and send, or ask it things.
+Version 5 adds the **Command Centre**: one home for your accounts, conversations, hellos, analytics and growth.
 
-## Install
+## Install (once)
 
-1. Unzip `Convo-4.x.zip` and drag **Convo** into Applications.
-2. In Terminal, once: `xattr -cr /Applications/Convo.app` (tells macOS you trust it; it isn't signed by Apple).
-3. Open Convo. The first time a Terminal window sets it up (3 to 5 minutes: Python, its parts and a browser, all
-   inside `~/Library/Application Support/Convo`), then the app opens. An older `~/Downloads/convo-agent` folder is
-   copied across (sign-in, data, settings, AI key) and left untouched.
+1. Open **[the newest release](https://github.com/LukeHorbach-Dev/convo-agent/releases)** (you need to be signed in
+   to GitHub, because the project is private) and under **Assets** click `Convo-<version>.zip`.
+2. Open the zip in Downloads and drag **Convo** into **Applications** (choose **Replace** if it asks).
+3. Open **Terminal**, paste this and press Enter (Convo isn't signed by Apple, so this tells your Mac you trust it):
 
-Updating: drag the new Convo over the old one. Data lives in Application Support, so nothing is lost.
+       xattr -cr /Applications/Convo.app
+
+4. Open Convo from Applications. The first time, a Terminal window sets it up (3 to 5 minutes), then Convo opens.
+
+Your data lives in `~/Library/Application Support/Convo`, so deleting or replacing the app never loses it.
+
+## Updates
+
+Convo looks at this project's releases and shows **"Convo x.y.z is ready"** when there's a new one. Press **Update
+now** and it downloads, checks and installs it, backs up your data and restarts by itself. **Undo the last update** goes
+back to the version before. Updates need a read-only GitHub key once (Convo, **Updates**, follow the four steps).
+
+Publishing a version (for Claude or anyone working on Convo): set `__version__` in `assistant/__init__.py`, add a
+`## <version>` section to `CHANGELOG.md`, commit, then `git tag v<version> && git push origin v<version>`.
+The release workflow (`.github/workflows/release.yml`) runs the tests, builds Convo.app and publishes the release.
+Versions with a dash (`5.1.0-preview.1`) are previews.
 
 ## A day with Convo
 

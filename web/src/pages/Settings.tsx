@@ -226,6 +226,7 @@ export function AccountSettings() {
         <Button variant="danger-soft" icon={Power} onClick={async () => {
           if (!await confirm({ title: "Quit Convo?", text: "Sending and overnight checks stop until you open Convo again. This window comes back by itself when you do.", ok: "Quit", danger: true })) return;
           await post("/api/quit").catch(() => {});
+          (window as any).pywebview?.api?.close?.();          // in Convo's Mac window: close it too
         }}>Quit Convo</Button></div></Card>
     </div>
   );

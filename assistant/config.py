@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agent.core.config import BrowserConfig, LLMConfig
@@ -46,6 +46,10 @@ class AssistantSettings(BaseSettings):
     reply_window_days: int = Field(90, ge=1)     # only draft replies for chats where they wrote in this window
     min_age: int = 19
     dashboard_port: int = 8765
+    # Updates from GitHub (see updates.py). The key can only read Convo's own (private) project.
+    github_token: SecretStr | None = None
+    update_previews: bool = False            # also offer preview versions, not just finished ones
+    update_repo: str = "LukeHorbach-Dev/convo-agent"
 
     @property
     def db_path(self) -> Path:
