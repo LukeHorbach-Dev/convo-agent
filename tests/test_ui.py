@@ -18,6 +18,7 @@ from assistant.practice import PracticeLLM, World
 from assistant.store import Store
 
 pytestmark = pytest.mark.browser
+_servers: list = []
 
 
 def until(check, timeout_s=8.0):
@@ -45,13 +46,15 @@ def running(tmp_path):
         so.bind(("127.0.0.1", 0))
         port = so.getsockname()[1]
     server = uvicorn.Server(uvicorn.Config(create_api(a, "tok"), host="127.0.0.1", port=port, log_level="warning"))
+    _servers.append(server)
     threading.Thread(target=server.run, daemon=True).start()
     for _ in range(50):
         if server.started:
             break
         time.sleep(0.1)
     yield a, f"http://127.0.0.1:{port}"
-    server.should_exit = True
+    for s in _servers:
+        s.should_exit = True
     world.stop()
 
 
@@ -119,3 +122,25 @@ def test_every_page_loads_and_the_main_buttons_work(running):
         assert page.is_visible("#nav")
         b.close()
     assert errors == []
+
+
+def test_window_waits_while_convo_is_not_running_and_comes_back_by_itself(running):
+    """Seen 30 Oct: after Quit, the old window showed "Convo has quit" and opening Convo again seemed to do nothing."""
+    from playwright.sync_api import sync_playwright
+    a, url = running
+    port = int(url.rsplit(":", 1)[1])
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        page = b.new_page()
+        page.goto(url + "/#token=tok")
+        page.wait_for_selector("#hero h2")
+        server = next(s for s in _servers if s.config.port == port)
+        server.should_exit = True                                   # Convo quits
+        page.wait_for_selector("#offline", timeout=10000)
+        assert "isn't running" in page.inner_text("#offline")
+        again = uvicorn.Server(uvicorn.Config(create_api(a, "tok"), host="127.0.0.1", port=port, log_level="warning"))
+        _servers.append(again)
+        threading.Thread(target=again.run, daemon=True).start()     # Convo is opened again
+        page.wait_for_selector("#offline", state="detached", timeout=15000)   # reloaded on its own
+        page.wait_for_selector("#hero h2")
+        b.close()

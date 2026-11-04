@@ -122,7 +122,9 @@ def cmd_app(args) -> int:
         subprocess.Popen([sys.executable, "-m", "assistant", "run"], stdout=out, stderr=out, stdin=subprocess.DEVNULL,
                          start_new_session=True, env=os.environ.copy())
         if not wait_until(port, up=True, timeout_s=60):
-            print(f"Convo didn't start. Details are in {logs / 'convo.log'}", file=sys.stderr)
+            print(f"Convo didn't start. Details are in {logs / 'convo.log'}. The last lines:", file=sys.stderr)
+            lines = (logs / "convo.log").read_text(errors="replace").splitlines()[-25:]
+            print("\n".join("    " + l for l in lines), file=sys.stderr)
             return 1
     how = open_window(f"http://127.0.0.1:{port}/#token={token}", s.data_dir / "window")
     print(f"Convo is open ({how}).", file=sys.stderr)

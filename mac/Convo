@@ -9,10 +9,21 @@ LOGS="$HOME/Library/Logs/Convo"
 VERSION="$(cat "$APP/VERSION")"
 mkdir -p "$SUPPORT" "$LOGS"
 
+show_problem() {
+  # Something went wrong: say so in a box instead of nothing happening.
+  osascript - "$1" "$LOGS" <<'OSA' >/dev/null 2>&1
+on run argv
+  set msg to (item 1 of argv) & return & return & "The details are in " & (item 2 of argv) & ". Send Claude a screenshot of them."
+  set b to button returned of (display dialog msg buttons {"Show the details", "OK"} default button "OK" with title "Convo" with icon caution)
+  if b is "Show the details" then do shell script "open " & quoted form of (item 2 of argv)
+end run
+OSA
+}
+
 if [ "$(cat "$SUPPORT/.installed" 2>/dev/null)" != "$VERSION" ] || [ ! -x "$SUPPORT/venv/bin/python" ]; then
   # First time (or a new version): set up in a Terminal window, so you can see it working and any problem.
   SETUP="$APP/mac/setup.sh"
-  osascript - "$SETUP" "$APP" <<'OSA'
+  if ! osascript - "$SETUP" "$APP" >>"$LOGS/launcher.log" 2>&1 <<'OSA'
 on run argv
   set cmd to "bash " & quoted form of (item 1 of argv) & " " & quoted form of (item 2 of argv)
   tell application "Terminal"
@@ -21,9 +32,15 @@ on run argv
   end tell
 end run
 OSA
+  then
+    show_problem "Convo needs to open Terminal to set itself up, and your Mac didn't let it. In System Settings, Privacy & Security, Automation, turn on Terminal under Convo, then open Convo again."
+  fi
   exit 0
 fi
 
 cd "$SUPPORT"
 export PYTHONPATH="$APP" CONVO_LOGS="$LOGS" PYTHONDONTWRITEBYTECODE=1
-exec "$SUPPORT/venv/bin/python" -m assistant app >> "$LOGS/launcher.log" 2>&1
+echo "--- $(date) opening Convo $VERSION" >> "$LOGS/launcher.log"
+if ! "$SUPPORT/venv/bin/python" -m assistant app >> "$LOGS/launcher.log" 2>&1; then
+  show_problem "Convo couldn't start."
+fi

@@ -418,8 +418,25 @@ const msgText = t => esc(t).replace(/\[(voice message|call|photo|video|gif|stick
   (all, k, rest) => `<span class="media">${MEDIA[k][0]} <b>${MEDIA[k][1]}</b>${rest.trim() ? ' <span>' + rest.trim() + '</span>' : ''}</span>`);
 const clock = ms => new Date(ms).toLocaleString([], {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
 
+/* When Convo isn't running (quit, or restarting after an update) this window waits and comes back by itself. */
+let OFFLINE = false;
+function offline(msg) {
+  if (OFFLINE) return; OFFLINE = true;
+  const el = document.createElement('div'); el.id = 'offline';
+  el.style.cssText = 'position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--bg);text-align:center;padding:24px';
+  el.innerHTML = `<div style="max-width:420px"><div class="logo-mark" style="margin:0 auto 16px;width:52px;height:52px"><i><b></b><b></b><b></b></i></div>
+    <h2>${esc(msg || 'Convo isn\'t running right now')}</h2>
+    <p class="muted" style="margin-top:8px">Open Convo from your Applications folder. This window comes back by itself as soon as it's running.</p>
+    <p class="faint small" style="margin-top:14px"><span class="typing"><b></b><b></b><b></b></span> Waiting for Convo…</p></div>`;
+  document.body.append(el);
+  const tick = setInterval(async () => {
+    try { const r = await fetch('/api/health', {cache: 'no-store'}); if (r.ok) { clearInterval(tick); location.reload(); } } catch (e) {}
+  }, 2000);
+}
 async function api(path, opts = {}) {
-  const r = await fetch(path, {...opts, headers: {'X-Agent-Token': TOKEN, 'content-type': 'application/json', ...(opts.headers || {})}});
+  let r;
+  try { r = await fetch(path, {...opts, headers: {'X-Agent-Token': TOKEN, 'content-type': 'application/json', ...(opts.headers || {})}}); }
+  catch (e) { offline(); throw e; }
   if (r.status === 401) { sessionStorage.removeItem('tok'); gate(true); throw new Error('auth'); }
   const ct = r.headers.get('content-type') || '';
   const body = ct.includes('json') ? await r.json() : await r.text();
@@ -968,7 +985,8 @@ async function practice(real) { toast('Opening practice…'); const r = await po
 function textSize(d) { const v = Math.min(24, Math.max(14, parseInt(prefs.get('sz', '17')) + d)); prefs.set('sz', v); applyPrefs(); }
 async function quitApp() {
   if (!await confirmBox({title: 'Quit Convo?', text: 'Sending and overnight checks stop until you open Convo again.', ok: 'Quit', danger: true})) return;
-  await api('/api/quit', {method: 'POST', body: '{}'}); document.body.innerHTML = '<div style="text-align:center;margin-top:30vh;font:1.1rem system-ui">Convo has quit. You can close this window.</div>';
+  await api('/api/quit', {method: 'POST', body: '{}'});
+  setTimeout(() => offline('Convo has quit'), 600);
 }
 
 /* ============================================================== help */
@@ -994,7 +1012,7 @@ PAGES.help = {
 /* ============================================================== boot */
 async function boot() {
   if (!TOKEN) return gate(true);
-  try { await refresh(); } catch (e) { return gate(true); }
+  try { await refresh(); } catch (e) { return OFFLINE ? null : gate(true); }
   gate(false); route();
   setInterval(() => refresh().catch(() => {}), 3000);
   setInterval(() => refreshLive().catch(() => {}), 2000);
