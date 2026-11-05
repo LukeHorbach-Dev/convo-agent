@@ -1,10 +1,10 @@
 import {
   AtSign, BarChart3, Bell, Brain, CalendarDays, Clapperboard, Clock, FileText, FolderKanban, Hand, Handshake, History,
   KeyRound, LayoutDashboard, Library, MessageCircleReply, MessagesSquare, Plug, Rocket, Settings, Sparkles, Sprout, Target,
-  Trophy, Users, Workflow, ArrowUpCircle,
+  Trophy, Users, Workflow, ArrowUpCircle, Smartphone, BellRing,
 } from "lucide-react";
 
-export type NavItem = { path: string; label: string; icon: any; badge?: "replies" | "hellos" | "update" };
+export type NavItem = { path: string; label: string; icon: any; badge?: "replies" | "hellos" | "update" | "followups" };
 export type NavSection = { title: string; items: NavItem[] };
 
 // The sidebar, exactly as in the brief. Every item opens a working page.
@@ -29,6 +29,7 @@ export const NAV: NavSection[] = [
     { path: "/hello", label: "Hello Message", icon: Hand, badge: "hellos" },
     { path: "/conversations", label: "Conversations", icon: MessagesSquare, badge: "replies" },
     { path: "/contacts", label: "Contacts", icon: Users },
+    { path: "/followups", label: "Follow-ups", icon: BellRing, badge: "followups" },
     { path: "/engagement", label: "Engagement Assistant", icon: MessageCircleReply },
     { path: "/collaborations", label: "Collaboration Opportunities", icon: Handshake },
   ] },
@@ -48,12 +49,14 @@ export const NAV: NavSection[] = [
     { path: "/api-connections", label: "API Connections", icon: KeyRound },
     { path: "/ai", label: "AI Preferences", icon: Brain },
     { path: "/settings", label: "Account Settings", icon: Settings },
+    { path: "/phone", label: "Phone Access", icon: Smartphone },
     { path: "/updates", label: "Updates", icon: ArrowUpCircle, badge: "update" },
   ] },
 ];
 
 export const ALL_ITEMS = NAV.flatMap((s) => s.items);
-export const titleFor = (path: string) => ALL_ITEMS.find((i) => i.path === path)?.label || "Convo";
+const EXTRA: Record<string, string> = { "/review/hellos": "Review hellos", "/review/replies": "Review replies" };
+export const titleFor = (path: string) => EXTRA[path] || ALL_ITEMS.find((i) => i.path === path)?.label || "Convo";
 
 // The phone's bottom bar: the things you check on the go.
 export const MOBILE_TABS = ["/", "/hello", "/conversations", "/strategist"];

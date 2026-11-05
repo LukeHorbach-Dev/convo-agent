@@ -54,9 +54,26 @@ def test_an_older_database_is_backed_up_before_it_is_upgraded_and_nothing_in_it_
     copy = sqlite3.connect(tmp_path / "backups" / backups[0]["name"])
     assert copy.execute("SELECT COUNT(*) FROM drafts").fetchone()[0] == 1886
     assert st.scalar("SELECT COUNT(*) FROM drafts WHERE kind = 'hello' AND status = 'draft'") == 1886   # the queue, untouched
-    assert st.get("schema_version") == 1
+    from assistant.store import MIGRATIONS
+    assert st.get("schema_version") == MIGRATIONS[-1][0]
     Store(db)                                                       # opening again: nothing more to do, no new backup
     assert len(st.backups()) == 1
+
+
+def test_a_5_0_database_is_backed_up_before_the_follow_ups_step(tmp_path):
+    """5.0 databases are at step 1; opening them in 5.1 backs up first, then adds the reminders tables."""
+    from assistant.store import MIGRATIONS
+    db = tmp_path / "assistant.db"
+    st = Store(db)
+    st.execute("INSERT INTO drafts(kind, username, text, status, created_at, updated_at) VALUES ('hello', 'x', 'Hey', 'draft', 'x', 'x')")
+    st.execute("UPDATE state SET value = '1' WHERE key = 'schema_version'")
+    st.execute("DROP TABLE reminders")
+    st.execute("DROP TABLE followups")
+    st.close()
+    st = Store(db)
+    assert any("before-update-2" in b["name"] for b in st.backups())
+    assert st.get("schema_version") == MIGRATIONS[-1][0]
+    assert st.scalar("SELECT COUNT(*) FROM reminders") == 0 and st.scalar("SELECT COUNT(*) FROM drafts") == 1
 
 
 def test_overview_uses_only_real_data_and_says_what_is_missing(app):

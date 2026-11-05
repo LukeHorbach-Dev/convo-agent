@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Hand, Pause, Play, Send, ShieldCheck, Square } from "lucide-react";
+import { Hand, MessagesSquare, Pause, Play, Send, ShieldCheck, Square } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Bars, SERIES } from "../components/charts";
 import { Badge, Button, Card, ErrorState, Note, PageHeader, Skeleton, useToast } from "../components/ui";
 import { api, post } from "../lib/api";
@@ -53,10 +54,11 @@ export default function Hello() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card title="Review and approve" subtitle="The full Hello workspace: read, edit, approve or skip each message">
             <div className="flex flex-wrap gap-2">
-              <Button variant="primary" icon={ExternalLink} onClick={() => (location.href = "/classic#/hellos")}>Review hellos ({num(h.waiting_approval)})</Button>
-              <Button icon={ExternalLink} onClick={() => (location.href = "/classic#/replies")}>Review replies ({num(st?.counts.replies_to_check || 0)})</Button>
+              <Link to="/review/hellos"><Button variant="primary" icon={Hand}>Review hellos ({num(h.waiting_approval)})</Button></Link>
+              <Link to="/review/replies"><Button icon={MessagesSquare}>Review replies ({num(st?.counts.replies_to_check || 0)})</Button></Link>
             </div>
-            <p className="mt-3 text-[12.5px] text-muted">These open the Convo screens you know, inside this window. In stage 2 they move into this page with the new design.</p>
+            <p className="mt-3 text-[12.5px] text-muted">Search, filter to the people you'd click with, edit, approve or skip, one by one or many at once, with Undo.
+              The classic screens are still at the bottom of the sidebar.</p>
           </Card>
           <Card title="Safeguards" icon={ShieldCheck}>
             <ul className="flex flex-col gap-2 text-[13.5px] text-ink-2">

@@ -50,6 +50,7 @@ class AssistantSettings(BaseSettings):
     github_token: SecretStr | None = None
     update_previews: bool = False            # also offer preview versions, not just finished ones
     update_repo: str = "LukeHorbach-Dev/convo-agent"
+    phone_access: bool = False               # also listen on this Mac's Tailscale address (see phone.py)
 
     @property
     def db_path(self) -> Path:

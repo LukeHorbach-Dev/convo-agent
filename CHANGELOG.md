@@ -2,6 +2,20 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.1.0-preview.1
+
+Stage 2: everyday work in the new design, Convo on your phone, and follow-ups.
+
+- **Review hellos and replies here**: Hello Message, Review hellos (or Review replies). Search a name, filter to
+  the people you'd click with or the ones that need a look, edit, approve or skip one by one, or tick several at
+  once. "Approve all ready" asks first (type APPROVE for big batches) and every action has **Undo**.
+- **Phone access** (Settings, Phone Access): use Convo on your phone at home or away through Tailscale, a free
+  private network between your own devices. Scan the code and it opens signed in. Off until you turn it on.
+- **Follow-ups**: who's been waiting on you for 2+ days, hellos with no answer after a week, and reminders you set
+  ("Remind me about them" on anyone in Contacts). Convo tells you on the day. Later and Done hide them, with Undo.
+  People Convo mustn't contact (under 19, asking for money, your never list, chats you skipped) never show up.
+- Nothing here sends anything. Messages still go only when you approve them and sending runs.
+
 ## 5.0.0
 
 Convo 5, checked on your Mac.

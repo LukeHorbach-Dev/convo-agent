@@ -24,7 +24,7 @@ pytestmark = pytest.mark.browser
 DIST = Path(__file__).parent.parent / "assistant" / "web" / "dist" / "index.html"
 ROUTES = ["", "strategist", "notifications", "accounts", "launch", "groups", "studio", "library", "calendar", "scheduled", "hello",
           "conversations", "contacts", "engagement", "collaborations", "analytics", "missions", "goals", "independence",
-          "automations", "automation-history", "reports", "integrations", "api-connections", "ai", "settings", "updates"]
+          "automations", "automation-history", "reports", "integrations", "api-connections", "ai", "settings", "updates", "phone", "followups", "review/hellos", "review/replies"]
 
 
 def until(check, timeout_s=8.0):
@@ -161,10 +161,57 @@ def test_the_classic_screens_are_one_click_away(running):
         page = b.new_page()
         page.goto(url + "/#token=tok")
         page.wait_for_selector("text=Good")
-        page.goto(url + "/#/hello")
-        page.click("text=Review hellos")
+        page.click("text=Classic screens")
         page.wait_for_selector("#title")                     # the classic Convo screens, already signed in
         assert "/classic" in page.url
         page.click("text=Command Centre")
         page.wait_for_selector("text=Good")
         b.close()
+
+
+def test_reviewing_hellos_in_the_new_design(running):
+    """Edit and approve one, skip one, undo, then approve all ready with the typed confirmation and undo that too.
+    Nothing is sent at any point."""
+    from playwright.sync_api import expect, sync_playwright
+    a, url = running
+    a.store.set("whats_new_seen", __version__)
+    count = lambda status: a.store.scalar("SELECT COUNT(*) FROM drafts WHERE kind = 'hello' AND status = ?", (status,))
+    assert count("draft") == 3
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        page = b.new_page(viewport={"width": 1400, "height": 900})
+        page.goto(url + "/#token=tok")
+        page.wait_for_selector("text=Good")
+        page.goto(url + "/#/hello")
+        page.click("main >> text=Review hellos")
+        page.wait_for_selector("main textarea")
+        assert page.locator("main textarea").count() == 3
+        # Edit and approve the first.
+        first = page.locator("main textarea").first
+        first.fill("hey :) loved your last post")
+        page.locator("main").get_by_role("button", name="Approve", exact=True).first.click()
+        assert until(lambda: count("approved") == 1)
+        assert a.store.scalar("SELECT text FROM drafts WHERE kind = 'hello' AND status = 'approved'") == "hey :) loved your last post"
+        expect(page.locator("main textarea")).to_have_count(2)
+        # Skip the next, then Undo it from the notification.
+        page.locator("main").get_by_role("button", name="Skip", exact=True).first.click()
+        assert until(lambda: count("skipped") == 1)
+        page.locator("[role=status]", has_text="Skipped").get_by_role("button", name="Undo").click()
+        assert until(lambda: count("skipped") == 0 and count("draft") == 2)
+        # Search narrows the list.
+        page.fill("input[aria-label='Search hellos']", "zzz-nobody")
+        page.wait_for_selector("text=Nobody by that name here")
+        page.fill("input[aria-label='Search hellos']", "")
+        page.wait_for_selector("main textarea")
+        # Approve all ready, then Undo puts them back.
+        page.click("main >> text=Approve all ready")
+        page.wait_for_selector("role=dialog >> text=Approve all")
+        page.click("role=dialog >> button:has-text('Approve 2')")
+        assert until(lambda: count("approved") == 3)
+        page.locator("[role=status]", has_text="Approved 2 hellos").get_by_role("button", name="Undo").click()
+        assert until(lambda: count("approved") == 1 and count("draft") == 2)
+        # The approved tab shows the one approved by hand.
+        page.locator("main").get_by_role("button", name="Approved").first.click()
+        page.wait_for_selector("main >> text=Undo approval")
+        b.close()
+    assert count("sent") == 0 and not a.sender.active                      # nothing was sent

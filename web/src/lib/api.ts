@@ -2,17 +2,21 @@
 // (#token=...), is kept for this window only, and goes with every request. Nothing secret lives in the page.
 
 const KEY = "tok";
+// On this Mac the password is kept for this window only. On your phone (Convo opened through Tailscale) it's kept
+// on the phone, so the Home Screen icon stays signed in: only Convo's own pages, at that private address, can read it.
+const remote = !["127.0.0.1", "localhost"].includes(location.hostname);
+const keep = (t: string) => { try { (remote ? localStorage : sessionStorage).setItem(KEY, t); } catch { /* private window */ } };
 
 export function captureToken(): void {
   const m = location.hash.match(/token=([^&]+)/);
   if (m) {
-    sessionStorage.setItem(KEY, decodeURIComponent(m[1]));
+    keep(decodeURIComponent(m[1]));
     history.replaceState(null, "", location.pathname + "#/");
   }
 }
 
-export const token = () => sessionStorage.getItem(KEY) || "";
-export const setToken = (t: string) => sessionStorage.setItem(KEY, t.trim());
+export const token = () => { try { return sessionStorage.getItem(KEY) || (remote ? localStorage.getItem(KEY) : "") || ""; } catch { return ""; } };
+export const setToken = (t: string) => keep(t.trim());
 
 export class ApiError extends Error {
   status: number;

@@ -8,6 +8,7 @@ import { api, onConnection, post } from "../lib/api";
 import { ago, money } from "../lib/format";
 import { MOBILE_TABS, NAV, titleFor } from "../lib/nav";
 import { prefs, useAccount, useAppState } from "../lib/state";
+import { useFollowups } from "../pages/Followups";
 import { Notes, useUpdates } from "../pages/Updates";
 import { describeRun, RunBar, RunControl } from "./RunControl";
 import { Avatar, Button, cx, Dot, IconButton, Modal, useConfirm, useToast } from "./ui";
@@ -39,8 +40,9 @@ export function Logo({ small }: { small?: boolean }) {
 // ------------------------------------------------------------------------------------------------ sidebar
 function SideNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const st = useAppState().data;
+  const fu = useFollowups().data;
   const badge = (b?: string) => (b === "replies" ? st?.counts.replies_to_check : b === "hellos" ? st?.counts.hellos_to_check
-    : b === "update" ? (st?.update?.available ? 1 : 0) : 0) || 0;
+    : b === "update" ? (st?.update?.available ? 1 : 0) : b === "followups" ? (fu ? fu.counts.waiting + fu.counts.reminder : 0) : 0) || 0;
   return (
     <nav aria-label="Main" className="flex flex-col gap-5 px-3 pb-6">
       {NAV.map((sec) => (

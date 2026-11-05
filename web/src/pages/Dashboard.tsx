@@ -2,11 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, ArrowRight, ArrowUpRight, CalendarClock, CheckCircle2, CircleDashed, Download, Eye, Hand, Lightbulb, ListTodo,
   MessagesSquare, Plug, Send, Sparkles, Target, TrendingUp, Users,
+  BellRing,
 } from "lucide-react";
 import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { AreaSeries, SERIES } from "../components/charts";
 import { ActivityRow } from "../components/Shell";
+import { FollowupRow, useFollowups } from "./Followups";
 import { Avatar, Badge, Button, Card, cx, Empty, ErrorState, Skeleton, useToast } from "../components/ui";
 import { api, post } from "../lib/api";
 import { ago, compact, greeting, longDate, num, pct, plural } from "../lib/format";
@@ -172,8 +174,10 @@ export default function Dashboard() {
                 </button>))}</div>
             ) : <Empty icon={CheckCircle2} title="All caught up">Nothing needs you right now.</Empty>}
           </Card>
-          <Card title="Upcoming" icon={CalendarClock}>
-            <Upcoming st={st} />
+          <Card title="Follow-ups" icon={BellRing} action={<Button size="sm" variant="ghost" onClick={() => nav("/followups")}>All<ArrowRight className="size-3.5" /></Button>}>
+            <DashFollowups />
+            <div className="mt-4 border-t border-line pt-3"><div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-faint"><CalendarClock className="size-3.5" />Upcoming</div>
+              <Upcoming st={st} /></div>
           </Card>
           <Card title="Recommendations" icon={Lightbulb} subtitle="Worked out from your data">
             <div className="flex flex-col gap-2.5">
@@ -192,6 +196,18 @@ export default function Dashboard() {
             : <Empty title="Nothing yet" icon={Activity}>Activity shows up here as Convo works.</Empty>}
         </Card>
       </>)}
+    </div>
+  );
+}
+
+function DashFollowups() {
+  const { data } = useFollowups();
+  if (!data) return <Skeleton className="h-24" />;
+  if (!data.items.length) return <p className="text-[13px] text-muted">Nobody's waiting on you. Nice.</p>;
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-[12.5px] text-muted">{data.counts.waiting} waiting on you · {data.counts.no_reply} no reply · {data.counts.reminder} reminders</p>
+      {data.items.slice(0, 3).map((f) => <FollowupRow key={f.key} f={f} compact />)}
     </div>
   );
 }

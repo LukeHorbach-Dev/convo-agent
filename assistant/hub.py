@@ -197,6 +197,10 @@ class GroupBody(BaseModel):
     description: str | None = None
 
 
+class ReadyBody(BaseModel):
+    kind: str
+
+
 def _text(v: str | None, n: int) -> str | None:
     v = (v or "").strip()
     return v[:n] or None
@@ -288,6 +292,35 @@ def register(api: FastAPI, a, auth) -> None:
     def hello():
         return {**hello_stats(st), "series": activity_series(st, 30), "sender": {"active": a.sender.active, "status": a.sender.status,
                 "stopped": a.sender.halt.is_set()}, "daily_messages": a.s.pace.daily_messages, "send_at": a.s.send_at}
+
+    # ------------------------------------------------------------------ reviewing hellos and replies
+    READY = ("status = 'draft' AND text != '' AND NOT COALESCE(json_extract(context, '$.needs_look'), 0) "
+             "AND NOT COALESCE(json_extract(context, '$.manual'), 0)")
+    LOOK = ("(COALESCE(json_extract(context, '$.needs_look'), 0) OR COALESCE(json_extract(context, '$.manual'), 0) "
+            "OR note IS NOT NULL)")
+
+    @api.get("/api/hub/drafts/summary", dependencies=dep)
+    def drafts_summary(kind: str = "hello"):
+        c = lambda where: st.scalar(f"SELECT COUNT(*) FROM drafts WHERE kind = ? AND {where}", (kind,)) or 0
+        return {"waiting": c("status = 'draft'"), "ready": c(READY), "look": c(f"status = 'draft' AND {LOOK}"),
+                "interesting": c("status = 'draft' AND COALESCE(json_extract(context, '$.interest'), 0) >= 2"),
+                "approved": c("status = 'approved'"), "other": c("status IN ('unsure', 'failed', 'skipped')"),
+                "sent": c("status = 'sent'"), "daily_messages": a.s.pace.daily_messages}
+
+    @api.post("/api/hub/drafts/approve-ready", dependencies=dep)
+    def approve_ready_ids(body: ReadyBody):
+        """Approve every ready one (as "Approve all ready"), returning their ids so the screen can offer Undo."""
+        if body.kind not in ("hello", "reply"):
+            raise HTTPException(404, "unknown")
+        ids = [r["id"] for r in st.all(f"SELECT id FROM drafts WHERE kind = ? AND {READY} ORDER BY id", (body.kind,))]
+        done = 0
+        for i in range(0, len(ids), 400):
+            chunk = ids[i:i + 400]
+            done += st.execute(f"UPDATE drafts SET status = 'approved', updated_at = ? WHERE id IN ({','.join('?' * len(chunk))}) "
+                               f"AND {READY}", (now_iso(), *chunk)).rowcount
+        if done:
+            st.log("info", f"Approved {done} {'hellos' if body.kind == 'hello' else 'replies'}.")
+        return {"approved": done, "ids": ids}
 
     @api.get("/api/hub/integrations", dependencies=dep)
     def integrations_status():

@@ -393,8 +393,9 @@ select.field { appearance: none; background-image: linear-gradient(45deg, transp
 <script>
 'use strict';
 /* ============================================================== plumbing */
+const REMOTE = !['127.0.0.1', 'localhost'].includes(location.hostname);   // opened on your phone, through Tailscale
 if (location.hash.startsWith('#token=')) { sessionStorage.setItem('tok', decodeURIComponent(location.hash.slice(7))); history.replaceState(null, '', location.pathname + '#/today'); }
-let TOKEN = sessionStorage.getItem('tok') || '', S = null, PAGE = null;
+let TOKEN = sessionStorage.getItem('tok') || (REMOTE ? (localStorage.getItem('tok') || '') : ''), S = null, PAGE = null;
 const prefs = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));

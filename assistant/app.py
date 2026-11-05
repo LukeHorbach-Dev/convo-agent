@@ -31,6 +31,7 @@ from .export import ExportError, apply_export, describe_export, find_downloads, 
 from .reports import briefing, people_csv, person, write_report
 from .sender import Sender
 from .store import Store, now_iso
+from .phone import PhoneAccess
 from .updates import TOKEN_RX, UpdateError, Updates, changelog_notes, restart_into
 from .writer import FakeBatches, Overnight, RealBatches, estimate_usd
 
@@ -85,6 +86,7 @@ class Assistant:
         self.check = {"running": False, "report": None, "at": None}
         self.auto_send = False                    # practice mode only: approve and send as soon as replies are written
         self.on_quit = None
+        self.phone = PhoneAccess(settings.dashboard_port, log=self.store.log)
         home = os.environ.get("CONVO_HOME")
         self.updates = Updates(
             Path(home) if home and practice is None else None,
@@ -144,9 +146,18 @@ class Assistant:
         threading.Thread(target=self._background, name="overnight", daemon=True).start()
         if self.updates.can_install:
             threading.Thread(target=self.updates.watch, args=(self._bg_stop,), name="updates", daemon=True).start()
+        if self.s.phone_access and self.practice is None:
+            threading.Thread(target=self.phone.start, name="phone-start", daemon=True).start()
 
     def _background(self) -> None:
         while not self._bg_stop.wait(60):
+            if self.s.phone_access and self.practice is None and not self.phone.listening:
+                self.phone.start()                  # Tailscale came on after Convo, or the Mac woke on a new network
+            try:
+                from .followups import remind_due
+                remind_due(self.store, self.notify)
+            except Exception as e:
+                self.store.log("warn", f"Couldn't check reminders ({e}).")
             try:
                 self.poll_overnight()
             except Exception as e:                  # never let the thread die
@@ -154,6 +165,7 @@ class Assistant:
 
     def shutdown(self) -> None:
         self._bg_stop.set()
+        self.phone.stop()
         self.stop_job()
         self.sender.shutdown()
 
@@ -365,6 +377,7 @@ class SettingsBody(BaseModel):
     auto_send: bool | None = None    # practice mode only
     github_token: str | None = None  # "" removes it
     update_previews: bool | None = None
+    phone_access: bool | None = None
 
 
 HHMM = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
@@ -377,7 +390,7 @@ def create_api(a: Assistant, token: str) -> FastAPI:
     @api.middleware("http")
     async def guard(request: Request, call_next):
         host = (request.headers.get("host") or "").rsplit(":", 1)[0]
-        if host not in ("127.0.0.1", "localhost"):
+        if host not in ("127.0.0.1", "localhost") and host not in a.phone.hosts:
             return JSONResponse({"detail": "forbidden host"}, status_code=403)
         resp = await call_next(request)
         resp.headers["Content-Security-Policy"] = ("default-src 'self'; script-src 'self' 'unsafe-inline'; "
@@ -530,21 +543,30 @@ def create_api(a: Assistant, token: str) -> FastAPI:
 
     # -------------------------------------------------- drafts
     @api.get("/api/drafts", dependencies=[Depends(auth)])
-    def drafts(kind: str = "reply", status: str = "draft", only: str = "", offset: int = 0, limit: int = 100):
-        """only=look: the ones that need a proper look; only=interesting: people rated 2 or 3, best first."""
-        extra, order = "", "d.id"
+    def drafts(kind: str = "reply", status: str = "draft", only: str = "", offset: int = 0, limit: int = 100, q: str = ""):
+        """only=look: the ones that need a proper look; only=interesting: people rated 2 or 3, best first.
+        q: part of a username or name."""
+        extra, order, args = "", "d.id", []
+        if q.strip():
+            like = "%" + q.strip().lstrip("@").replace("%", "").replace("_", "\\_") + "%"
+            extra += (" AND (d.username LIKE ? ESCAPE '\\' OR d.other_name LIKE ? ESCAPE '\\' OR "
+                      "d.username IN (SELECT username FROM people WHERE display_name LIKE ? ESCAPE '\\'))")
+            args = [like, like, like]
         if only == "look":
-            extra = (" AND (COALESCE(json_extract(d.context, '$.needs_look'), 0) OR COALESCE(json_extract(d.context, '$.manual'), 0) "
+            extra += (" AND (COALESCE(json_extract(d.context, '$.needs_look'), 0) OR COALESCE(json_extract(d.context, '$.manual'), 0) "
                      "OR d.note IS NOT NULL)")
         elif only == "interesting":
-            extra, order = " AND COALESCE(json_extract(d.context, '$.interest'), 0) >= 2", "json_extract(d.context, '$.interest') DESC, d.id"
+            extra += " AND COALESCE(json_extract(d.context, '$.interest'), 0) >= 2"
+            order = "json_extract(d.context, '$.interest') DESC, d.id"
+        if status == "sent":
+            order = "d.sent_at DESC, d.id DESC"
         statuses = ("unsure", "failed", "skipped") if status == "other" else (status,)
         marks = ",".join("?" * len(statuses))
         rows = st.all(f"""SELECT d.*, p.summary, p.interest, p.concern, p.concern_why, p.note AS person_note
             FROM drafts d LEFT JOIN people p ON p.username = d.username
             WHERE d.kind = ? AND d.status IN ({marks}){extra} ORDER BY {order} LIMIT ? OFFSET ?""",
-                      (kind, *statuses, min(limit, 500), max(offset, 0)))
-        total = st.scalar(f"SELECT COUNT(*) FROM drafts d WHERE d.kind = ? AND d.status IN ({marks}){extra}", (kind, *statuses))
+                      (kind, *statuses, *args, min(limit, 500), max(offset, 0)))
+        total = st.scalar(f"SELECT COUNT(*) FROM drafts d WHERE d.kind = ? AND d.status IN ({marks}){extra}", (kind, *statuses, *args))
         for r in rows:
             r["context"] = json.loads(r["context"] or "{}")
             if r["thread_id"]:
@@ -871,6 +893,15 @@ def create_api(a: Assistant, token: str) -> FastAPI:
             a.s.github_token = SecretStr(key) if key else None
             env["AGENT_GITHUB_TOKEN"] = key or None
             st.log("good" if key else "info", "GitHub key saved; Convo will look for updates." if key else "GitHub key removed.")
+        if body.phone_access is not None:
+            if a.practice is not None:
+                raise HTTPException(400, "Phone access is for the real Convo, not practice.")
+            a.s.phone_access = body.phone_access
+            env["AGENT_PHONE_ACCESS"] = "true" if body.phone_access else "false"
+            if body.phone_access:
+                threading.Thread(target=a.phone.start, name="phone-start", daemon=True).start()
+            else:
+                a.phone.stop()
         if body.update_previews is not None:
             a.s.update_previews = body.update_previews
             env["AGENT_UPDATE_PREVIEWS"] = "true" if body.update_previews else "false"
@@ -882,6 +913,11 @@ def create_api(a: Assistant, token: str) -> FastAPI:
         if env:
             save_env(env, a.env_path)
         return {"ok": True}
+
+    # -------------------------------------------------- phone access (Tailscale)
+    @api.get("/api/phone", dependencies=[Depends(auth)])
+    def phone():
+        return {**a.phone.status(token), "on": a.s.phone_access}
 
     # -------------------------------------------------- updates (GitHub)
     def _upd(fn):
@@ -913,5 +949,8 @@ def create_api(a: Assistant, token: str) -> FastAPI:
         return {"ok": True}
 
     from .hub import register as register_hub
+    from .followups import register as register_followups
     register_hub(api, a, auth)
+    register_followups(api, a, auth)
+    a.phone.app = api
     return api

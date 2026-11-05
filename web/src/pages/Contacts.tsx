@@ -1,5 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, Download, ExternalLink, Search, Sparkles, Star, TriangleAlert, Users } from "lucide-react";
+import { Ban, BellRing, Download, ExternalLink, Search, Sparkles, Star, TriangleAlert, Users } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { ReminderForm } from "./Followups";
 import { useEffect, useState } from "react";
 import { Avatar, Badge, Bubble, Button, Card, cx, Drawer, Empty, ErrorState, Input, PageHeader, Segmented, Skeleton, Textarea, useToast } from "../components/ui";
 import { api, download, post } from "../lib/api";
@@ -14,7 +16,9 @@ export default function Contacts() {
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
   const [off, setOff] = useState(0);
-  const [person, setPerson] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const [person, setPersonState] = useState<string | null>(params.get("u"));
+  const setPerson = (u: string | null) => { setPersonState(u); if (!u && params.get("u")) setParams({}, { replace: true }); };
   useEffect(() => { const t = setTimeout(() => { setDebounced(q); setOff(0); }, 220); return () => clearTimeout(t); }, [q]);
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["people", show, debounced, off], placeholderData: keepPreviousData,
@@ -84,6 +88,7 @@ export function PersonDrawer({ username, onClose }: { username: string | null; o
     onError: (e) => toast((e as Error).message, "bad") });
   const msgs = p ? p.chats.flatMap((c: any) => c.messages).slice(-40) : [];
   const r = p?.report;
+  const [remind, setRemind] = useState(false);
   return (
     <Drawer open={!!username} onClose={onClose} title={username ? `@${username}` : ""}
       header={p && <div className="flex items-center gap-3"><Avatar name={p.display_name || p.username} size={48} />
@@ -97,6 +102,8 @@ export function PersonDrawer({ username, onClose }: { username: string | null; o
             {p.interest >= 3 && <Badge tone="good" icon={Star}>You'd click</Badge>}
             {p.concern === "high" && <Badge tone="bad">Careful</Badge>}{p.never && <Badge tone="bad" icon={Ban}>Never message</Badge>}
           </div>
+          <div><Button size="sm" icon={BellRing} onClick={() => setRemind(true)}>Remind me about them</Button>
+            <ReminderForm username={p.username} open={remind} onClose={() => setRemind(false)} /></div>
           {p.summary && <p className="text-[14px] text-ink-2">{p.summary}{p.interest_why && <span className="text-muted"> · {p.interest_why}</span>}</p>}
           {p.concern_why && p.concern !== "none" && <div className="rounded-xl bg-bad-soft px-3 py-2 text-[13px] text-ink-2">{p.concern_why}</div>}
           <div className="flex flex-wrap gap-2">

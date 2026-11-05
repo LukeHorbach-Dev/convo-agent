@@ -136,6 +136,21 @@ CREATE TABLE IF NOT EXISTS snapshots (
     PRIMARY KEY (account_id, at, source)
 )
 """),
+    (2, """
+CREATE TABLE IF NOT EXISTS reminders (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT,
+    note          TEXT NOT NULL,
+    due_at        TEXT NOT NULL,
+    done_at       TEXT,
+    created_at    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS followups (
+    key           TEXT PRIMARY KEY,
+    snoozed_until TEXT,
+    done_at       TEXT
+)
+"""),
 ]
 
 

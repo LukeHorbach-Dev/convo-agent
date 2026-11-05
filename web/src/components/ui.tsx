@@ -221,18 +221,19 @@ function useEscape(open: boolean, onClose: () => void) {
 }
 
 // ------------------------------------------------------------------------------------------------ toasts and confirms
-type ToastItem = { id: number; text: string; tone: "good" | "bad" | "info" };
-const ToastCtx = createContext<(text: string, tone?: ToastItem["tone"]) => void>(() => {});
+type ToastAction = { label: string; run: () => void };
+type ToastItem = { id: number; text: string; tone: "good" | "bad" | "info"; action?: ToastAction };
+const ToastCtx = createContext<(text: string, tone?: ToastItem["tone"], action?: ToastAction) => void>(() => {});
 const ConfirmCtx = createContext<(o: ConfirmOpts) => Promise<boolean>>(async () => false);
 type ConfirmOpts = { title: string; text: ReactNode; ok?: string; danger?: boolean; typed?: string };
 
 export function Providers({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
   const next = useRef(1);
-  const toast = useCallback((text: string, tone: ToastItem["tone"] = "good") => {
+  const toast = useCallback((text: string, tone: ToastItem["tone"] = "good", action?: ToastAction) => {
     const id = next.current++;
-    setItems((x) => [...x, { id, text, tone }]);
-    setTimeout(() => setItems((x) => x.filter((t) => t.id !== id)), tone === "bad" ? 7000 : 4000);
+    setItems((x) => [...x.slice(-3), { id, text, tone, action }]);
+    setTimeout(() => setItems((x) => x.filter((t) => t.id !== id)), tone === "bad" ? 7000 : action ? 8000 : 4000);
   }, []);
   const [confirm, setConfirm] = useState<(ConfirmOpts & { resolve: (v: boolean) => void }) | null>(null);
   const [typed, setTyped] = useState("");
@@ -249,7 +250,9 @@ export function Providers({ children }: { children: ReactNode }) {
                 className={cx("pointer-events-auto flex max-w-md animate-rise items-center gap-2.5 rounded-2xl border px-4 py-3 text-[13.5px] shadow-[var(--shadow-pop)]",
                   t.tone === "bad" ? "border-bad/30 bg-[#2a1416] text-ink" : "border-line-2 bg-raised text-ink")}>
                 {t.tone === "bad" ? <AlertTriangle className="size-4 text-bad" /> : t.tone === "good" ? <Check className="size-4 text-good" /> : <Info className="size-4 text-cyan" />}
-                {t.text}
+                <span className="grow">{t.text}</span>
+                {t.action && <button className="shrink-0 rounded-lg px-2 py-1 text-[13px] font-semibold text-violet-2 hover:bg-hover"
+                  onClick={() => { t.action!.run(); setItems((x) => x.filter((y) => y.id !== t.id)); }}>{t.action.label}</button>}
               </div>
             ))}
           </div>, document.body)}

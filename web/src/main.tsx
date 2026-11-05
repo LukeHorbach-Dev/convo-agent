@@ -18,7 +18,10 @@ import Contacts from "./pages/Contacts";
 import Conversations from "./pages/Conversations";
 import Dashboard from "./pages/Dashboard";
 import Hello from "./pages/Hello";
+import Phone from "./pages/Phone";
+import Followups from "./pages/Followups";
 import Reports from "./pages/Reports";
+import Review from "./pages/Review";
 import { AccountSettings, AIPreferences, ApiConnections, Integrations } from "./pages/Settings";
 import Strategist from "./pages/Strategist";
 import Updates from "./pages/Updates";
@@ -63,8 +66,11 @@ function App() {
         <Route path="/calendar" element={<PublishingCalendar />} />
         <Route path="/scheduled" element={<ScheduledPosts />} />
         <Route path="/hello" element={<Hello />} />
+        <Route path="/review/hellos" element={<Review kind="hello" key="hello" />} />
+        <Route path="/review/replies" element={<Review kind="reply" key="reply" />} />
         <Route path="/conversations" element={<Conversations />} />
         <Route path="/contacts" element={<Contacts />} />
+        <Route path="/followups" element={<Followups />} />
         <Route path="/engagement" element={<EngagementAssistant />} />
         <Route path="/collaborations" element={<Collaborations />} />
         <Route path="/analytics" element={<Analytics />} />
@@ -79,6 +85,7 @@ function App() {
         <Route path="/ai" element={<AIPreferences />} />
         <Route path="/settings" element={<AccountSettings />} />
         <Route path="/updates" element={<Updates />} />
+        <Route path="/phone" element={<Phone />} />
         <Route path="*" element={<Dashboard />} />
       </Routes>
     </Shell>
