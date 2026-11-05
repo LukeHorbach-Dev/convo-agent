@@ -19,7 +19,9 @@ window. To stop it completely, use "Quit Convo" in Account Settings.
 
 UPDATES
 You don't need to download Convo again. When there's a new version, Convo says "Convo x.y.z is ready".
-Press Update now: it installs, backs up your data and restarts by itself. The first time, Convo asks for a
-GitHub key (Updates page, four short steps).
+Press Update now: it installs, backs up your data and restarts by itself.
+
+EASIEST INSTALL (instead of steps 1 to 3): paste this into Terminal and press Enter:
+     curl -fsSL https://raw.githubusercontent.com/LukeHorbach-Dev/convo-agent/main/install.sh | bash
 
 Your data, Instagram sign-in and settings live in ~/Library/Application Support/Convo and are always kept.

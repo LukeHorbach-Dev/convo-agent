@@ -9,7 +9,7 @@ export type UpdateInfo = {
   status: "idle" | "checking" | "up_to_date" | "available" | "downloading" | "installing" | "restarting" | "error";
   current: string; available: boolean; connected: boolean; can_install: boolean; why_not: string | null; previous: string | null;
   latest: { version: string; notes: string; published: string | null; prerelease: boolean; page: string | null } | null;
-  error: string | null; progress: number | null; checked_at: number | null; notes_current: string | null; previews: boolean; repo: string;
+  error: string | null; progress: number | null; checked_at: number | null; needs_key: boolean; notes_current: string | null; previews: boolean; repo: string;
 };
 
 // GitHub's own page for making a key, filled in: read-only access to Convo's project, for a year.
@@ -125,7 +125,7 @@ export default function Updates() {
         </div>
 
         <div className="grid content-start gap-5">
-          <Card title="GitHub key" icon={GitBranch} subtitle={u.connected ? undefined : "Convo's project is private, so Convo needs a key that can only read it."}>
+          {(u.connected || u.needs_key) && <Card title="GitHub key" icon={GitBranch} subtitle={u.connected ? undefined : "Only needed while Convo's GitHub project is private: a key that can only read it."}>
             {u.connected ? (
               <div className="flex flex-wrap items-center gap-3">
                 <span className="flex items-center gap-2 text-[14px] text-good"><CheckCircle2 className="size-4" />Key saved</span>
@@ -146,7 +146,7 @@ export default function Updates() {
               <Button variant={u.connected ? "secondary" : "primary"} icon={Save} loading={saveKey.isPending} disabled={!key.trim()}>Save key</Button>
             </form>
             <p className="mt-3 flex items-start gap-2 text-[12px] text-faint"><KeyRound className="mt-0.5 size-3.5 shrink-0" />Kept on this Mac only (in Convo's settings file, readable by you alone) and only ever sent to GitHub.</p>
-          </Card>
+          </Card>}
 
           <Card title="Options">
             <div className="flex items-center justify-between gap-4">
@@ -180,7 +180,7 @@ function StatusLine({ u }: { u: UpdateInfo }) {
     : u.status === "error" ? ["warn", `Couldn't check for updates${checked}`]
     : u.status === "restarting" ? ["good", "Restarting…"]
     : busy(u) ? ["violet", "Updating…"]
-    : ["neutral", u.connected ? "Not checked yet" : "Add your GitHub key to get updates"];
+    : ["neutral", "Not checked yet"];
   return <div className="mt-1.5 flex items-center gap-2 text-[13px] text-muted"><Dot tone={tone} pulse={tone === "violet"} />{text}</div>;
 }
 

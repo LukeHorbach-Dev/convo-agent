@@ -2,6 +2,13 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.0.0-preview.2
+
+- **A new logo**: a speech bubble shaped like a C, in Convo's violet and blue, on the Dock, in the window and on
+  the classic screens.
+- **One-line install**: paste one line into Terminal and Convo downloads, installs, sets itself up and opens.
+- **Updates without a key** once the GitHub project is public (the key box only appears if it's needed).
+
 ## 5.0.0-preview.1
 
 A preview of Convo 5: the new Command Centre, a proper Mac window, and updates straight from GitHub.

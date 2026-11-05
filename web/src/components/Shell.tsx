@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpCircle, Bell, ChevronDown, ChevronsLeft, ChevronsRight, Download, FlaskConical, LayoutTemplate, Menu, PenLine, Plus, Send, Sparkles, Square, X,
 } from "lucide-react";
-import { Component, ErrorInfo, ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { Component, ErrorInfo, ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { api, onConnection, post } from "../lib/api";
 import { ago, money } from "../lib/format";
@@ -13,13 +13,25 @@ import { Avatar, Button, cx, Dot, IconButton, Modal, useConfirm, useToast } from
 
 // ------------------------------------------------------------------------------------------------ the logo
 export function Logo({ small }: { small?: boolean }) {
+  // The same drawing as the Mac app icon (mac/icon.svg): a speech bubble shaped like a C, with the next message's dot.
+  const id = useId().replace(/:/g, "");
+  const size = small ? 32 : 36;
   return (
-    <span className={cx("grid shrink-0 place-items-center rounded-[11px] bg-gradient-to-br from-violet to-cyan shadow-[0_6px_18px_-6px_rgb(139_92_246/0.6)]",
-      small ? "size-8" : "size-9")}>
-      <span className="flex gap-[3px] rounded-[7px] bg-bg px-[6px] py-[5px]">
-        {[0, 1, 2].map((i) => <span key={i} className="size-[3.5px] rounded-full bg-white" />)}
-      </span>
-    </span>
+    <svg width={size} height={size} viewBox="100 100 824 824" className="shrink-0 drop-shadow-[0_6px_14px_rgb(139_92_246/0.35)]" aria-hidden="true">
+      <defs>
+        <linearGradient id={`${id}b`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2a2150" /><stop offset="1" stopColor="#0c0d16" /></linearGradient>
+        <radialGradient id={`${id}v`} cx="0.22" cy="0.12" r="0.8"><stop offset="0" stopColor="#8b5cf6" stopOpacity="0.8" /><stop offset="1" stopColor="#8b5cf6" stopOpacity="0" /></radialGradient>
+        <linearGradient id={`${id}r`} x1="0.15" y1="0.1" x2="0.85" y2="0.95"><stop offset="0" stopColor="#c4b5fd" /><stop offset="0.45" stopColor="#8b5cf6" /><stop offset="1" stopColor="#22d3ee" /></linearGradient>
+      </defs>
+      <rect x="100" y="100" width="824" height="824" rx="200" fill={`url(#${id}b)`} />
+      <rect x="100" y="100" width="824" height="824" rx="200" fill={`url(#${id}v)`} />
+      <rect x="104" y="104" width="816" height="816" rx="196" fill="none" stroke="#fff" strokeOpacity="0.12" strokeWidth="8" />
+      <g transform="translate(0 -6)">
+        <path d="M 328 624 C 326 700 296 756 242 792 C 336 806 422 778 468 726 Z" fill={`url(#${id}r)`} />
+        <path d="M 688 660 A 232 232 0 1 1 688 364" fill="none" stroke={`url(#${id}r)`} strokeWidth="100" strokeLinecap="round" />
+        <circle cx="734" cy="512" r="58" fill="#e0fbff" />
+      </g>
+    </svg>
   );
 }
 

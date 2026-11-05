@@ -11,8 +11,9 @@ The version Convo came from is kept, so "Undo update" switches straight back. Th
 files `current` (the downloaded version in use) and `previous` next to the versions folder. Installing a new Convo.app by
 hand always wins over downloaded updates (see mac/Convo).
 
-The GitHub project is private, so Convo needs a GitHub key that can only read it (AGENT_GITHUB_TOKEN in .env, saved
-from Settings, owner-only like the AI key). The key is only ever sent to api.github.com.
+The GitHub project is public, so no key is needed. If it's ever made private, Convo needs a GitHub key that can only
+read it (AGENT_GITHUB_TOKEN in .env, saved from the Updates page, owner-only like the AI key); the key is only ever
+sent to api.github.com.
 """
 from __future__ import annotations
 
@@ -86,7 +87,7 @@ class Updates:
         self.http = http or httpx.Client(timeout=httpx.Timeout(20, read=60), follow_redirects=True)
         self.log, self.backup, self._restart, self.python, self.run, self.find_uv = log, backup, restart, python, run, uv
         self.lock = threading.Lock()
-        self.state = {"status": "idle", "latest": None, "error": None, "progress": None, "checked_at": None}
+        self.state = {"status": "idle", "latest": None, "error": None, "progress": None, "checked_at": None, "needs_key": False}
         self._told: set[str] = set()
 
     # ------------------------------------------------------------------ what the screens show
@@ -126,8 +127,9 @@ class Updates:
                               "Settings, Updates.")
         if r.status_code in (403, 404):
             if not self.token():
-                raise UpdateError("Convo's GitHub project is private, so Convo needs your GitHub key to see updates. "
-                                  "Add it in Settings, Updates.")
+                self.state["needs_key"] = True
+                raise UpdateError("GitHub didn't let Convo see its project. If the project is private, add a GitHub key "
+                                  "below (or make the project public on GitHub).")
             if r.status_code == 403 and r.headers.get("x-ratelimit-remaining") == "0":
                 raise UpdateError("GitHub asked Convo to wait a while before looking again.")
             raise UpdateError(f"GitHub didn't let this key read {self.repo}. When you make the key, choose that "
@@ -144,6 +146,7 @@ class Updates:
             self.state.update(status="checking", error=None)
         try:
             releases = self._get(f"{API}/repos/{self.repo}/releases", params={"per_page": 30}).json()
+            self.state["needs_key"] = False
             want_previews = self.previews() or is_preview(self.current)
             best = None
             for rel in releases:

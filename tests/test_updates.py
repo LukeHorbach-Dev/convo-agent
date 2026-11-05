@@ -72,7 +72,7 @@ def test_without_the_key_it_says_what_to_do(tmp_path):
     gh.add("5.0.0")
     u, *_ = make(tmp_path, gh, token=None)
     s = u.check()
-    assert s["status"] == "error" and "GitHub key" in s["error"] and not s["available"]
+    assert s["status"] == "error" and "GitHub key" in s["error"] and not s["available"] and s["needs_key"]
 
 
 def test_a_wrong_key_is_explained(tmp_path):

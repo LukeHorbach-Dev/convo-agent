@@ -5,18 +5,15 @@ every conversation. Claude writes hellos and replies in your voice, sorts people
 closer look" and the rest, and remembers what they told you. You check, approve and send, or ask it things.
 Version 5 adds the **Command Centre**: one home for your accounts, conversations, hellos, analytics and growth.
 
-## Install (once)
+## Install
 
-1. Open **[the newest release](https://github.com/LukeHorbach-Dev/convo-agent/releases)** (you need to be signed in
-   to GitHub, because the project is private) and under **Assets** click `Convo-<version>.zip`.
-2. Open the zip in Downloads and drag **Convo** into **Applications** (choose **Replace** if it asks).
-3. Open **Terminal**, paste this and press Enter (Convo isn't signed by Apple, so this tells your Mac you trust it):
+Open **Terminal**, paste this line and press Enter:
 
-       xattr -cr /Applications/Convo.app
+    curl -fsSL https://raw.githubusercontent.com/LukeHorbach-Dev/convo-agent/main/install.sh | bash
 
-4. Open Convo from Applications. The first time, a Terminal window sets it up (3 to 5 minutes), then Convo opens.
-
-Your data lives in `~/Library/Application Support/Convo`, so deleting or replacing the app never loses it.
+It downloads the newest Convo, checks it, puts it in Applications, sets it up (3 to 5 minutes the first time) and
+opens it. Run the same line again any time to reinstall. Your data lives in `~/Library/Application Support/Convo`,
+so reinstalling or deleting the app never loses it.
 
 ## Updates
 

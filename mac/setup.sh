@@ -89,7 +89,7 @@ PYTHONPATH="$APP" "$SUPPORT/venv/bin/python" -c 'import assistant.app, playwrigh
 echo "$VERSION" > "$SUPPORT/.installed"
 trap - ERR
 say "All set. Opening Convo."
-if [ -n "$BUNDLE" ] && [ -d "$BUNDLE" ]; then
+if [ -n "$BUNDLE" ] && [ -d "$BUNDLE" ] && command -v open >/dev/null; then
   open "$BUNDLE"
 else
   (PYTHONPATH="$APP" CONVO_LOGS="$LOGS" CONVO_HOME="$SUPPORT" "$SUPPORT/venv/bin/python" -m assistant app &)
