@@ -7,12 +7,21 @@ import { ago } from "../lib/format";
 import { Badge, Button, Drawer, Field, Input, Note, useConfirm, useToast } from "./ui";
 
 export type ConnStatus = { id: string; name: string; has_app: boolean; client_id: string | null; connected: boolean; account: any; connected_at: string | null;
-  last_sync: string | null; error: string | null; redirect_uri: string; scopes: string[] };
+  last_sync: string | null; error: string | null; redirect_uri: string; scopes: string[]; relay_ok?: boolean | null };
 
 type Guide = { minutes: number; intro: string; steps: ReactNode[]; idLabel: string; secretLabel: string; after?: ReactNode };
 
 const L = ({ href, children }: { href: string; children: ReactNode }) =>
   <a className="inline-flex items-center gap-1 font-medium text-violet-2 hover:underline" href={href} target="_blank" rel="noreferrer">{children}<ExternalLink className="size-3" /></a>;
+
+const Copyable = ({ text }: { text: string }) => {
+  const toast = useToast();
+  return <button type="button" onClick={() => navigator.clipboard.writeText(text).then(() => toast("Copied."))}
+    className="mt-1 flex w-full items-center gap-2 rounded-lg bg-bg-2 px-2.5 py-1.5 text-left font-mono text-[11.5px] text-ink-2 hover:bg-hover"><span className="truncate">{text}</span><Copy className="ml-auto size-3.5 shrink-0" /></button>;
+};
+
+const RelayStep = ({ s }: { s: ConnStatus }) => s.relay_ok ? <>The return page is on <CheckCircle2 className="inline size-4 text-good" /> (Instagram and TikTok send you back through it).</>
+  : <>Turn on Convo's return page (once, for Instagram and TikTok): open <L href="https://github.com/LukeHorbach-Dev/convo-agent/settings/pages">GitHub, Pages</L>, under <b>Branch</b> choose <b>main</b> and <b>/docs</b>, press <b>Save</b>. It takes a minute or two; this step turns green when it's working.</>;
 
 export const GUIDES: Record<string, (s: ConnStatus) => Guide> = {
   youtube: () => ({
@@ -27,6 +36,32 @@ export const GUIDES: Record<string, (s: ConnStatus) => Guide> = {
       <>Press <b>Connect YouTube</b>. Google says it hasn't verified the app: that's expected for your own app. Press <b>Continue</b> and allow the access.</>,
     ],
     after: <Note className="mt-3">While your Google app is in "Testing", Google signs Convo out every 7 days. To stop that, open <b>Audience</b> and press <b>Publish app</b> (it stays yours; nobody else can use it without your Client ID).</Note>,
+  }),
+  instagram: (s) => ({
+    minutes: 15, idLabel: "Instagram app ID", secretLabel: "Instagram app secret",
+    intro: "Meta lets Convo read your Instagram numbers and publish Reels through your own free developer app. Your Instagram must be a Creator (or Business) account.",
+    steps: [
+      <>In the Instagram app: <b>Settings</b>, <b>Account type and tools</b>, <b>Switch to professional account</b>, choose <b>Creator</b>. (Skip if you've done it.)</>,
+      <RelayStep s={s} />,
+      <>Open <L href="https://developers.facebook.com/apps/creation/">Meta for Developers: create app</L> (log in with Facebook). Choose the use case <b>Manage messaging and content on Instagram</b>, name it <b>Convo</b>, press <b>Create app</b>.</>,
+      <>In the app, open <b>Instagram</b>, <b>API setup with Instagram login</b>. Under <b>Set up Instagram business login</b>, open <b>Business login settings</b> and paste this as the <b>OAuth redirect URI</b>, then save:<Copyable text={s.redirect_uri} /></>,
+      <>Open <b>App roles</b>, <b>Roles</b>, add your Instagram account as an <b>Instagram Tester</b>, then accept the invite in Instagram (<b>Settings</b>, <b>Website permissions</b>, <b>Apps and websites</b>, <b>Tester invites</b>).</>,
+      <>Back on <b>API setup with Instagram login</b>, copy the <b>Instagram app ID</b> and <b>Instagram app secret</b> into the boxes below, then press <b>Connect Instagram</b>.</>,
+    ],
+    after: <Note className="mt-3">Meta changes these pages often. If a step looks different, send Claude a screenshot.</Note>,
+  }),
+  tiktok: (s) => ({
+    minutes: 15, idLabel: "Client key", secretLabel: "Client secret",
+    intro: "TikTok lets Convo read your profile and video numbers and send videos to your TikTok inbox as drafts, through your own free developer app.",
+    steps: [
+      <RelayStep s={s} />,
+      <>Open <L href="https://developers.tiktok.com/apps/">TikTok for Developers: Manage apps</L>, log in with your TikTok, and press <b>Connect an app</b>. Name it <b>Convo</b>.</>,
+      <>Under <b>Products</b>, add <b>Login Kit</b> and <b>Content Posting API</b> (choose <b>Upload</b>, not Direct Post).</>,
+      <>In <b>Login Kit</b>, add this as a <b>Web</b> redirect URI:<Copyable text={s.redirect_uri} /></>,
+      <>Under <b>Scopes</b>, tick <b>user.info.basic</b>, <b>user.info.profile</b>, <b>user.info.stats</b>, <b>video.list</b> and <b>video.upload</b>.</>,
+      <>Switch to <b>Sandbox</b>, create one, and add your own TikTok account under <b>Target users</b>. Copy the Sandbox <b>Client key</b> and <b>Client secret</b> into the boxes below, then press <b>Connect TikTok</b>.</>,
+    ],
+    after: <Note className="mt-3">In Sandbox, TikTok works with your own account only, which is all Convo needs. If a step looks different, send Claude a screenshot.</Note>,
   }),
 };
 
@@ -81,7 +116,8 @@ export function ConnectDrawer({ pid, open, onClose }: { pid: string | null; open
             <p className="mt-3 text-[12px] text-faint">Kept on this Mac only, readable by you alone. Never paste these into a chat.</p>
           </div>
         )}
-        {!s.connected && <Button variant="primary" size="lg" icon={Link2} disabled={!s.has_app} loading={connect.isPending} onClick={() => connect.mutate()}>Connect {s.name}</Button>}
+        {!s.connected && <Button variant="primary" size="lg" icon={Link2} disabled={!s.has_app || s.relay_ok === false} loading={connect.isPending} onClick={() => connect.mutate()}>Connect {s.name}</Button>}
+        {!s.connected && s.relay_ok === false && <p className="-mt-3 text-center text-[12.5px] text-muted">Turn on the return page first (step above).</p>}
         <details className="text-[12.5px] text-muted"><summary className="cursor-pointer">Technical details</summary>
           <p className="mt-2">Return address: <code className="break-all">{s.redirect_uri}</code>
             <button className="ml-1 text-violet-2" onClick={() => navigator.clipboard.writeText(s.redirect_uri).then(() => toast("Copied."))}><Copy className="inline size-3" /></button></p>

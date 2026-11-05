@@ -125,7 +125,8 @@ class Connection:
         if not (d.get("client_id") and d.get("client_secret")):
             raise ConnectError(f"Add your {self.p.name} app's Client ID and secret first.")
         verifier, challenge = pkce()
-        state = f"{self.p.id}.{secrets.token_urlsafe(24)}"
+        # The return page for Instagram and TikTok reads the platform and port from the state to find Convo on this Mac.
+        state = f"{self.p.id}.{self.port}.{secrets.token_urlsafe(24)}"
         now = time.time()
         self.pending = {k: v for k, v in self.pending.items() if now - v[1] < 900}
         self.pending[state] = (verifier, now)
@@ -141,6 +142,7 @@ class Connection:
         d = self.vault.read()
         tokens = self._token({"grant_type": "authorization_code", "code": code, "redirect_uri": self.redirect_uri,
                               "code_verifier": got[0]}, d)
+        tokens = self.after_login(tokens, d)
         self.vault.update(tokens=tokens, connected_at=_now(), error=None)
         self.log("good", f"{self.p.name} is connected.")
         return tokens
@@ -163,16 +165,25 @@ class Connection:
                 "expires_at": time.time() + float(j.get("expires_in") or 3600), "scope": j.get("scope") or old.get("scope"),
                 **({"open_id": j["open_id"]} if "open_id" in j else {}), **({"user_id": j["user_id"]} if "user_id" in j else {})}
 
+    def after_login(self, tokens: dict, d: dict) -> dict:
+        """Platforms that hand out a short-lived key first swap it here (Instagram)."""
+        return tokens
+
+    refresh_before_s = 90
+
+    def refresh(self, t: dict, d: dict) -> dict:
+        if not t.get("refresh_token"):
+            return t
+        return self._token({"grant_type": "refresh_token", "refresh_token": t["refresh_token"]}, d)
+
     def access_token(self) -> str:
         d = self.vault.read()
         t = d.get("tokens") or {}
         if not t.get("access_token"):
             raise ConnectError(f"{self.p.name} isn't connected.")
-        if t.get("expires_at", 0) > time.time() + 90:
+        if t.get("expires_at", 0) > time.time() + self.refresh_before_s:
             return t["access_token"]
-        if not t.get("refresh_token"):
-            return t["access_token"]
-        t = self._token({"grant_type": "refresh_token", "refresh_token": t["refresh_token"]}, d)
+        t = self.refresh(t, d)
         self.vault.update(tokens=t)
         return t["access_token"]
 

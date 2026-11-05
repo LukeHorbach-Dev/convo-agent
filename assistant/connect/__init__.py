@@ -12,16 +12,31 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from ..store import Store, now_iso
-from . import youtube
+from . import instagram, tiktok, youtube
 from .base import ConnectError, Connection
+
+SYNCS = {"youtube": youtube.sync, "instagram": instagram.sync, "tiktok": tiktok.sync}
+# What Publish does on each platform, and how Convo describes it before asking.
+PUBLISH = {
+    "youtube": (lambda c, st, item, path, prog: youtube.upload(c, st, item, path, prog), "private",
+                "It goes up as private, with this post's YouTube title, description and tags. Only you can see it until you make it public in YouTube Studio."),
+    "instagram": (lambda c, st, item, path, prog: instagram.publish_reel(c, st, item, path, prog), "public",
+                  "It's posted as a Reel on your Instagram straight away, with this post's Instagram caption. Everyone can see it."),
+    "tiktok": (lambda c, st, item, path, prog: tiktok.upload_draft(c, st, item, path, prog), "draft",
+               "It goes to your TikTok inbox as a draft. You finish it in the TikTok app (sound, cover, who sees it) and post it yourself."),
+}
 
 SYNC_EVERY = timedelta(hours=6)
 
 
 class Connections:
     def __init__(self, folder: Path, port: int, log, http=None):
-        self.all: dict[str, Connection] = {"youtube": Connection(youtube.YOUTUBE, folder, port, http=http, log=log)}
-        self.uploads: dict[int, dict] = {}                     # content id -> {"pct", "error", "done", "video_id"}
+        self.all: dict[str, Connection] = {
+            "youtube": Connection(youtube.YOUTUBE, folder, port, http=http, log=log),
+            "instagram": instagram.InstagramConnection(instagram.INSTAGRAM, folder, port, http=http, log=log),
+            "tiktok": Connection(tiktok.TIKTOK, folder, port, http=http, log=log),
+        }
+        self.uploads: dict[tuple[int, str], dict] = {}         # (content id, platform) -> {"pct", "error", "done", "result"}
 
     def __getitem__(self, pid: str) -> Connection:
         if pid not in self.all:
@@ -32,11 +47,12 @@ class Connections:
         c = self[pid]
         with c.busy:
             try:
-                out = {"youtube": youtube.sync}[pid](c, st)
+                out = SYNCS[pid](c, st)
             except ConnectError as e:
                 c.vault.update(error=str(e))
                 raise
-        st.log("good", f"{c.p.name} updated" + (f": {out.get('subscribers'):,} subscribers." if out.get("subscribers") is not None else "."))
+        n = out.get("subscribers") if out.get("subscribers") is not None else out.get("followers")
+        st.log("good", f"{c.p.name} updated" + (f": {n:,} {'subscribers' if pid == 'youtube' else 'followers'}." if n is not None else "."))
         return out
 
     def sync_due(self, st: Store) -> None:
@@ -78,9 +94,29 @@ def register(api: FastAPI, a, auth) -> None:
         except ConnectError as e:
             raise HTTPException(400, str(e))
 
+    relay = {"ok": None, "at": 0.0}
+
+    def relay_ok() -> bool | None:
+        """Is the https return page (GitHub Pages) up? Checked at most every 10 minutes."""
+        import time as _t
+        from .base import RELAY
+        if _t.time() - relay["at"] > 600 or (relay["ok"] is False and _t.time() - relay["at"] > 30):
+            try:
+                r = cx.all["tiktok"].http.get(RELAY, timeout=6)
+                relay["ok"] = r.status_code == 200 and "Going back to Convo" in r.text
+            except Exception:
+                relay["ok"] = False
+            relay["at"] = _t.time()
+        return relay["ok"]
+
     @api.get("/api/connect", dependencies=dep)
     def statuses():
-        return {"items": [c.status() for c in cx.all.values()]}
+        items = [c.status() for c in cx.all.values()]
+        if any(c.p.redirect == "relay" and not c.status()["connected"] for c in cx.all.values()):
+            for i in items:
+                if cx.all[i["id"]].p.redirect == "relay":
+                    i["relay_ok"] = relay_ok()
+        return {"items": items}
 
     @api.post("/api/connect/{pid}/app", dependencies=dep)
     def save_app(pid: str, body: AppBody):
@@ -135,38 +171,76 @@ def register(api: FastAPI, a, auth) -> None:
                 "recent": st.all("SELECT post_id, title, published_at, url, thumbnail, views, likes, comments, extra FROM platform_posts "
                                  "WHERE platform = 'youtube' ORDER BY published_at DESC LIMIT 12")}
 
-    @api.post("/api/hub/content/{cid}/publish/youtube", dependencies=dep)
-    def publish_youtube(cid: int):
+    @api.get("/api/connect/{pid}/overview", dependencies=dep)
+    def overview(pid: str):
+        if pid == "youtube":
+            return youtube_overview()
+        s = cx[pid].status()
+        acct = (s.get("account") or {}).get("account_id")
+        if not acct:
+            return {"connected": s["connected"], "account": None}
+        snaps = st.all("SELECT at, followers, following, posts, extra FROM snapshots WHERE account_id = ? ORDER BY at", (acct,))
+        last = snaps[-1] if snaps else None
+        days = [{"date": r["date"], **json.loads(r["metrics"])} for r in
+                st.all("SELECT date, metrics FROM platform_daily WHERE platform = ? AND account_id = ? ORDER BY date DESC LIMIT 28", (pid, acct))][::-1]
+        return {"connected": s["connected"], "account": s["account"], "last_sync": s["last_sync"], "error": s["error"],
+                "followers": last and last["followers"], "following": last and last["following"], "posts": last and last["posts"],
+                "likes_total": last and json.loads(last["extra"] or "{}").get("likes"),
+                "history": [{"at": r["at"], "followers": r["followers"]} for r in snaps], "days": days,
+                "recent": st.all("SELECT post_id, title, published_at, url, thumbnail, views, likes, comments, shares, extra FROM platform_posts "
+                                 "WHERE platform = ? ORDER BY published_at DESC LIMIT 12", (pid,))}
+
+    @api.post("/api/hub/content/{cid}/publish/{pid}", dependencies=dep)
+    def publish(cid: int, pid: str):
+        if pid not in PUBLISH:
+            raise HTTPException(404, "Convo can't publish there.")
         item = st.one("SELECT * FROM content WHERE id = ?", (cid,))
         if item is None:
             raise HTTPException(404, "That post isn't there any more.")
+        name = cx[pid].p.name
         if not (item["media_type"] or "").startswith("video/"):
-            raise HTTPException(400, "YouTube needs a video file. Add one in the Studio first.")
-        if not cx["youtube"].status()["connected"]:
-            raise HTTPException(400, "Connect YouTube first (Integrations).")
-        if cx.uploads.get(cid, {}).get("pct") is not None and not cx.uploads[cid].get("done"):
+            raise HTTPException(400, f"{name} needs a video file here. Add one in the Studio first." if pid != "instagram" else
+                                "Convo can publish Reels (videos) to Instagram. For photos, copy the caption and post from your phone.")
+        if not cx[pid].status()["connected"]:
+            raise HTTPException(400, f"Connect {name} first (Integrations).")
+        key = (cid, pid)
+        if cx.uploads.get(key, {}).get("pct") is not None and not cx.uploads[key].get("done"):
             raise HTTPException(409, "It's already uploading.")
         path = Path(a.s.data_dir) / "library" / str(cid) / item["media"]
-        state = cx.uploads[cid] = {"pct": 0, "error": None, "done": False, "video_id": None}
+        fn, kind, _ = PUBLISH[pid]
+        state = cx.uploads[key] = {"pct": 0, "error": None, "done": False, "result": None}
 
         def run():
             try:
-                vid = youtube.upload(cx["youtube"], st, item, path, progress=lambda p: state.update(pct=p))
-                versions = json.loads(item["versions"] or "{}")
-                versions.setdefault("youtube", {}).update(uploaded_id=vid, privacy="private", uploaded_at=now_iso())
-                st.execute("UPDATE content SET versions = ?, post_url = COALESCE(post_url, ?), updated_at = ? WHERE id = ?",
-                           (json.dumps(versions), f"https://youtu.be/{vid}", now_iso(), cid))
-                st.log("good", f"Uploaded {item['title'] or 'your video'} to YouTube as private. Make it public in YouTube Studio when you're ready.")
-                state.update(done=True, video_id=vid, pct=100)
+                result = fn(cx[pid], st, item, path, lambda p: state.update(pct=p))
+                row = st.one("SELECT versions, status FROM content WHERE id = ?", (cid,))
+                versions = json.loads(row["versions"] or "{}")
+                versions.setdefault(pid, {}).update(published=result, published_as=kind, published_at=now_iso())
+                if pid == "youtube":
+                    versions["youtube"]["uploaded_id"] = result
+                fields = {"versions": json.dumps(versions), "updated_at": now_iso()}
+                url = (f"https://youtu.be/{result}" if pid == "youtube" else result if str(result).startswith("https://") else None)
+                st.execute("UPDATE content SET versions = ?, updated_at = ?, post_url = COALESCE(post_url, ?) WHERE id = ?",
+                           (fields["versions"], fields["updated_at"], url, cid))
+                if kind == "public":
+                    st.execute("UPDATE content SET status = 'posted', posted_at = ? WHERE id = ?", (now_iso(), cid))
+                st.log("good", {"private": f"Uploaded {item['title'] or 'your video'} to YouTube as private. Make it public in YouTube Studio when you're ready.",
+                                "public": f"Posted {item['title'] or 'your Reel'} on Instagram.",
+                                "draft": f"Sent {item['title'] or 'your video'} to your TikTok inbox. Finish it in the TikTok app."}[kind])
+                state.update(done=True, result=result, pct=100)
             except (ConnectError, OSError) as e:
                 state.update(error=str(e), done=True)
-                st.log("warn", f"The YouTube upload of {item['title'] or 'your video'} stopped: {e}")
-        threading.Thread(target=run, name="youtube-upload", daemon=True).start()
+                st.log("warn", f"Publishing {item['title'] or 'your post'} to {name} stopped: {e}")
+        threading.Thread(target=run, name=f"publish-{pid}", daemon=True).start()
         return state
 
-    @api.get("/api/hub/content/{cid}/publish/youtube", dependencies=dep)
-    def publish_youtube_state(cid: int):
-        return cx.uploads.get(cid) or {"pct": None, "error": None, "done": False, "video_id": None}
+    @api.get("/api/hub/content/{cid}/publish/{pid}", dependencies=dep)
+    def publish_state(cid: int, pid: str):
+        return cx.uploads.get((cid, pid)) or {"pct": None, "error": None, "done": False, "result": None}
+
+    @api.get("/api/connect/publish-info", dependencies=dep)
+    def publish_info():
+        return {pid: {"kind": kind, "explain": explain, "connected": cx[pid].status()["connected"]} for pid, (_, kind, explain) in PUBLISH.items()}
 
 
 def _quiet_sync(cx: Connections, pid: str, st: Store) -> None:

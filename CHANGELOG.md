@@ -2,6 +2,19 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.4.0-preview.1
+
+Stage 5: Instagram and TikTok.
+
+- **Connect Instagram** (needs a free Creator account) and **TikTok**, each with your own free developer app. The
+  steps are in Integrations, Set up. Both send you back to Convo through a small return page on your GitHub project
+  (one switch in GitHub, Pages, also in the steps).
+- **Analytics** shows each one's real numbers: followers, your latest posts with views, likes, comments and shares,
+  and Instagram reach by day.
+- **Publish from the Content Studio**: a Reel straight to Instagram (Convo asks first, as it's public), a video to
+  your TikTok inbox as a draft that you finish in the TikTok app, or to YouTube as private.
+- Hello Message keeps its careful browser method: the official Instagram API doesn't allow starting DMs.
+
 ## 5.3.0-preview.1
 
 Stage 4: YouTube.

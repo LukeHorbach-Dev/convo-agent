@@ -496,13 +496,14 @@ AUTOMATIONS_LIVE = [
      False, None, ("Time to post",)),
     ("caption", "Caption writing", "Writes captions, titles and hashtags for each platform from your notes, when you press Write with AI.",
      True, None, ()),
+    ("analytics", "Platform updates", "Fetches followers, views and engagement from YouTube, Instagram and TikTok every 6 hours, once connected.",
+     False, None, ("YouTube updated", "Instagram updated", "TikTok updated")),
 ]
 AUTOMATIONS_PLANNED = [
     ("repurpose", "Content repurposing", "Suggests older content worth reposting in a new format.", True, 6),
-    ("analytics", "Analytics updates", "Pulls followers, views and engagement from connected platforms every few hours.", False, 4),
-    ("publishing", "Scheduled publishing", "Publishes approved posts at their time through the official APIs.", True, 4),
-    ("comments", "Comment notifications", "Tells you about new comments worth answering.", False, 5),
-    ("comment_replies", "AI-assisted comment replies", "Writes replies to comments for you to approve.", True, 5),
+    ("publishing", "Publish scheduled posts by themselves", "At a post's time, publishes it to the connected platforms you chose (you can already publish any post from the Studio).", True, 6),
+    ("comments", "Comment notifications", "Tells you about new comments worth answering.", False, 6),
+    ("comment_replies", "AI-assisted comment replies", "Writes replies to comments for you to approve.", True, 6),
     ("weekly_report", "Weekly performance report", "A plain summary of the week, every Monday.", False, 6),
     ("insights", "Audience insights", "What your audience responds to, from your analytics.", False, 6),
     ("missions", "Weekly mission tracking", "Updates mission progress from real activity.", False, 6),
@@ -521,7 +522,7 @@ def automations(store: Store, a) -> list[dict]:
             if r and (last is None or r["at"] > last["at"]):
                 last = r
         on = {"overnight": s.write_overnight, "send_at": bool(s.send_at), "quiet": bool(s.quiet_from and s.quiet_to),
-              "budget": True, "safety": True, "follow_up": True, "content_reminders": True, "caption": True}[aid]
+              "budget": True, "safety": True, "follow_up": True, "content_reminders": True, "caption": True, "analytics": True}[aid]
         nxt = None
         if aid == "send_at" and s.send_at:
             now = datetime.now()
@@ -531,7 +532,7 @@ def automations(store: Store, a) -> list[dict]:
                 t += timedelta(days=1)
             nxt = t.astimezone().isoformat(timespec="minutes")
         out.append({"id": aid, "name": name, "description": what, "needs_approval": approval, "status": "live", "enabled": on,
-                    "always_on": aid in ("budget", "safety", "follow_up", "content_reminders", "caption"), "last_run": last, "next_run": nxt,
+                    "always_on": aid in ("budget", "safety", "follow_up", "content_reminders", "caption", "analytics"), "last_run": last, "next_run": nxt,
                     "config": {"send_at": s.send_at, "quiet_from": s.quiet_from, "quiet_to": s.quiet_to,
                                "daily_ai_budget_usd": s.daily_ai_budget_usd}})
     for aid, name, what, approval, stage in AUTOMATIONS_PLANNED:

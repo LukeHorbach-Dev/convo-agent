@@ -5,6 +5,7 @@ import { AreaSeries, Bars, SERIES } from "../components/charts";
 import { Avatar, Badge, Card, Empty, ErrorState, PageHeader, Segmented, Skeleton } from "../components/ui";
 import { api } from "../lib/api";
 import { num, pct } from "../lib/format";
+import { PlatformPanel } from "../components/PlatformPanel";
 import { YouTubePanel } from "../components/YouTubePanel";
 import { Stat } from "./Dashboard";
 
@@ -67,6 +68,8 @@ export default function Analytics() {
                   <Badge tone={r[p] === "API" ? "good" : r[p] === "Not available" ? "neutral" : "warn"}>{r[p]}</Badge></td>)}</tr>))}</tbody>
           </table></div>
         </Card>
+      <PlatformPanel pid="instagram" />
+      <PlatformPanel pid="tiktok" />
       <YouTubePanel />
       </>)}
     </div>

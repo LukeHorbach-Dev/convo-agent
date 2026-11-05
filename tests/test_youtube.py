@@ -131,7 +131,7 @@ def test_uploading_a_video_as_private(yt):
         if s["done"]:
             break
         time.sleep(0.05)
-    assert s["video_id"] == "newvid" and s["error"] is None and g.uploaded == b"\x00" * 1000
+    assert s["result"] == "newvid" and s["error"] is None and g.uploaded == b"\x00" * 1000
     assert g.meta["snippet"]["title"] == "Derby day" and g.meta["snippet"]["tags"] == ["football"]
     item = c.get(f"/api/hub/content/{cid}", headers=H).json()
     assert item["versions"]["youtube"]["uploaded_id"] == "newvid" and item["post_url"] == "https://youtu.be/newvid"

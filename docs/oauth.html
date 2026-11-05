@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- Convo's sign-in return page. Instagram and TikTok only send people back to an https address, so they come here
+     first, and this page hands the one-time code straight on to Convo on your own Mac (http://127.0.0.1). The code is
+     useless to anyone else: Convo also needs its own secret and a check code that never leave your Mac.
+     Nothing is stored or sent anywhere else. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer"><title>Convo</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0a0b0f;color:#e7e9ee;font:16px/1.5 -apple-system,system-ui,sans-serif}
+div{max-width:420px;padding:32px;text-align:center}a{color:#a78bfa}p{color:#9aa0ad}</style></head>
+<body><div><h1 id="t">Going back to Convo…</h1><p id="m">If nothing happens, make sure Convo is open on your Mac, then press the link below.</p>
+<p><a id="go" href="#">Open Convo</a></p></div>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var state = q.get("state") || "";
+  var m = /^(instagram|tiktok)\.(\d{2,5})\.[A-Za-z0-9_-]+$/.exec(state);
+  if (!m) { document.getElementById("t").textContent = "This link isn't from Convo"; document.getElementById("go").remove(); return; }
+  var keep = new URLSearchParams();
+  ["code", "state", "error", "error_description", "error_reason"].forEach(function (k) { if (q.get(k)) keep.set(k, q.get(k)); });
+  var url = "http://127.0.0.1:" + m[2] + "/oauth/" + m[1] + "?" + keep.toString();
+  document.getElementById("go").href = url;
+  history.replaceState(null, "", location.pathname);
+  location.replace(url);
+})();
+</script></body></html>
