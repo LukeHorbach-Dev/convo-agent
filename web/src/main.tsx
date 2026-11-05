@@ -34,8 +34,8 @@ function Gate({ onOpen }: { onOpen: () => void }) {
   return (
     <div className="app-glow grid min-h-dvh place-items-center px-6">
       <form className="w-full max-w-sm rounded-3xl border border-line bg-surface p-7 shadow-[var(--shadow-pop)]" onSubmit={(e) => { e.preventDefault(); setToken(v); onOpen(); }}>
-        <Logo /><h1 className="mt-4 text-[20px] font-semibold">Open Convo</h1>
-        <p className="mt-1 text-[13.5px] text-muted">Convo opens itself already signed in. If you came here another way, paste the password from data/dashboard-token.</p>
+        <Logo /><h1 className="mt-4 text-[20px] font-semibold">Open Convo again</h1>
+        <p className="mt-1 text-[13.5px] text-muted">This window lost its connection to Convo. Close it and open <b>Convo</b> from Applications: it opens already signed in.</p>
         <Input className="mt-5" type="password" autoFocus value={v} onChange={(e) => setV(e.target.value)} placeholder="Password" aria-label="Password" />
         <Button variant="primary" className="mt-3 w-full" size="lg">Open</Button>
       </form>

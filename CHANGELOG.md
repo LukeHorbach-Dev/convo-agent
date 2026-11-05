@@ -2,6 +2,12 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.0.0-preview.4
+
+- Fixed: Convo's window asking for a password. That happened when an older Convo was still running in the
+  background with a different password. Opening Convo now replaces it by itself.
+- If a window ever loses its connection, it says to open Convo again from Applications.
+
 ## 5.0.0-preview.3
 
 - If Convo can't start, it now repairs itself once (it sets its parts up again; your data isn't touched), and if

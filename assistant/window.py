@@ -57,6 +57,38 @@ def wait_until(port: int, up: bool, timeout_s: float = 40) -> bool:
     return False
 
 
+def token_ok(port: int, token: str) -> bool:
+    """Whether the Convo on this port knows this password (an older one left running may not)."""
+    req = urllib.request.Request(f"http://127.0.0.1:{port}/api/updates", headers={"X-Agent-Token": token})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def stop_listener(port: int) -> list[int]:
+    """Stop whatever Convo is listening on this port when it won't quit when asked (it doesn't know the current
+    password, e.g. one left running from before Convo's folder was deleted). Only called after /api/health said
+    it's Convo. Returns the process ids stopped."""
+    import signal
+    try:
+        out = subprocess.run(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"], capture_output=True, text=True,
+                             timeout=10).stdout
+    except Exception:
+        return []
+    pids = [int(p) for p in out.split() if p.isdigit() and int(p) != os.getpid()]
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        for pid in pids:
+            try:
+                os.kill(pid, sig)
+            except OSError:
+                pass
+        if wait_until(port, up=False, timeout_s=10):
+            break
+    return pids
+
+
 def ask_to_quit(port: int, token: str) -> None:
     req = urllib.request.Request(f"http://127.0.0.1:{port}/api/quit", method="POST", data=b"{}",
                                  headers={"X-Agent-Token": token, "content-type": "application/json"})

@@ -113,16 +113,20 @@ def cmd_app(args) -> int:
     window. On a Mac the window is native and this keeps running until it's closed; Convo itself keeps running
     in the background either way."""
     from .app import load_or_create_token
-    from .window import ask_to_quit, health, native_window, open_window, show_problem, wait_until, window_mode
+    from .window import (ask_to_quit, health, native_window, open_window, show_problem, stop_listener, token_ok, wait_until,
+                         window_mode)
     s = AssistantSettings()
     port = s.dashboard_port
     token = load_or_create_token(s.data_dir)
     logs = Path(os.environ.get("CONVO_LOGS", s.data_dir / "logs"))
     logs.mkdir(parents=True, exist_ok=True)
     running = health(port)
-    if running and running.get("version") != __version__:
+    if running and (running.get("version") != __version__ or not token_ok(port, token)):
+        # An older Convo, or one that doesn't know this password (left running from before): replace it.
         ask_to_quit(port, token)
-        wait_until(port, up=False, timeout_s=20)
+        if not wait_until(port, up=False, timeout_s=20):
+            stopped = stop_listener(port)
+            print(f"An older Convo was still running and didn't quit when asked; stopped it ({stopped}).", file=sys.stderr)
         running = None
     if not running:
         out = open(logs / "convo.log", "ab")
