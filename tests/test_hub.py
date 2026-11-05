@@ -147,7 +147,8 @@ def test_activity_integrations_and_manual_backup(app):
     assert c.get("/api/hub/activity?kind=warn", headers=H).json()["items"][0]["text"] == "something to look at"
     items = {i["id"]: i for i in c.get("/api/hub/integrations", headers=H).json()["items"]}
     assert items["anthropic"]["status"] == "not_configured" and items["instagram_download"]["status"] == "connected"
-    assert items["youtube_api"]["status"] == "planned" and items["youtube_api"]["can"]
+    assert items["youtube_api"]["status"] == "not_configured" and items["youtube_api"]["connectable"] and items["youtube_api"]["can"]
+    assert items["tiktok_api"]["status"] == "planned"
     assert c.post("/api/hub/backups", headers=H).json()["name"].endswith("manual.db")
     assert c.get("/api/hub/overview").status_code == 401                           # every new endpoint needs the token
 

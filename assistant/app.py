@@ -87,6 +87,8 @@ class Assistant:
         self.auto_send = False                    # practice mode only: approve and send as soon as replies are written
         self.on_quit = None
         self.phone = PhoneAccess(settings.dashboard_port, log=self.store.log)
+        from .connect import Connections
+        self.connect = Connections(Path(settings.data_dir) / "integrations", settings.dashboard_port, log=self.store.log)
         home = os.environ.get("CONVO_HOME")
         self.updates = Updates(
             Path(home) if home and practice is None else None,
@@ -158,6 +160,8 @@ class Assistant:
                 from .followups import remind_due
                 remind_due(self.store, self.notify)
                 due_now(self.store, self.notify)
+                if self.practice is None:
+                    self.connect.sync_due(self.store)
             except Exception as e:
                 self.store.log("warn", f"Couldn't check reminders ({e}).")
             try:
@@ -396,7 +400,9 @@ def create_api(a: Assistant, token: str) -> FastAPI:
             return JSONResponse({"detail": "forbidden host"}, status_code=403)
         resp = await call_next(request)
         resp.headers["Content-Security-Policy"] = ("default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                                                   "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; "
+                                                   "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com "
+                                                   "https://*.cdninstagram.com https://*.fbcdn.net https://*.tiktokcdn.com https://*.tiktokcdn-us.com; "
+                                                   "media-src 'self' blob:; "
                                                    "connect-src 'self'")
         resp.headers["X-Frame-Options"] = "DENY"
         resp.headers["Referrer-Policy"] = "no-referrer"
@@ -956,5 +962,7 @@ def create_api(a: Assistant, token: str) -> FastAPI:
     register_hub(api, a, auth)
     register_followups(api, a, auth)
     register_content(api, a, auth, token)
+    from .connect import register as register_connect
+    register_connect(api, a, auth)
     a.phone.app = api
     return api

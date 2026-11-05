@@ -2,4 +2,4 @@
 hellos and replies in Luke's voice, sorts conversations, and only uses the website to send what Luke approved and
 to unfollow."""
 
-__version__ = "5.2.0-preview.1"
+__version__ = "5.3.0-preview.1"

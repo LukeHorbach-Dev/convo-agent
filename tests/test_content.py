@@ -105,7 +105,7 @@ def test_the_strategist_gets_real_numbers_and_only_saves_ideas_when_asked(app):
     from assistant.ask import TOOLS, numbers
     a, c, _, _ = app
     n = numbers(a.store, 30)
-    assert set(n["totals"]) == {"sent_hellos", "sent_replies", "received"} and "views" in n["not_measured_yet"]
+    assert set(n["totals"]) == {"sent_hellos", "sent_replies", "received"} and any("views" in x for x in n["not_measured_yet"]) and n["youtube"] is None
     assert len(n["by_week"]) == 5 and "content" in n and "hello" in n
     assert {t["name"] for t in TOOLS} >= {"numbers", "content_plan", "save_idea"}
     assert all(t["strict"] for t in TOOLS)

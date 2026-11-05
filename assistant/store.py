@@ -172,6 +172,31 @@ CREATE TABLE IF NOT EXISTS content (
 );
 CREATE INDEX IF NOT EXISTS content_when ON content(scheduled_at)
 """),
+    (4, """
+CREATE TABLE IF NOT EXISTS platform_posts (
+    platform      TEXT NOT NULL,
+    account_id    INTEGER,
+    post_id       TEXT NOT NULL,
+    title         TEXT,
+    published_at  TEXT,
+    url           TEXT,
+    thumbnail     TEXT,
+    views         INTEGER,
+    likes         INTEGER,
+    comments      INTEGER,
+    shares        INTEGER,
+    extra         TEXT NOT NULL DEFAULT '{}',
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (platform, post_id)
+);
+CREATE TABLE IF NOT EXISTS platform_daily (
+    platform      TEXT NOT NULL,
+    account_id    INTEGER,
+    date          TEXT NOT NULL,
+    metrics       TEXT NOT NULL DEFAULT '{}',
+    PRIMARY KEY (platform, account_id, date)
+)
+"""),
 ]
 
 

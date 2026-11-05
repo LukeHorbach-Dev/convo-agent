@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { Badge, Button, Card, cx, Dot, ErrorState, Field, IconButton, Input, Note, PageHeader, Select, Skeleton, Textarea, Toggle, useConfirm, useToast } from "../components/ui";
+import { ConnectDrawer } from "../components/Connect";
 import { api, post } from "../lib/api";
 import { ago, money, plural } from "../lib/format";
 import { useAppState, useReadingPrefs } from "../lib/state";
@@ -31,7 +32,8 @@ const STATUS: Record<string, [any, string, string]> = {
 };
 
 export function Integrations() {
-  const { data, isLoading, error, refetch } = useQuery({ queryKey: ["integrations"], queryFn: () => api("/api/hub/integrations") });
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ["integrations"], queryFn: () => api("/api/hub/integrations"), refetchInterval: 10000 });
+  const [setting, setSetting] = useState<string | null>(null);
   if (error) return <ErrorState error={error} retry={refetch} />;
   const items: any[] = data?.items || [];
   return (
@@ -48,12 +50,15 @@ export function Integrations() {
                   <p className="mt-1 text-[13.5px] text-muted">{i.detail}</p></div>
                 <span className={cx("flex shrink-0 items-center gap-1.5 text-[12.5px] font-medium", color)}><Icon className="size-4" />{label}</span>
               </div>
+              {i.connectable && <div className="mt-3"><Button size="sm" variant={i.status === "connected" ? "secondary" : "primary"} onClick={() => setSetting(i.platform)}>
+                {i.status === "connected" ? "Manage" : i.status === "error" ? "Fix it" : "Set up"}</Button></div>}
               {i.can && <div className="mt-4 grid gap-3 sm:grid-cols-2 text-[13px]">
                 <div><div className="mb-1 text-[11.5px] font-semibold uppercase tracking-wide text-good">Allowed</div>{i.can.map((c: string) => <div key={c} className="text-ink-2">• {c}</div>)}</div>
                 <div><div className="mb-1 text-[11.5px] font-semibold uppercase tracking-wide text-faint">Not allowed</div>{i.cannot.map((c: string) => <div key={c} className="text-muted">• {c}</div>)}</div>
               </div>}
             </Card>);
         })}</div>)}
+      <ConnectDrawer pid={setting} open={!!setting} onClose={() => setSetting(null)} />
     </div>
   );
 }

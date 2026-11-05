@@ -2,6 +2,18 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.3.0-preview.1
+
+Stage 4: YouTube.
+
+- **Connect your YouTube channel** (Integrations, YouTube API, Set up): six short steps make your own free Google
+  app, then Connect signs in on Google's own page. Your app details and keys stay on this Mac.
+- **Analytics** now shows YouTube's real numbers: subscribers, views and watch time by day for 28 days, where views
+  came from, and your latest videos with views, likes and comments. Updated every 6 hours (or Update now).
+- **Upload from the Content Studio**: a video post with YouTube chosen gets "Upload to YouTube (private)", with its
+  title, description and tags. You make it public in YouTube Studio when you're happy.
+- The AI Strategist uses your YouTube numbers too.
+
 ## 5.2.0-preview.1
 
 Stage 3: your content, planned and written, and a strategist that works from real numbers.

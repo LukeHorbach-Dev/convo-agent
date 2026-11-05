@@ -172,9 +172,18 @@ def integrations(store: Store, a) -> list[dict]:
             "connected" if check.startswith("Self-check: 6 of 6") else "error" if check else "unknown",
          "detail": check.splitlines()[0] if check else "Run the self-check in Account Settings to confirm Convo can use Instagram.", "stage": 0},
     ]
+    live = {pid: c.status() for pid, c in getattr(getattr(a, "connect", None), "all", {}).items()}
     for p, info in PLATFORMS.items():
-        items.append({"id": f"{p}_api", "name": f"{info['name']} API", "status": "planned", "stage": info["stage"],
-                      "detail": info["official"]["connect"], "can": info["official"]["can"], "cannot": info["official"]["cannot"]})
+        s = live.get(p)
+        status = "planned" if s is None else "error" if s["error"] else "connected" if s["connected"] else "not_configured"
+        detail = info["official"]["connect"]
+        if s and s["connected"]:
+            acct = s.get("account") or {}
+            detail = f"Connected as {acct.get('name') or acct.get('handle') or 'your account'}" + (f", updated {s['last_sync'][:16].replace('T', ' ')}." if s.get("last_sync") else ".")
+        elif s and s["error"]:
+            detail = s["error"]
+        items.append({"id": f"{p}_api", "platform": p, "name": f"{info['name']} API", "status": status, "stage": info["stage"],
+                      "connectable": s is not None, "detail": detail, "can": info["official"]["can"], "cannot": info["official"]["cannot"]})
     return items
 
 

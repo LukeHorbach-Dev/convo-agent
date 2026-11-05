@@ -169,6 +169,7 @@ function Editor({ id }: { id: number }) {
 
         <div className="grid content-start gap-5">
           <Plan c={c} onChange={(x) => setC((old) => old && { ...old, ...x })} />
+          {c.platforms.includes("youtube") && <YouTubeUpload c={c} onDone={() => q.refetch().then((r) => r.data && setC((old) => old && { ...old, versions: r.data!.versions, post_url: r.data!.post_url }))} />}
           <Card title="Preview">
             <PhonePreview c={c} p={tab} />
           </Card>
@@ -298,5 +299,42 @@ function PhonePreview({ c, p }: { c: Content; p: PlatformId }) {
         {v?.hashtags?.length ? <span className="text-sky-300/80">{v.hashtags.map((t) => `#${t}`).join(" ")}</span> : null}
       </div>
     </div>
+  );
+}
+
+function YouTubeUpload({ c, onDone }: { c: Content; onDone: () => void }) {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const yt = useQuery({ queryKey: ["yt"], queryFn: () => api("/api/connect/youtube/overview") });
+  const [state, setState] = useState<{ pct: number | null; error: string | null; done: boolean; video_id: string | null } | null>(null);
+  useEffect(() => {
+    if (!state || state.done) return;
+    const t = setInterval(async () => {
+      const s = await api(`/api/hub/content/${c.id}/publish/youtube`).catch(() => null);
+      if (!s) return;
+      setState(s);
+      if (s.done) { clearInterval(t); if (s.error) toast(s.error, "bad"); else { toast("Uploaded to YouTube as private."); onDone(); } }
+    }, 1500);
+    return () => clearInterval(t);
+  }, [state?.done, c.id]); // eslint-disable-line
+  const uploaded = c.versions.youtube && (c.versions.youtube as any).uploaded_id;
+  const isVideo = c.media_type?.startsWith("video/");
+  const start = async () => {
+    if (!await confirm({ title: "Upload to YouTube?", text: "It goes up as private, with the YouTube title, description and tags from this post. Only you can see it until you make it public in YouTube Studio.", ok: "Upload" })) return;
+    try { setState(await post(`/api/hub/content/${c.id}/publish/youtube`)); } catch (e) { toast((e as Error).message, "bad"); }
+  };
+  return (
+    <Card title="YouTube" icon={Upload}>
+      {uploaded ? (
+        <div className="grid gap-2 text-[13.5px]"><div className="flex items-center gap-2 text-good"><CheckCircle2 className="size-4" />Uploaded as private</div>
+          <a className="text-violet-2 hover:underline" href={`https://studio.youtube.com/video/${uploaded}/edit`} target="_blank" rel="noreferrer">Open it in YouTube Studio to publish</a></div>
+      ) : !yt.data?.channel ? <p className="text-[13px] text-muted">Connect YouTube (Integrations) to upload straight from here.</p>
+        : !isVideo ? <p className="text-[13px] text-muted">Add a video file to upload it.</p>
+        : state && !state.done ? (
+          <div><div className="mb-2 text-[13px] text-ink-2">Uploading… {state.pct ?? 0}%</div>
+            <div className="h-2 rounded-full bg-bg-2"><div className="h-full rounded-full bg-gradient-to-r from-violet to-cyan transition-[width]" style={{ width: `${state.pct ?? 0}%` }} /></div></div>
+        ) : <><Button variant="primary" icon={Upload} onClick={start}>Upload to YouTube (private)</Button>
+            <p className="mt-2 text-[12px] text-faint">Uses about a sixth of YouTube's daily allowance for your app.</p></>}
+    </Card>
   );
 }

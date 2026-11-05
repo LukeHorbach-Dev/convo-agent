@@ -71,11 +71,29 @@ def numbers(st: Store, days: int) -> dict:
     content = ({s: st.scalar("SELECT COUNT(*) FROM content WHERE status = ?", (s,)) or 0
                 for s in ("idea", "draft", "ready", "scheduled", "due", "posted")} if _has_table(st, "content") else {})
     a.pop("availability", None)
+    yt = _youtube_numbers(st) if _has_table(st, "platform_daily") else None
+    missing = ["Instagram and TikTok views, reach and impressions", "likes and comments on Instagram and TikTok posts"]
+    if not yt:
+        missing += ["YouTube views, watch time and subscribers (YouTube isn't connected)"]
     return {"days": days, "totals": totals, "by_week": weeks, **a, "followups": f["counts"], "content": content,
-            "last_download": (st.get("last_import") or {}).get("at"),
-            "not_measured_yet": ["views", "reach", "impressions", "watch time", "likes and comments on posts",
-                                 "where followers came from"],
+            "youtube": yt, "last_download": (st.get("last_import") or {}).get("at"),
+            "not_measured_yet": missing,
             "note": "Messages and followers come from Instagram downloads, so they're as recent as the newest download."}
+
+
+def _youtube_numbers(st: Store) -> dict | None:
+    rows = st.all("SELECT date, metrics FROM platform_daily WHERE platform = 'youtube' ORDER BY date DESC LIMIT 28")
+    acct = st.one("SELECT id, handle FROM accounts WHERE platform = 'youtube' AND connection = 'api'")
+    if not rows and not acct:
+        return None
+    m = [json.loads(r["metrics"]) for r in rows]
+    snap = st.one("SELECT at, followers, posts FROM snapshots WHERE account_id = ? ORDER BY at DESC LIMIT 1", (acct["id"],)) if acct else None
+    return {"channel": acct and acct["handle"], "subscribers": snap and snap["followers"], "as_of": snap and snap["at"],
+            "views_28d": sum(x.get("views", 0) for x in m), "watch_minutes_28d": sum(x.get("estimatedMinutesWatched", 0) for x in m),
+            "subscribers_net_28d": sum(x.get("subscribersGained", 0) - x.get("subscribersLost", 0) for x in m),
+            "traffic_sources": (st.get("youtube_traffic") or {}).get("sources"),
+            "latest_videos": st.all("SELECT title, published_at, views, likes, comments FROM platform_posts WHERE platform = 'youtube' "
+                                    "ORDER BY published_at DESC LIMIT 10")}
 
 
 def _norm(s: str) -> str:
