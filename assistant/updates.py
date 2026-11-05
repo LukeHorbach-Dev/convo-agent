@@ -79,11 +79,12 @@ class Updates:
     def __init__(self, home: Path | None, token: Callable[[], str | None], previews: Callable[[], bool] = lambda: False,
                  repo: str = DEFAULT_REPO, current: str = __version__, http: httpx.Client | None = None,
                  log: Callable[[str, str], None] = lambda kind, text: None, backup: Callable[[str], object] = lambda label: None,
-                 restart: Callable[[Path], None] | None = None, python: str = sys.executable, run=subprocess.run):
+                 restart: Callable[[Path], None] | None = None, python: str = sys.executable, run=subprocess.run,
+                 uv: Callable[[], str | None] = find_uv):
         self.home = Path(home) if home else None
         self.token, self.previews, self.repo, self.current = token, previews, repo, current
         self.http = http or httpx.Client(timeout=httpx.Timeout(20, read=60), follow_redirects=True)
-        self.log, self.backup, self._restart, self.python, self.run = log, backup, restart, python, run
+        self.log, self.backup, self._restart, self.python, self.run, self.find_uv = log, backup, restart, python, run, uv
         self.lock = threading.Lock()
         self.state = {"status": "idle", "latest": None, "error": None, "progress": None, "checked_at": None}
         self._told: set[str] = set()
@@ -261,7 +262,7 @@ class Updates:
         have = self._lock_file().read_text().strip() if self._lock_file().exists() else None
         if have == want:
             return
-        uv = find_uv()
+        uv = self.find_uv()
         if not uv:
             raise UpdateError("Convo couldn't find uv to install the new parts. Download Convo again from GitHub instead.")
         self.state["progress"] = None

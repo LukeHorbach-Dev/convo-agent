@@ -63,7 +63,7 @@ def make(tmp_path, gh, token=None, current="5.0.0-preview.1", ok_start=True, **k
     restarted, backups, logs = [], [], []
     u = Updates(tmp_path / "home", token=lambda: token, current=current, http=httpx.Client(transport=httpx.MockTransport(gh.handler)),
                 log=lambda k, t: logs.append(t), backup=backups.append, restart=restarted.append, python=str(venv / "python"),
-                run=run, **kw)
+                run=run, uv=lambda: "/usr/bin/uv", **kw)
     return u, calls, restarted, backups, logs
 
 
