@@ -2,6 +2,24 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.5.0-preview.1
+
+Stage 6: growth, measured honestly.
+
+- **Weekly Missions** with XP, levels, streaks and badges, filled in by themselves from real activity: real
+  conversations (you both wrote), replying to everyone waiting, posting, planning, saving ideas, checking in with
+  people you'd click with. Add your own too. There are no "send more messages" missions.
+- **Growth Goals**: followers on any account, YouTube views, posts or conversations a week, by a date. Convo says
+  on track or behind only once there's enough to judge.
+- **Organic Independence Score**: from the parts that can really be measured (found by the platform, real
+  conversations, genuine comments, posting consistently), with a suggestion on the launch network. No score until
+  at least two parts are measured.
+- **Launch mode** on the Launch Network: five steps per account, type in an account's numbers to build its
+  history, and plan a shout-out from your main account in one click.
+- **Collaborations**: track ideas with people from idea to done.
+- **Engagement Assistant**: new Instagram and YouTube comments in one list, replies written in your voice for you
+  to check. Instagram replies post only when you press Send; YouTube opens the comment for you.
+
 ## 5.4.0-preview.1
 
 Stage 5: Instagram and TikTok.

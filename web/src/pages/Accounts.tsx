@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AtSign, ExternalLink, FolderKanban, Link2, Pencil, Plus, Rocket, Trash2, Users } from "lucide-react";
+import { AtSign, CheckCircle2, CircleDashed, ExternalLink, FolderKanban, Link2, Pencil, Plus, Rocket, Trash2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Avatar, Badge, Button, Card, Dot, Empty, ErrorState, Field, IconButton, Input, Modal, Note, PageHeader, Planned, Select, Skeleton,
+import { cx,
+  Avatar, Badge, Button, Card, Dot, Empty, ErrorState, Field, IconButton, Input, Modal, Note, PageHeader, Select, Skeleton,
   Textarea, useConfirm, useToast,
 } from "../components/ui";
 import { api, del, patch, post } from "../lib/api";
@@ -143,9 +143,7 @@ export function LaunchNetwork() {
       )}
       <Note tone="neutral">Every supporting account must post its own genuine content. Convo coordinates calendars, cross-promotion and captions, and never fakes likes,
         comments, follows or shares.</Note>
-      <Planned stage={6} title="Launch mode and Organic Independence" what={["A launch period with weekly visibility targets", "Publishing activity across all supporting accounts",
-        "Referral traffic and conversions to your main account", "The Organic Independence Score, and when to rely on them less"]}
-        needs={["Platform connections (stages 4 and 5)", "A tracking link per account"]} />
+      {items.length > 0 && <LaunchMode />}
       <AccountForm open={form.open} account={form.account} role="launch" max={max} onClose={() => setForm({ open: false })} />
     </div>
   );
@@ -189,5 +187,58 @@ export function AccountGroups() {
           </Card>))}</div>
       ) : <Card><Empty icon={Users} title="No groups yet">Groups help when the launch network grows: for example “Football”, “Baking”, “Uni life”.</Empty></Card>}
     </div>
+  );
+}
+
+// ------------------------------------------------------------------------------------------------ Launch mode
+function LaunchMode() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const nav = useNavigate();
+  const { data } = useQuery({ queryKey: ["launch"], queryFn: () => api("/api/hub/launch") });
+  const [typing, setTyping] = useState<any>(null);
+  const shout = async (a: any) => {
+    try { const r = await post(`/api/hub/launch/${a.id}/shoutout`); qc.invalidateQueries({ queryKey: ["launch"] }); toast("Shout-out idea added to your main account."); nav(`/studio/${r.content_id}`); }
+    catch (e) { toast((e as Error).message, "bad"); }
+  };
+  return (
+    <Card title="Launch mode" icon={Rocket} subtitle="Five steps to get each account going, checked from real data">
+      <div className="grid gap-3">{(data?.items || []).map((a: any) => (
+        <div key={a.id} className="rounded-xl border border-line bg-bg-2 p-4">
+          <div className="flex flex-wrap items-center gap-2"><span className="text-[14px] font-semibold">@{a.handle}</span><span className="text-[12.5px] text-muted">{a.platform_name}</span>
+            <span className="ml-auto text-[12.5px] tabular text-muted">{a.done} of {a.of}</span></div>
+          <div className="mt-2 h-1.5 rounded-full bg-bg"><div className="h-full rounded-full bg-gradient-to-r from-violet to-cyan" style={{ width: `${(a.done / a.of) * 100}%` }} /></div>
+          <ul className="mt-3 grid gap-1.5 text-[13px] sm:grid-cols-2">{a.steps.map((s: any) => (
+            <li key={s.id} className={cx("flex items-center gap-2", s.done ? "text-ink-2" : "text-muted")}>
+              {s.done ? <CheckCircle2 className="size-4 shrink-0 text-good" /> : <CircleDashed className="size-4 shrink-0 text-faint" />}{s.title}</li>))}</ul>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => setTyping(a)}>Type its numbers</Button>
+            <Button size="sm" onClick={() => shout(a)}>Plan a shout-out</Button>
+            <Button size="sm" variant="ghost" onClick={() => nav("/studio")}>Plan a post</Button>
+            {a.followers != null && <span className="ml-auto self-center text-[12.5px] text-muted">{a.followers.toLocaleString()} followers{a.as_of ? ` · ${ago(a.as_of)}` : ""}</span>}
+          </div>
+        </div>))}</div>
+      <NumbersForm a={typing} onClose={() => setTyping(null)} />
+    </Card>
+  );
+}
+
+function NumbersForm({ a, onClose }: { a: any; onClose: () => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [f, setF] = useState({ followers: "", following: "", posts: "" });
+  const n = (v: string) => (v.trim() === "" ? null : Number(v));
+  const save = useMutation({ mutationFn: () => post(`/api/hub/accounts/${a.id}/numbers`, { followers: n(f.followers), following: n(f.following), posts: n(f.posts) }),
+    onSuccess: () => { toast("Saved. They're part of its history now."); qc.invalidateQueries(); setF({ followers: "", following: "", posts: "" }); onClose(); },
+    onError: (e) => toast((e as Error).message, "bad") });
+  return (
+    <Modal open={!!a} onClose={onClose} title={a ? `@${a.handle}'s numbers today` : ""}
+      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" loading={save.isPending} disabled={!f.followers && !f.following && !f.posts} onClick={() => save.mutate()}>Save</Button></>}>
+      <p className="mb-3 text-[13px] text-muted">Copy them from the app. Each time you do, the follower history grows (connected accounts do this by themselves).</p>
+      <div className="grid grid-cols-3 gap-3">
+        {(["followers", "following", "posts"] as const).map((k) => <Field key={k} label={k[0].toUpperCase() + k.slice(1)} htmlFor={`n-${k}`}>
+          <Input id={`n-${k}`} type="number" min={0} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></Field>)}
+      </div>
+    </Modal>
   );
 }

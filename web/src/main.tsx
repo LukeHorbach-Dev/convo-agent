@@ -11,7 +11,7 @@ import { AccountGroups, ConnectedAccounts, LaunchNetwork } from "./pages/Account
 import { AutomationHistory, Notifications } from "./pages/Activity";
 import Analytics from "./pages/Analytics";
 import Automations from "./pages/Automations";
-import { Collaborations, EngagementAssistant, GrowthGoals, OrganicIndependence, WeeklyMissions } from "./pages/Coming";
+import { Collaborations, EngagementAssistant, GrowthGoals, OrganicIndependence, WeeklyMissions } from "./pages/Growth";
 import Calendar from "./pages/Calendar";
 import Library from "./pages/Library";
 import Scheduled from "./pages/Scheduled";

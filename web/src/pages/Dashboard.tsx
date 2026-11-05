@@ -46,6 +46,7 @@ const ACTION_ROUTES: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const missions = useQuery({ queryKey: ["missions"], queryFn: () => api("/api/hub/missions") });
   const nav = useNavigate();
   const toast = useToast();
   const qc = useQueryClient();
@@ -151,12 +152,11 @@ export default function Dashboard() {
             </div>
             <p className="mt-3 text-[12.5px] text-muted">{o.replies.writing ? `${o.replies.writing} being written overnight at half price.` : "Replies are written for you after each download."}</p>
           </Card>
-          <Card title="This week" icon={CheckCircle2} subtitle="Missions with XP and streaks arrive in stage 6"
+          <Card title="This week" icon={CheckCircle2} subtitle={missions.data ? `Level ${missions.data.level} · ${missions.data.streak}-week streak · ${missions.data.xp_week} XP` : "Your missions"}
             action={<Button size="sm" variant="ghost" onClick={() => nav("/missions")}>Missions<ArrowRight className="size-3.5" /></Button>}>
-            {(() => { const top = Math.max(k.sent_7d, k.received_7d, o.hello.sent_7d, 1); return <>
-              <WeekBar label="Messages sent" value={k.sent_7d} goal={top} />
-              <WeekBar label="Messages received" value={k.received_7d} goal={top} />
-              <WeekBar label="Hellos sent" value={o.hello.sent_7d} goal={top} /></>; })()}
+            {missions.data ? missions.data.missions.slice(0, 4).map((m: any) => (
+              <WeekBar key={m.key} label={`${m.done ? "✓ " : ""}${m.title}`} value={m.metric === "waiting" ? (m.done ? 1 : 0) : m.value} goal={m.metric === "waiting" ? 1 : m.target} />
+            )) : <Skeleton className="h-24" />}
           </Card>
         </div>
 

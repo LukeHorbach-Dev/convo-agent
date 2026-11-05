@@ -963,6 +963,10 @@ def create_api(a: Assistant, token: str) -> FastAPI:
     register_followups(api, a, auth)
     register_content(api, a, auth, token)
     from .connect import register as register_connect
+    from .engagement import register as register_engagement
+    from .growth import register as register_growth
     register_connect(api, a, auth)
+    register_growth(api, a, auth)
+    register_engagement(api, a, auth)
     a.phone.app = api
     return api

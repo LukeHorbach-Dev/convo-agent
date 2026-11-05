@@ -197,6 +197,65 @@ CREATE TABLE IF NOT EXISTS platform_daily (
     PRIMARY KEY (platform, account_id, date)
 )
 """),
+    (5, """
+CREATE TABLE IF NOT EXISTS missions (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    title         TEXT NOT NULL,
+    metric        TEXT NOT NULL,
+    target        INTEGER NOT NULL,
+    xp            INTEGER NOT NULL DEFAULT 25,
+    active        INTEGER NOT NULL DEFAULT 1,
+    created_at    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mission_weeks (
+    week          TEXT NOT NULL,           -- the Monday, YYYY-MM-DD
+    mission       TEXT NOT NULL,           -- built-in key or custom:<id>
+    title         TEXT NOT NULL,
+    target        INTEGER NOT NULL,
+    value         INTEGER NOT NULL,
+    done          INTEGER NOT NULL,
+    xp            INTEGER NOT NULL,
+    PRIMARY KEY (week, mission)
+);
+CREATE TABLE IF NOT EXISTS goals (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    title         TEXT NOT NULL,
+    metric        TEXT NOT NULL,
+    account_id    INTEGER,
+    target        REAL NOT NULL,
+    start_value   REAL,
+    start_at      TEXT NOT NULL,
+    due           TEXT,
+    done_at       TEXT,
+    created_at    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS collabs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    username      TEXT,
+    platform      TEXT,
+    stage         TEXT NOT NULL DEFAULT 'idea',     -- idea | reached_out | talking | agreed | done | not_now
+    idea          TEXT NOT NULL DEFAULT '',
+    notes         TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS comments (
+    platform      TEXT NOT NULL,
+    comment_id    TEXT NOT NULL,
+    post_id       TEXT,
+    post_title    TEXT,
+    post_url      TEXT,
+    username      TEXT,
+    text          TEXT NOT NULL,
+    at            TEXT,
+    reply_text    TEXT,
+    reply_status  TEXT NOT NULL DEFAULT 'new',      -- new | draft | approved | sent | skipped | failed
+    reply_note    TEXT,
+    replied_at    TEXT,
+    PRIMARY KEY (platform, comment_id)
+)
+"""),
 ]
 
 

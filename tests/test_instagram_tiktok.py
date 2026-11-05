@@ -129,6 +129,7 @@ def test_instagram_connects_syncs_and_publishes_a_reel_only_when_asked(env):
     keys = json.loads((tmp / "integrations" / "instagram.json").read_text())
     assert keys["tokens"]["access_token"] == "long-ig" and keys["tokens"]["expires_at"] > time.time() + 50 * 86400
     out = c.post("/api/connect/instagram/sync", headers=H).json()
+    out.pop("new_comments", None)
     assert out == {"handle": "lukehorbach2", "followers": 812, "posts": 1, "days": 2}
     ov = c.get("/api/connect/instagram/overview", headers=H).json()
     assert ov["followers"] == 812 and ov["recent"][0]["views"] == 1200 and ov["days"][1]["reach"] == 450

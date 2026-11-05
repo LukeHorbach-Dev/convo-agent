@@ -94,6 +94,7 @@ def test_connecting_youtube_and_syncing(yt):
     assert "at-1" in keys.read_text() and oct(keys.stat().st_mode)[-3:] == "600"
     # Sync: channel, videos, 28 days, traffic.
     out = c.post("/api/connect/youtube/sync", headers=H).json()
+    out.pop("new_comments", None)
     assert out == {"channel": "Luke Horbach", "handle": "lukehorbach", "subscribers": 1234, "videos": 2, "days": 2}
     ov = c.get("/api/connect/youtube/overview", headers=H).json()
     assert ov["subscribers"] == 1234 and ov["views_total"] == 56789 and [v["title"] for v in ov["recent"]] == ["Derby day", "Exchange week"]

@@ -253,6 +253,8 @@ class PracticeLLM:
     def complete_json(self, system, user, schema) -> dict:
         self.calls += 1
         props = schema.get("properties", {})
+        if set(props) == {"reply", "skip", "why"}:                               # a reply to a comment
+            return {"reply": "thank you, means a lot :)", "skip": False, "why": ""}
         if props and set(props) <= {"instagram", "tiktok", "youtube"}:          # captions for a post
             out = {}
             for p in props:

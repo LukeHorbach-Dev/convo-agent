@@ -51,6 +51,12 @@ class Connections:
             except ConnectError as e:
                 c.vault.update(error=str(e))
                 raise
+            if pid in ("instagram", "youtube"):
+                from ..engagement import fetch_instagram, fetch_youtube
+                try:
+                    out["new_comments"] = (fetch_instagram if pid == "instagram" else fetch_youtube)(c, st)
+                except ConnectError:
+                    pass
         n = out.get("subscribers") if out.get("subscribers") is not None else out.get("followers")
         st.log("good", f"{c.p.name} updated" + (f": {n:,} {'subscribers' if pid == 'youtube' else 'followers'}." if n is not None else "."))
         return out
