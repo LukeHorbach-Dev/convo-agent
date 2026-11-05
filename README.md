@@ -1,4 +1,4 @@
-# Convo, your personal brand command centre (version 5 preview)
+# Convo, your personal brand command centre (version 5)
 
 Convo is a Mac app. It reads **Instagram's own data download** to know exactly who you follow, who follows you and
 every conversation. Claude writes hellos and replies in your voice, sorts people into "you'd click", "worth a

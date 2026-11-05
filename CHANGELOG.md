@@ -2,6 +2,19 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.0.0
+
+Convo 5, checked on your Mac.
+
+- **The Command Centre** is your home screen: followers, conversations, hellos and what to do next, from your
+  real Instagram data. The classic screens are one click away (bottom of the sidebar).
+- **Always clear what's running**: the top bar says what Convo is doing, and Stop now changes straight away to
+  "Stopped by you" with Start again.
+- **Updates from GitHub**: Convo tells you when there's a new version. Click Update now; it backs up your data
+  and restarts by itself, and "Go back" undoes it.
+- **One-line install**, a **new logo**, its **own Mac window**, and it **repairs itself** if it can't start.
+- Your 1,886 hellos are exactly as they were. Nothing is sent without your approval.
+
 ## 5.0.0-preview.5
 
 - **Always clear whether anything is running.** The top bar shows what Convo is doing right now: "Nothing
