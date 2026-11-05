@@ -75,7 +75,7 @@ export default function Calendar() {
                 return (
                   <div key={key(d)} onDragOver={(e) => e.preventDefault()} onDrop={onDrop(d)}
                     className={cx("min-h-[96px] border-b border-r border-line p-1.5 transition-colors", view === "week" && "md:min-h-[360px]", other && "bg-bg-2/40")}>
-                    <div className={cx("mb-1 flex items-center gap-1.5 px-1 text-[12px]", key(d) === today ? "font-semibold text-violet-2" : other ? "text-faint/60" : "text-muted")}>
+                    <div className={cx("mb-1 flex items-center gap-1.5 px-1 text-[12px]", key(d) === today ? "font-semibold text-violet-2" : other ? "text-faint" : "text-muted")}>
                       {key(d) === today ? <span className="grid size-5 place-items-center rounded-full bg-violet text-[11px] text-white">{d.getDate()}</span> : d.getDate()}
                       {view === "week" && <span className="md:hidden">{d.toLocaleDateString(undefined, { weekday: "long" })}</span>}
                     </div>
@@ -103,7 +103,7 @@ function Chip({ c, compact }: { c: Content; compact?: boolean }) {
     <button draggable={draggable} onDragStart={(e) => e.dataTransfer.setData("text/convo-post", JSON.stringify({ id: c.id, at: c.scheduled_at }))}
       onClick={() => nav(`/studio/${c.id}`)} title={`${c.title || "Untitled"} · ${at ? new Date(at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) + " · " : ""}${STATUS[c.status].label}`}
       className={cx("flex w-full items-center gap-1.5 rounded-lg border border-line bg-raised px-1.5 py-1 text-left text-[12px] hover:border-line-2", draggable && "cursor-grab active:cursor-grabbing",
-        c.status === "posted" && "opacity-60", c.status === "due" && "border-warn/50")}>
+        c.status === "posted" && "opacity-80", c.status === "due" && "border-warn/50")}>
       <span className="h-3.5 w-1 shrink-0 rounded-full" style={{ background: color }} />
       {at && !compact && <span className="shrink-0 tabular text-faint">{new Date(at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</span>}
       <span className="min-w-0 truncate text-ink-2">{c.title || "Untitled"}</span>

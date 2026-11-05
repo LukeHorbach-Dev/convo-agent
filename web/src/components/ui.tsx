@@ -10,7 +10,7 @@ export const cx = clsx;
 // ------------------------------------------------------------------------------------------------ buttons
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "danger-soft" | "cyan";
 const variants: Record<Variant, string> = {
-  primary: "bg-violet text-white hover:bg-violet-2 shadow-[0_6px_20px_-8px_rgb(139_92_246/0.7)]",
+  primary: "bg-[#7444e0] text-white hover:bg-violet shadow-[0_6px_20px_-8px_rgb(139_92_246/0.7)]",
   secondary: "bg-raised text-ink border border-line-2 hover:bg-hover hover:border-faint/60",
   ghost: "text-ink-2 hover:bg-hover hover:text-ink",
   danger: "bg-[#dc3d3d] text-white hover:bg-[#e64a4a] shadow-[0_6px_20px_-8px_rgb(220_61_61/0.7)]",

@@ -14,7 +14,7 @@
   --color-ink: #eceef3;
   --color-ink-2: #c3c8d2;
   --color-muted: #8e95a3;
-  --color-faint: #5f6675;
+  --color-faint: #858c9b;     /* readable on every surface (WCAG AA) */
   --color-violet: #8b5cf6;
   --color-violet-2: #a78bfa;
   --color-violet-soft: rgb(139 92 246 / 0.14);

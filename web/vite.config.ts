@@ -6,6 +6,9 @@ import tailwindcss from "@tailwindcss/vite";
 // running Convo on port 8765.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  build: { outDir: "../assistant/web/dist", emptyOutDir: true, chunkSizeWarningLimit: 1200 },
+  build: {
+    outDir: "../assistant/web/dist", emptyOutDir: true, chunkSizeWarningLimit: 600,
+    rollupOptions: { output: { manualChunks: { react: ["react", "react-dom", "react-router-dom", "@tanstack/react-query"], charts: ["recharts"] } } },
+  },
   server: { proxy: { "/api": "http://127.0.0.1:8765", "/classic": "http://127.0.0.1:8765" } },
 });

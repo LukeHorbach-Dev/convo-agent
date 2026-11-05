@@ -104,11 +104,11 @@ export function AIPreferences() {
       <PageHeader title="AI Preferences" subtitle="Which models write for you, what they cost, and what the AI knows about you." />
       <Card title="Writing" icon={Brain}>
         <Row title="Who writes your replies" hint={`About ${money(est.overnight)} a reply overnight, ${money(est.now)} straight away`}>
-          <Select value={s.writer_model} onChange={(e) => save.mutate({ writer_model: e.target.value })}>{WRITERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></Row>
+          <Select aria-label="Writer model" value={s.writer_model} onChange={(e) => save.mutate({ writer_model: e.target.value })}>{WRITERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></Row>
         <Row title="Write overnight at half price" hint="Usually ready within the hour, always by tomorrow">
           <Toggle checked={!!s.write_overnight} onChange={(v) => save.mutate({ write_overnight: v })} label="Write overnight" /></Row>
         <Row title="How Claude uses Instagram" hint="It looks at the page and clicks; the app types only what you approved">
-          <Select value={s.eyes_model} onChange={(e) => save.mutate({ eyes_model: e.target.value })}>
+          <Select aria-label="Model that uses Instagram" value={s.eyes_model} onChange={(e) => save.mutate({ eyes_model: e.target.value })}>
             <option value="claude-haiku-5-5">Haiku: about 1¢ a message (recommended)</option><option value="claude-sonnet-5-5">Sonnet: steadier on odd pages, about 15¢</option></Select></Row>
         <Row title="Daily AI limit" hint="Writing and sending pause for the day once this much is spent">
           <BudgetInput value={s.daily_ai_budget_usd} onSave={(v) => save.mutate({ daily_ai_budget_usd: v })} /></Row>
@@ -187,12 +187,12 @@ export function AccountSettings() {
         daily_messages: Number(pace.daily_messages), message_gap_s: Number(pace.message_gap_s), daily_unfollows: Number(pace.daily_unfollows),
         unfollow_gap_s: Number(pace.unfollow_gap_s), reply_window_days: Number(pace.reply_window_days), send_at: pace.send_at || "", quiet_from: pace.quiet_from || "", quiet_to: pace.quiet_to || "" })}>Save</Button>}>
         <Note tone="neutral" className="mb-4">Instagram doesn't publish a safe number of messages. These are your own limits; Convo also stops by itself whenever Instagram warns it.</Note>
-        <Row title="Messages a day" hint="The rest go tomorrow by themselves"><Input type="number" min={0} max={300} value={pace.daily_messages} onChange={set("daily_messages")} /></Row>
-        <Row title="Seconds between messages"><Input type="number" min={0} max={600} value={pace.message_gap_s} onChange={set("message_gap_s")} /></Row>
-        <Row title="Unfollows a day"><Input type="number" min={0} max={300} value={pace.daily_unfollows} onChange={set("daily_unfollows")} /></Row>
-        <Row title="Seconds between unfollows"><Input type="number" min={0} max={600} value={pace.unfollow_gap_s} onChange={set("unfollow_gap_s")} /></Row>
-        <Row title="Reply to chats from the last" hint="Days"><Input type="number" min={1} value={pace.reply_window_days} onChange={set("reply_window_days")} /></Row>
-        <Row title="Send by itself at" hint="Leave empty for off"><Input type="time" value={pace.send_at || ""} onChange={set("send_at")} /></Row>
+        <Row title="Messages a day" hint="The rest go tomorrow by themselves"><Input aria-label="Messages a day" type="number" min={0} max={300} value={pace.daily_messages} onChange={set("daily_messages")} /></Row>
+        <Row title="Seconds between messages"><Input aria-label="Seconds between messages" type="number" min={0} max={600} value={pace.message_gap_s} onChange={set("message_gap_s")} /></Row>
+        <Row title="Unfollows a day"><Input aria-label="Unfollows a day" type="number" min={0} max={300} value={pace.daily_unfollows} onChange={set("daily_unfollows")} /></Row>
+        <Row title="Seconds between unfollows"><Input aria-label="Seconds between unfollows" type="number" min={0} max={600} value={pace.unfollow_gap_s} onChange={set("unfollow_gap_s")} /></Row>
+        <Row title="Reply to chats from the last" hint="Days"><Input aria-label="Reply to chats from the last" type="number" min={1} value={pace.reply_window_days} onChange={set("reply_window_days")} /></Row>
+        <Row title="Send by itself at" hint="Leave empty for off"><Input aria-label="Send by itself at" type="time" value={pace.send_at || ""} onChange={set("send_at")} /></Row>
         <Row title="Quiet hours" hint="Nothing is sent between these times"><div className="flex items-center gap-2"><Input type="time" value={pace.quiet_from || ""} onChange={set("quiet_from")} aria-label="From" />
           <span className="text-faint">to</span><Input type="time" value={pace.quiet_to || ""} onChange={set("quiet_to")} aria-label="To" /></div></Row>
       </Card>

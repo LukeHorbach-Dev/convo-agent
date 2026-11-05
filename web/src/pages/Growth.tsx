@@ -43,9 +43,9 @@ export function WeeklyMissions() {
         <Card title="This week's missions" icon={Target}>
           <div className="grid gap-3">{m.missions.map((x: any) => (
             <div key={x.key} className={cx("rounded-xl border px-4 py-3", x.done ? "border-good/30 bg-good-soft/40" : "border-line bg-bg-2")}>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {x.done ? <CheckCircle2 className="size-5 shrink-0 text-good" /> : <Target className="size-5 shrink-0 text-faint" />}
-                <span className="grow text-[14px] font-medium">{x.title}</span>
+                <span className="min-w-0 grow basis-[60%] text-[14px] font-medium">{x.title}</span>
                 <span className="text-[12.5px] tabular text-muted">{x.metric === "waiting" ? `${x.value} waiting` : `${x.value} / ${x.target}`}</span>
                 <Badge tone={x.done ? "good" : "neutral"}>+{x.xp} XP</Badge>
                 {x.custom && <button aria-label="Remove mission" className="text-faint hover:text-bad" onClick={async () => { await del(`/api/hub/missions/${x.key.split(":")[1]}`); qc.invalidateQueries({ queryKey: ["missions"] }); toast("Removed."); }}><Trash2 className="size-4" /></button>}
@@ -57,7 +57,7 @@ export function WeeklyMissions() {
         <div className="grid gap-5 lg:grid-cols-2">
           <Card title="Badges" icon={Award}>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{m.badges.map((b: any) => (
-              <div key={b.id} className={cx("rounded-xl border p-3 text-center", b.earned ? "border-violet/40 bg-violet-soft" : "border-line bg-bg-2 opacity-60")} title={b.how}>
+              <div key={b.id} className={cx("rounded-xl border p-3 text-center", b.earned ? "border-violet/40 bg-violet-soft" : "border-line bg-bg-2")} title={b.how}>
                 <Award className={cx("mx-auto size-6", b.earned ? "text-violet-2" : "text-faint")} />
                 <div className="mt-1.5 text-[13px] font-medium">{b.name}</div><div className="text-[11.5px] text-muted">{b.earned ? "Earned" : b.how}</div></div>))}</div>
           </Card>
@@ -225,7 +225,7 @@ export function Collaborations() {
         {people.isLoading ? <Skeleton className="h-40" /> : people.data?.items.length ? (
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{people.data.items.map((p: any) => (
             <div key={p.username} className="flex items-start gap-3 rounded-xl border border-line bg-bg-2 px-3 py-2.5">
-              <button onClick={() => setPerson(p.username)}><Avatar name={p.display_name || p.username} size={34} /></button>
+              <button onClick={() => setPerson(p.username)} aria-label={`About @${p.username}`}><Avatar name={p.display_name || p.username} size={34} /></button>
               <button onClick={() => setPerson(p.username)} className="min-w-0 grow text-left"><span className="block truncate text-[13.5px] font-medium">@{p.username}</span>
                 <span className="line-clamp-2 text-[12px] text-muted">{p.interest_why || p.summary}</span></button>
               {tracked.has(p.username) ? <Badge tone="good">Tracked</Badge> : <Button size="sm" variant="ghost" icon={Plus} aria-label={`Add @${p.username}`} onClick={() => setAdding({ name: p.display_name || p.username, username: p.username })} />}

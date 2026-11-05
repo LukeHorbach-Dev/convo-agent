@@ -258,3 +258,31 @@ def test_a_post_from_idea_to_posted(running, tmp_path):
         page.wait_for_selector("main >> text=Lemon cake")
         b.close()
     assert errors == []
+
+
+AXE = Path(__file__).parent.parent / "web" / "node_modules" / "axe-core" / "axe.min.js"
+
+
+@pytest.mark.skipif(not AXE.exists(), reason="axe-core isn't installed (cd web && npm ci)")
+def test_every_page_passes_the_accessibility_check(running):
+    """No serious or critical problems (contrast, labels, names for buttons) on any page, checked with axe."""
+    from playwright.sync_api import sync_playwright
+    a, url = running
+    a.store.set("whats_new_seen", __version__)
+    axe = AXE.read_text()
+    problems = []
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        page = b.new_page(viewport={"width": 1440, "height": 900})
+        page.goto(url + "/#token=tok")
+        page.wait_for_selector("h1")
+        for r in ROUTES:
+            page.goto(f"{url}/#/{r}")
+            page.wait_for_selector("main h1", timeout=8000)
+            page.wait_for_timeout(300)
+            page.add_script_tag(content=axe)
+            found = page.evaluate("""async () => (await axe.run(document, {resultTypes: ['violations']})).violations
+                .filter(v => ['serious', 'critical'].includes(v.impact)).map(v => v.id + ' x' + v.nodes.length)""")
+            problems += [f"/{r}: {f}" for f in found]
+        b.close()
+    assert problems == []

@@ -1,5 +1,28 @@
 # Architecture
 
+## Convo 5 (the `assistant` package)
+
+The Mac app runs `assistant` (FastAPI on 127.0.0.1:8765) with the Command Centre (React, `web/` built into
+`assistant/web/dist`). Modules:
+
+| Module | What it does |
+|---|---|
+| `app.py` | The API, settings, the sender and background loop (overnight writing, reminders, due posts, platform syncs) |
+| `store.py` | SQLite with numbered migrations; a full backup before any migration runs on a real database |
+| `hub.py` | Dashboard, conversations, accounts, groups, analytics, automations |
+| `followups.py` | Waiting on you, hellos with no reply, your reminders (never people Convo mustn't contact) |
+| `content.py` | Posts, files in `data/library/`, signed media links, captions, schedule, due notifications |
+| `connect/` | OAuth (PKCE, one-time state) with Luke's own apps; YouTube, Instagram and TikTok; keys in `data/integrations/` (0600) |
+| `growth.py` | Missions, goals, the Organic Independence Score, launch mode, collaborations |
+| `engagement.py` | Comments and replies (sent only on Send) |
+| `phone.py` | Optional listener on the Tailscale address |
+| `updates.py` | Updates from GitHub releases with checksums, test start, backup, switch and undo |
+| `ask.py` | Ask and the AI Strategist (tools; code-level safety on anything that sends) |
+
+The older `agent` engine below still provides the browser, profile and LLM pieces Convo builds on.
+
+## The original engine (`agent`)
+
 A modular monolith: one process, one SQLite database, one worker thread for platform work, one watchdog thread,
 and a FastAPI dashboard. Nothing in the business logic imports Playwright or an LLM SDK; those sit behind
 interfaces and are injected in `agent/app.py`.

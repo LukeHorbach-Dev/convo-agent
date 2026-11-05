@@ -77,7 +77,7 @@ export default function Phone() {
 
           <Card title="Set up once (about 5 minutes)" icon={Wifi}>
             <ol className="grid gap-3 text-[13.5px] text-ink-2">
-              <Step n={1}>On this Mac, install <b>Tailscale</b> from the Mac App Store and sign in (Google, Apple or Microsoft is fine). <a className="inline-flex items-center gap-1 text-violet-2 hover:underline" href="https://apps.apple.com/app/tailscale/id1475387142" target="_blank" rel="noreferrer">Open the App Store page<ExternalLink className="size-3" /></a></Step>
+              <Step n={1}>On this Mac, install <b>Tailscale</b> from the Mac App Store and sign in (Google, Apple or Microsoft is fine). <a className="inline-flex items-center gap-1 text-violet-2 underline underline-offset-2" href="https://apps.apple.com/app/tailscale/id1475387142" target="_blank" rel="noreferrer">Open the App Store page<ExternalLink className="size-3" /></a></Step>
               <Step n={2}>On your phone, install <b>Tailscale</b> from the App Store, sign in with the <b>same account</b> and switch it on.</Step>
               <Step n={3}>Turn on <b>Phone access</b> here. If your Mac asks whether Python may accept incoming connections, choose <b>Allow</b>.</Step>
               <Step n={4}>Scan the code with your phone's camera. Convo opens, already signed in.</Step>

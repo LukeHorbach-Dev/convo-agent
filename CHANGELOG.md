@@ -2,6 +2,18 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.6.0-preview.1
+
+Stages 7 and 8: tested and polished.
+
+- **Easier to read**: faint text and the main buttons now meet the accessibility contrast standard everywhere, and
+  every page passes an automatic accessibility check (labels, button names, links) that now runs with the tests.
+- **Opens faster**: each page loads when you first open it.
+- **Phone**: missions and other rows wrap neatly on small screens.
+- **Safety**: a new test checks that every part of Convo needs its password (and that no other web address is
+  answered).
+- Updated guides: what's in Convo 5, and how it's built.
+
 ## 5.5.0-preview.1
 
 Stage 6: growth, measured honestly.

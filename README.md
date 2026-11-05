@@ -50,6 +50,15 @@ Versions with a dash (`5.1.0-preview.1`) are previews.
 | **Practice** | Settings, Practice: a pretend Instagram with made-up people to try everything, including an **automatic** switch that approves and sends by itself. Only practice has that switch. |
 | **Spreadsheet** | People, Spreadsheet: everyone with summaries, interest, concerns, notes. |
 | **Self-check** | Settings: Claude tries every Instagram step on your account without sending anything (about 5¢). |
+| **Review hellos and replies** | Search, filter, edit, approve or skip, one by one or many at once, with Undo. "Approve all ready" asks first. |
+| **Follow-ups** | Who's waiting on you, hellos with no answer, and reminders you set, with a Mac notification on the day. |
+| **Phone access** | Convo on your phone at home or away through Tailscale (a private network between your own devices). |
+| **Content Studio** | Ideas, videos and photos with captions for each platform written from your notes; Library, Calendar and Scheduled Posts. |
+| **YouTube, Instagram, TikTok** | Your own developer apps; real numbers in Analytics; upload to YouTube as private, Reels to Instagram, drafts to TikTok. |
+| **AI Strategist** | Answers from your real numbers and never makes one up. |
+| **Missions and goals** | Weekly missions with XP and streaks from genuine activity, goals judged honestly, the Organic Independence Score. |
+| **Launch network** | Up to 10 supporting accounts with a launch checklist, typed-in numbers and one-click shout-out ideas. |
+| **Engagement** | Instagram and YouTube comments with replies in your voice; nothing posts until you press Send. |
 
 ## How sending works (and why it's reliable)
 

@@ -1,6 +1,6 @@
 [project]
 name = "convo-agent"
-version = "5.5.0-preview.1"
+version = "5.6.0-preview.1"
 description = "Local personal conversation agent with a human-approval gate for real-platform messaging"
 requires-python = ">=3.12"
 dependencies = [

@@ -1,32 +1,44 @@
 import "./index.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { StrictMode, useEffect, useState } from "react";
+import { lazy, StrictMode, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter, Route, Routes } from "react-router-dom";
 import { Logo, Shell } from "./components/Shell";
 import { Button, Input, Providers } from "./components/ui";
 import { ApiError, captureToken, onConnection, setToken, token } from "./lib/api";
 import { AccountProvider, useAppState, useReadingPrefs } from "./lib/state";
-import { AccountGroups, ConnectedAccounts, LaunchNetwork } from "./pages/Accounts";
-import { AutomationHistory, Notifications } from "./pages/Activity";
-import Analytics from "./pages/Analytics";
-import Automations from "./pages/Automations";
-import { Collaborations, EngagementAssistant, GrowthGoals, OrganicIndependence, WeeklyMissions } from "./pages/Growth";
-import Calendar from "./pages/Calendar";
-import Library from "./pages/Library";
-import Scheduled from "./pages/Scheduled";
-import Studio from "./pages/Studio";
-import Contacts from "./pages/Contacts";
-import Conversations from "./pages/Conversations";
 import Dashboard from "./pages/Dashboard";
-import Hello from "./pages/Hello";
-import Phone from "./pages/Phone";
-import Followups from "./pages/Followups";
-import Reports from "./pages/Reports";
-import Review from "./pages/Review";
-import { AccountSettings, AIPreferences, ApiConnections, Integrations } from "./pages/Settings";
-import Strategist from "./pages/Strategist";
-import Updates from "./pages/Updates";
+
+// Pages load when first opened, so Convo starts quickly (the Dashboard is part of the first load).
+const Analytics = lazy(() => import("./pages/Analytics"));
+const Automations = lazy(() => import("./pages/Automations"));
+const Calendar = lazy(() => import("./pages/Calendar"));
+const Library = lazy(() => import("./pages/Library"));
+const Scheduled = lazy(() => import("./pages/Scheduled"));
+const Studio = lazy(() => import("./pages/Studio"));
+const Contacts = lazy(() => import("./pages/Contacts"));
+const Conversations = lazy(() => import("./pages/Conversations"));
+const Hello = lazy(() => import("./pages/Hello"));
+const Phone = lazy(() => import("./pages/Phone"));
+const Followups = lazy(() => import("./pages/Followups"));
+const Reports = lazy(() => import("./pages/Reports"));
+const Review = lazy(() => import("./pages/Review"));
+const Strategist = lazy(() => import("./pages/Strategist"));
+const Updates = lazy(() => import("./pages/Updates"));
+const AccountGroups = lazy(() => import("./pages/Accounts").then((m) => ({ default: m.AccountGroups })));
+const ConnectedAccounts = lazy(() => import("./pages/Accounts").then((m) => ({ default: m.ConnectedAccounts })));
+const LaunchNetwork = lazy(() => import("./pages/Accounts").then((m) => ({ default: m.LaunchNetwork })));
+const AutomationHistory = lazy(() => import("./pages/Activity").then((m) => ({ default: m.AutomationHistory })));
+const Notifications = lazy(() => import("./pages/Activity").then((m) => ({ default: m.Notifications })));
+const Collaborations = lazy(() => import("./pages/Growth").then((m) => ({ default: m.Collaborations })));
+const EngagementAssistant = lazy(() => import("./pages/Growth").then((m) => ({ default: m.EngagementAssistant })));
+const GrowthGoals = lazy(() => import("./pages/Growth").then((m) => ({ default: m.GrowthGoals })));
+const OrganicIndependence = lazy(() => import("./pages/Growth").then((m) => ({ default: m.OrganicIndependence })));
+const WeeklyMissions = lazy(() => import("./pages/Growth").then((m) => ({ default: m.WeeklyMissions })));
+const AccountSettings = lazy(() => import("./pages/Settings").then((m) => ({ default: m.AccountSettings })));
+const AIPreferences = lazy(() => import("./pages/Settings").then((m) => ({ default: m.AIPreferences })));
+const ApiConnections = lazy(() => import("./pages/Settings").then((m) => ({ default: m.ApiConnections })));
+const Integrations = lazy(() => import("./pages/Settings").then((m) => ({ default: m.Integrations })));
 
 captureToken();
 
@@ -56,6 +68,7 @@ function App() {
   if (!token() || (st.error instanceof ApiError && st.error.status === 401)) return <Gate onOpen={() => { qc.invalidateQueries(); bump((n) => n + 1); }} />;
   return (
     <Shell>
+      <Suspense fallback={<div className="grid gap-4"><div className="skeleton h-10 w-64 rounded-xl" /><div className="skeleton h-72 rounded-2xl" /></div>}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/strategist" element={<Strategist />} />
@@ -91,6 +104,7 @@ function App() {
         <Route path="/phone" element={<Phone />} />
         <Route path="*" element={<Dashboard />} />
       </Routes>
+      </Suspense>
     </Shell>
   );
 }

@@ -40,7 +40,7 @@ export default function Strategist() {
             <div key={i} className={cx("max-w-[80%] rounded-2xl px-4 py-3 text-[14.5px] leading-relaxed whitespace-pre-wrap",
               x.who === "you" ? "self-end rounded-br-md bg-violet text-white" : "self-start rounded-bl-md border border-line bg-raised text-ink-2")}>
               {x.pending ? <span className="flex gap-1">{[0, 1, 2].map((d) => <span key={d} className="size-2 animate-bounce rounded-full bg-faint" style={{ animationDelay: `${d * 0.15}s` }} />)}</span> : x.text}
-              {x.meta && <div className="mt-1.5 text-[11.5px] opacity-60">{x.meta}</div>}
+              {x.meta && <div className="mt-1.5 text-[11.5px] opacity-80">{x.meta}</div>}
             </div>
           )) : (
             <div className="m-auto max-w-lg text-center">
