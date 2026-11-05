@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowUpCircle, Bell, ChevronDown, ChevronsLeft, ChevronsRight, Download, FlaskConical, LayoutTemplate, Menu, PenLine, Plus, Send, Sparkles, Square, X,
+  ArrowUpCircle, Bell, ChevronDown, ChevronsLeft, ChevronsRight, Download, FlaskConical, LayoutTemplate, Menu, PenLine, Plus, Send, Sparkles, X,
 } from "lucide-react";
 import { Component, ErrorInfo, ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ import { ago, money } from "../lib/format";
 import { MOBILE_TABS, NAV, titleFor } from "../lib/nav";
 import { prefs, useAccount, useAppState } from "../lib/state";
 import { Notes, useUpdates } from "../pages/Updates";
+import { describeRun, RunBar, RunControl } from "./RunControl";
 import { Avatar, Button, cx, Dot, IconButton, Modal, useConfirm, useToast } from "./ui";
 
 // ------------------------------------------------------------------------------------------------ the logo
@@ -74,19 +75,11 @@ function SideNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
 }
 
 function StatusPill({ collapsed }: { collapsed: boolean }) {
-  const st = useAppState().data;
-  let tone: "good" | "warn" | "bad" | "neutral" = "neutral", line = "Ready";
-  if (st) {
-    if (st.sender.active) { tone = "good"; line = st.sender.status; }
-    else if (st.job.name) { tone = "good"; line = st.job.name[0].toUpperCase() + st.job.name.slice(1) + "…"; }
-    else if (st.sender.stopped) { tone = "bad"; line = "Stopped by you"; }
-    else if (st.sender.status.startsWith("Stopped")) { tone = "bad"; line = "Stopped: needs you"; }
-    else if (st.sender.waiting_until || st.sender.quiet_until) { tone = "warn"; line = st.sender.status; }
-    else if (st.overnight) { tone = "good"; line = `Writing ${st.overnight.count} replies overnight`; }
-  }
+  const run = describeRun(useAppState().data);
+  const tone = ({ running: "good", stopped: "bad", waiting: "warn", idle: "neutral" } as const)[run.kind];
   return (
-    <div role="status" title={line} className={cx("flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-[12.5px] text-ink-2", collapsed && "justify-center px-0")}>
-      <Dot tone={tone} pulse={tone === "good"} />{!collapsed && <span className="truncate">{line}</span>}
+    <div role="status" title={run.headline} className={cx("flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-[12.5px] text-ink-2", collapsed && "justify-center px-0")}>
+      <Dot tone={tone} pulse={run.kind === "running"} />{!collapsed && <span className="truncate">{run.headline}</span>}
     </div>
   );
 }
@@ -195,15 +188,6 @@ function QuickActions({ onAsk }: { onAsk: () => void }) {
   );
 }
 
-function StopNow() {
-  const toast = useToast();
-  const qc = useQueryClient();
-  const m = useMutation({ mutationFn: () => post("/api/stop"), onSuccess: () => { toast("Stopped. Nothing else goes until you press Send."); qc.invalidateQueries(); },
-                          onError: (e) => toast((e as Error).message, "bad") });
-  return <Button variant="danger" icon={Square} loading={m.isPending} onClick={() => m.mutate()} title="Stop all sending and writing straight away"
-    className="max-sm:px-2.5"><span className="max-sm:hidden">Stop now</span></Button>;
-}
-
 // ------------------------------------------------------------------------------------------------ Ask (⌘K)
 export function AskPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [q, setQ] = useState("");
@@ -295,8 +279,9 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="max-sm:hidden"><AccountSwitcher /></div>
           <Notifications />
           <QuickActions onAsk={() => setAsk(true)} />
-          <StopNow />
+          <RunControl />
         </header>
+        <RunBar />
         <UpdateBanner />
         <main className="mx-auto w-full max-w-[1320px] px-4 pt-6 pb-28 lg:px-8 lg:pb-12" key={loc.pathname}>
           <div className="animate-rise"><PageBoundary>{children}</PageBoundary></div>

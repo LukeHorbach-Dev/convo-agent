@@ -6,6 +6,7 @@ import { api, post } from "../lib/api";
 import { num, pct, plural } from "../lib/format";
 import { useAppState } from "../lib/state";
 import { Stat } from "./Dashboard";
+import { useRunActions } from "../components/RunControl";
 
 export default function Hello() {
   const toast = useToast();
@@ -17,8 +18,10 @@ export default function Hello() {
     onSuccess: (_, v) => { toast(v.path.includes("pause") ? "Paused." : v.path.includes("stop") ? "Stopped." : v.body?.just_one ? "Sending one. Check it in Instagram." : "Sending what you approved."); qc.invalidateQueries(); },
     onError: (e) => toast((e as Error).message, "bad"),
   });
+  const { stop } = useRunActions();
   if (error) return <ErrorState error={error} retry={refetch} />;
-  const sending = h?.sender.active;
+  const sending = st ? st.sender.active : h?.sender.active;          // the live state, so buttons change at once
+  const stopped = st ? st.sender.stopped && !st.sender.active : h?.sender.stopped;
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Hello Message"
@@ -28,7 +31,8 @@ export default function Hello() {
             : <><Button icon={Play} disabled={!st?.counts.approved} onClick={() => m.mutate({ path: "/api/send/start", body: { just_one: true } })}>Send just one</Button>
                 <Button variant="primary" icon={Send} disabled={!st?.counts.approved && !st?.counts.unfollow_queued}
                   onClick={() => m.mutate({ path: "/api/send/start", body: { just_one: false } })}>Send everything approved{st?.counts.approved ? ` (${st.counts.approved})` : ""}</Button></>}
-          <Button variant="danger-soft" icon={Square} onClick={() => m.mutate({ path: "/api/stop" })}>Stop</Button>
+          {stopped ? <span className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-bad-soft px-3 text-sm font-medium text-bad"><Square className="size-3.5 fill-current" />Stopped</span>
+            : <Button variant={sending ? "danger" : "danger-soft"} icon={Square} loading={stop.isPending} onClick={() => stop.mutate()}>Stop</Button>}
         </>} />
 
       {!h ? <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-[112px]" />)}</div> : (<>
@@ -40,8 +44,8 @@ export default function Hello() {
             sub={h.reply_rate == null ? "Shows once hellos have gone and a new download is loaded" : `${plural(h.replied, "person", "people")} wrote back`} />
         </div>
 
-        <Card title={sending ? "Sending now" : "Sending"} subtitle={h.sender.status}
-          action={<Badge tone={sending ? "good" : h.sender.stopped ? "bad" : "neutral"}>{sending ? "Running" : h.sender.stopped ? "Stopped" : "Idle"}</Badge>}>
+        <Card title={sending ? "Sending now" : "Sending"} subtitle={st?.sender.status || h.sender.status}
+          action={<Badge tone={sending ? "good" : stopped ? "bad" : "neutral"}>{sending ? "Running" : stopped ? "Stopped by you" : "Not running"}</Badge>}>
           <Bars data={h.series} keys={[{ key: "sent_hellos", color: SERIES.violet }, { key: "sent_replies", color: SERIES.cyan }]}
             names={{ sent_hellos: "Hellos sent", sent_replies: "Replies sent" }} height={200} />
         </Card>

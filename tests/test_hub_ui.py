@@ -136,9 +136,17 @@ def test_main_actions_work(running):
         page.keyboard.press("Enter")
         page.wait_for_selector("text=AI spent today")
         page.keyboard.press("Escape")
-        # Stop now.
-        page.click("text=Stop now")
+        # Stop now: the top bar changes at once to "Stopped" with "Start again", which asks before sending.
+        assert page.is_visible("header >> [aria-label^='Status:']")
+        page.click("header >> text=Stop now")
         assert until(a.sender.halt.is_set)
+        page.wait_for_selector("header >> text=Stopped by you", timeout=3000)
+        assert "Stopped by you" in page.get_attribute("header >> [aria-label^='Status:']", "aria-label")
+        page.click("header >> text=Start again")
+        page.wait_for_selector("role=dialog >> text=Start sending again?")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        assert a.sender.halt.is_set() and not a.sender.active          # cancelled: still stopped
         # The hellos queue was never touched by any of this.
         assert a.store.scalar("SELECT COUNT(*) FROM drafts WHERE kind = 'hello' AND status = 'draft'") == 3
         b.close()

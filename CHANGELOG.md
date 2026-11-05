@@ -2,6 +2,16 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.0.0-preview.5
+
+- **Always clear whether anything is running.** The top bar shows what Convo is doing right now: "Nothing
+  running", "Sending to @someone", "Writing replies 3 of 10", "Quiet hours", or "Stopped by you". Click it for
+  the details.
+- **Stop now changes straight away.** It shows "Stopping…", then "Stopped by you" with a **Start again** button,
+  which asks before anything sends.
+- On a phone, a slim bar under the top bar shows the same whenever something is running or stopped.
+- The Hello Message page's buttons follow the same live state.
+
 ## 5.0.0-preview.4
 
 - Fixed: Convo's window asking for a password. That happened when an older Convo was still running in the
