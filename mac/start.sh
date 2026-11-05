@@ -21,12 +21,11 @@ end run
 OSA
 }
 
-if [ "$(cat "$SUPPORT/.installed" 2>/dev/null)" != "$VERSION" ] || [ ! -x "$PY" ]; then
-  # First time (or a version that wasn't installed from inside Convo): set up in a Terminal window, so you can see
-  # it working and any problem.
-  if ! osascript - "$APP/mac/setup.sh" "$APP" "${CONVO_BUNDLE:-}" >>"$LOGS/launcher.log" 2>&1 <<'OSA'
+run_setup() {
+  # Set up (or repair, with "--repair") in a Terminal window, so you can see it working and any problem.
+  if ! osascript - "$APP/mac/setup.sh" "$APP" "${CONVO_BUNDLE:-}" "${1:-}" >>"$LOGS/launcher.log" 2>&1 <<'OSA'
 on run argv
-  set cmd to "bash " & quoted form of (item 1 of argv) & " " & quoted form of (item 2 of argv) & " " & quoted form of (item 3 of argv)
+  set cmd to "bash " & quoted form of (item 1 of argv) & " " & quoted form of (item 2 of argv) & " " & quoted form of (item 3 of argv) & " " & quoted form of (item 4 of argv)
   tell application "Terminal"
     activate
     do script cmd
@@ -36,15 +35,29 @@ OSA
   then
     show_problem "Convo needs to open Terminal to set itself up, and your Mac didn't let it. In System Settings, Privacy & Security, Automation, turn on Terminal under Convo, then open Convo again."
   fi
+}
+
+if [ "$(cat "$SUPPORT/.installed" 2>/dev/null)" != "$VERSION" ] || [ ! -x "$PY" ]; then
+  run_setup      # first time, or a version that wasn't installed from inside Convo
   exit 0
 fi
 
 cd "$SUPPORT"
 export PYTHONPATH="$APP" CONVO_LOGS="$LOGS" CONVO_HOME="$SUPPORT" PYTHONDONTWRITEBYTECODE=1
-echo "--- $(date) opening Convo $VERSION from $APP" >> "$LOGS/launcher.log"
-if ! "$PY" -c 'import assistant.app' >> "$LOGS/launcher.log" 2>&1; then
-  show_problem "Convo $VERSION couldn't start. If this began after an update, put Convo in Applications again from GitHub (your data is kept)."
+echo "--- $(date) opening Convo $VERSION from $APP ($(uname -m))" >> "$LOGS/launcher.log"
+if ! ERR="$("$PY" -c 'import assistant.app' 2>&1)"; then
+  printf '%s\n' "$ERR" >> "$LOGS/launcher.log"
+  if [ "$(cat "$SUPPORT/.repair-tried" 2>/dev/null)" != "$VERSION" ]; then
+    # The first time: rebuild Convo's parts from scratch (your data isn't touched), then it opens by itself.
+    echo "$VERSION" > "$SUPPORT/.repair-tried"
+    echo "  repairing: setting Convo's parts up again" >> "$LOGS/launcher.log"
+    run_setup --repair
+    exit 0
+  fi
+  LAST="$(printf '%s\n' "$ERR" | grep -v '^ ' | grep -v '^Traceback' | tail -n 1 | cut -c1-220)"
+  show_problem "Convo $VERSION couldn't start, even after repairing itself. Send Claude a screenshot of this box. The problem: $LAST"
   exit 1
 fi
+rm -f "$SUPPORT/.repair-tried"
 # The window keeps this program running while it's open, so the Dock shows Convo. Problems show their own message.
 exec "$PY" -m assistant app "$@" >> "$LOGS/launcher.log" 2>&1

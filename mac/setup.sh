@@ -7,6 +7,8 @@
 set -euo pipefail
 APP="${1:?usage: setup.sh /path/to/convo-code [/Applications/Convo.app]}"
 BUNDLE="${2:-}"
+MODE="${3:-}"                       # "--repair": rebuild Convo's parts from scratch (your data is never touched)
+export UV_PYTHON_PREFERENCE=only-managed   # always Convo's own Python, never one that came with something else
 SUPPORT="$HOME/Library/Application Support/Convo"
 LOGS="$HOME/Library/Logs/Convo"
 VERSION="$(cat "$APP/VERSION")"
@@ -38,6 +40,7 @@ if [ ! -x "$UV" ]; then fail "uv isn't where it should be ($UV)."; fi
 
 # 2. Python and Convo's parts
 say "Getting Python 3.12 and Convo's parts"
+if [ "$MODE" = "--repair" ]; then echo "  Repairing: starting Convo's parts again from scratch."; rm -rf "$SUPPORT/venv"; fi
 if [ ! -x "$SUPPORT/venv/bin/python" ] || ! "$SUPPORT/venv/bin/python" -c 'import sys; sys.exit(sys.version_info[:2] != (3, 12))'; then
   rm -rf "$SUPPORT/venv"
   "$UV" venv -q -p 3.12 "$SUPPORT/venv"
@@ -84,7 +87,9 @@ if [ ! -f "$SUPPORT/.env" ]; then touch "$SUPPORT/.env"; chmod 600 "$SUPPORT/.en
 # 5. A quick look that it all starts
 say "Checking it starts"
 cd "$SUPPORT"
-PYTHONPATH="$APP" "$SUPPORT/venv/bin/python" -c 'import assistant.app, playwright; print("  all parts present")'
+# The same check Convo makes when it opens from Finder, with Finder's bare settings, so a problem shows up here.
+env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin PYTHONPATH="$APP" PYTHONDONTWRITEBYTECODE=1 \
+  "$SUPPORT/venv/bin/python" -c 'import assistant.app, playwright; print("  all parts present")'
 
 echo "$VERSION" > "$SUPPORT/.installed"
 trap - ERR

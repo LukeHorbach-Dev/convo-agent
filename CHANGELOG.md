@@ -2,6 +2,12 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.0.0-preview.3
+
+- If Convo can't start, it now repairs itself once (it sets its parts up again; your data isn't touched), and if
+  that doesn't help, the message box says what the problem is.
+- Setup checks Convo starts the same way the Mac opens it from Applications, so a problem shows up straight away.
+
 ## 5.0.0-preview.2
 
 - **A new logo**: a speech bubble shaped like a C, in Convo's violet and blue, on the Dock, in the window and on
