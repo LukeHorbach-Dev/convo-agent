@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, ArrowRight, ArrowUpRight, CalendarClock, CheckCircle2, CircleDashed, Download, Eye, Hand, Lightbulb, ListTodo,
   MessagesSquare, Plug, Send, Sparkles, Target, TrendingUp, Users,
-  BellRing,
+  BellRing, Clapperboard,
 } from "lucide-react";
 import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -245,8 +245,13 @@ function FollowerHistory({ points }: { points: { at: string; followers: number |
 
 function Upcoming({ st }: { st: any }) {
   const nav = useNavigate();
+  const posts = useQuery({ queryKey: ["content", "upcoming"], queryFn: () => api("/api/hub/content?status=due,scheduled&limit=20") });
   if (!st) return <Skeleton className="h-24" />;
   const items: { icon: any; title: string; detail: string; to: string }[] = [];
+  const upcoming = [...(posts.data?.items || [])].sort((x: any, y: any) => (x.scheduled_at || "").localeCompare(y.scheduled_at || ""));
+  for (const c of upcoming.slice(0, 3)) items.push({ icon: Clapperboard, title: c.status === "due" ? `Time to post: ${c.title || "Untitled"}` : c.title || "Untitled post",
+    detail: c.status === "due" ? "The words are ready to copy" : new Date(c.scheduled_at).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }),
+    to: c.status === "due" ? "/scheduled" : `/studio/${c.id}` });
   if (st.counts.approved) items.push({ icon: Send, title: `${plural(st.counts.approved, "message")} approved`,
     detail: st.settings.send_at ? `Sends by itself at ${st.settings.send_at}` : "Sends when you press Send", to: "/hello" });
   if (st.overnight) items.push({ icon: Sparkles, title: `${plural(st.overnight.count, "reply", "replies")} being written`, detail: "At half price, usually within the hour", to: "/conversations" });
@@ -257,9 +262,8 @@ function Upcoming({ st }: { st: any }) {
         <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-cyan-soft text-cyan"><i.icon className="size-4" /></span>
         <span><span className="block text-[13.5px] font-medium">{i.title}</span><span className="block text-[12px] text-muted">{i.detail}</span></span>
       </button>))}
-      <p className="text-[12px] text-faint">Scheduled posts join this list in stage 3.</p>
     </div>
-  ) : <Empty icon={CalendarClock} title="Nothing scheduled">Approved messages and, from stage 3, scheduled posts appear here.</Empty>;
+  ) : <Empty icon={CalendarClock} title="Nothing scheduled">Approved messages and scheduled posts appear here.</Empty>;
 }
 
 function AccountFocus({ a }: { a: any }) {

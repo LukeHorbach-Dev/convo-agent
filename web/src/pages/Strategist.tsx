@@ -1,16 +1,16 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RotateCcw, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Card, cx, Note, PageHeader } from "../components/ui";
-import { post } from "../lib/api";
+import { api, post } from "../lib/api";
 import { money } from "../lib/format";
 import { prefs, useAppState } from "../lib/state";
 
 type Msg = { who: "you" | "convo"; text: string; meta?: string; pending?: boolean };
 
 const SUGGESTIONS = [
-  "What's waiting on me today?", "Who's the most interesting person I've talked to this week?", "Which chats need a careful look?",
-  "Write a reply to @… about football", "How many hellos have I sent, and how many replied?", "Status",
+  "What's working this month?", "How many hellos got a reply?", "What's waiting on me today?",
+  "Give me 5 post ideas for my main account and save them", "What's on my content plan this week?", "Who's the most interesting person I've talked to this week?",
 ];
 
 export default function Strategist() {
@@ -29,6 +29,7 @@ export default function Strategist() {
   const ask = (t: string) => { if (t.trim() && !m.isPending) { m.mutate(t.trim()); setQ(""); } };
   void prefs;
   return (
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
     <div className="flex flex-col gap-4">
       <PageHeader title="AI Strategist" subtitle="Ask about your people and messages, or tell Convo what to do. It answers from your real data only."
         actions={log.length > 0 && <Button variant="ghost" icon={RotateCcw} onClick={async () => { setLog([]); await post("/api/ask/reset").catch(() => {}); }}>New chat</Button>} />
@@ -45,8 +46,8 @@ export default function Strategist() {
             <div className="m-auto max-w-lg text-center">
               <div className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-violet/30 to-cyan/20"><Sparkles className="size-6 text-violet-2" /></div>
               <h2 className="text-[17px] font-semibold">Your strategist</h2>
-              <p className="mt-1.5 text-[13.5px] text-muted">Today it knows your Instagram people, chats and messages. As YouTube, Instagram and TikTok connect (stages 4 and 5),
-                it adds views, reach and what to post next. It always says when something is a guess rather than a number.</p>
+              <p className="mt-1.5 text-[13.5px] text-muted">It knows your people, chats, hellos, follow-ups and content plan, with the real numbers on the right.
+                It never makes up a statistic: views and reach arrive when YouTube, Instagram and TikTok are connected.</p>
             </div>)}
           <div ref={end} />
         </div>
@@ -62,5 +63,30 @@ export default function Strategist() {
         </div>
       </Card>
     </div>
+    <Facts />
+    </div>
+  );
+}
+
+/** The numbers the strategist works from, so you can see them too. */
+function Facts() {
+  const { data } = useQuery({ queryKey: ["analytics", 30], queryFn: () => api("/api/hub/analytics?days=30") });
+  const plan = useQuery({ queryKey: ["content-stats"], queryFn: () => api("/api/hub/content-stats") });
+  if (!data) return <Card title="Your numbers"><div className="h-40" /></Card>;
+  const t = (k: string) => data.series.reduce((n: number, d: any) => n + d[k], 0);
+  const h = data.hello, r = data.relationships, p = plan.data?.by_status;
+  const rows: [string, string][] = [
+    ["Messages you sent (30 days)", String(t("sent_hellos") + t("sent_replies"))], ["Messages you got (30 days)", String(t("received"))],
+    ["Hellos sent", String(h.sent)], ["Hello reply rate", h.reply_rate == null ? "Not yet" : `${Math.round(h.reply_rate * 100)}%`],
+    ["Followers (newest download)", r.followers ? String(r.followers) : "—"], ["People you've chatted with", String(r.chatted)],
+    ["Posts scheduled", p ? String(p.scheduled + p.due) : "—"], ["Posted this week", plan.data ? String(plan.data.posted_7d) : "—"],
+  ];
+  return (
+    <Card title="Your numbers" subtitle="Real, from your data (last 30 days)">
+      <dl className="grid gap-2.5">{rows.map(([k, v]) => (
+        <div key={k} className="flex items-baseline justify-between gap-3 border-b border-line pb-2 last:border-0 last:pb-0">
+          <dt className="text-[13px] text-muted">{k}</dt><dd className="tabular text-[14px] font-semibold">{v}</dd></div>))}</dl>
+      <p className="mt-3 text-[12px] text-faint">Views, reach and watch time aren't measured until your platforms are connected.</p>
+    </Card>
   );
 }

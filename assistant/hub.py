@@ -481,12 +481,15 @@ AUTOMATIONS_LIVE = [
      False, "daily_ai_budget_usd", ("spending limit",)),
     ("safety", "Instagram safety stops", "Stops for 6 hours if Instagram shows any 'try again later' warning, and after three problems in a row.",
      False, None, ("Instagram asked", "stopped", "Stopped")),
+    ("follow_up", "Follow-up reminders", "Lists who's waiting on you and hellos with no answer, and tells you on the day of a reminder you set.",
+     False, None, ("Reminder set",)),
+    ("content_reminders", "Posting reminders", "Tells you when a scheduled post's time comes, with the words ready to paste.",
+     False, None, ("Time to post",)),
+    ("caption", "Caption writing", "Writes captions, titles and hashtags for each platform from your notes, when you press Write with AI.",
+     True, None, ()),
 ]
 AUTOMATIONS_PLANNED = [
-    ("follow_up", "Follow-up reminders", "Reminds you about chats that went quiet.", True, 2),
-    ("caption", "Caption generation", "Captions, hooks and hashtags for each platform when you add content.", True, 3),
-    ("repurpose", "Content repurposing", "Suggests older content worth reposting in a new format.", True, 3),
-    ("content_reminders", "Content and publishing reminders", "Nudges for the posts on your calendar.", False, 3),
+    ("repurpose", "Content repurposing", "Suggests older content worth reposting in a new format.", True, 6),
     ("analytics", "Analytics updates", "Pulls followers, views and engagement from connected platforms every few hours.", False, 4),
     ("publishing", "Scheduled publishing", "Publishes approved posts at their time through the official APIs.", True, 4),
     ("comments", "Comment notifications", "Tells you about new comments worth answering.", False, 5),
@@ -509,7 +512,7 @@ def automations(store: Store, a) -> list[dict]:
             if r and (last is None or r["at"] > last["at"]):
                 last = r
         on = {"overnight": s.write_overnight, "send_at": bool(s.send_at), "quiet": bool(s.quiet_from and s.quiet_to),
-              "budget": True, "safety": True}[aid]
+              "budget": True, "safety": True, "follow_up": True, "content_reminders": True, "caption": True}[aid]
         nxt = None
         if aid == "send_at" and s.send_at:
             now = datetime.now()
@@ -519,7 +522,7 @@ def automations(store: Store, a) -> list[dict]:
                 t += timedelta(days=1)
             nxt = t.astimezone().isoformat(timespec="minutes")
         out.append({"id": aid, "name": name, "description": what, "needs_approval": approval, "status": "live", "enabled": on,
-                    "always_on": aid in ("budget", "safety"), "last_run": last, "next_run": nxt,
+                    "always_on": aid in ("budget", "safety", "follow_up", "content_reminders", "caption"), "last_run": last, "next_run": nxt,
                     "config": {"send_at": s.send_at, "quiet_from": s.quiet_from, "quiet_to": s.quiet_to,
                                "daily_ai_budget_usd": s.daily_ai_budget_usd}})
     for aid, name, what, approval, stage in AUTOMATIONS_PLANNED:

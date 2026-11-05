@@ -2,6 +2,23 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.2.0-preview.1
+
+Stage 3: your content, planned and written, and a strategist that works from real numbers.
+
+- **Content Studio**: start an idea, video, short, photo or carousel. Drop the file in (it stays on your Mac), write
+  your notes, choose Instagram, TikTok and/or YouTube, and press **Write with AI** for a caption, title and hashtags
+  for each one, from your notes and your About me only (about 1 to 2 cents). A phone preview shows how it looks.
+- **Content Library**: every idea, draft and post in one place, with search and filters.
+- **Publishing Calendar**: month and week views. Drag a post to another day, or drag a ready post onto a day.
+- **Scheduled Posts**: when a post's time comes, Convo tells you, with the words ready to copy and the file one
+  click away (Show in Finder), then you mark it posted. Once your platforms are connected (stages 4 and 5) it can
+  post for you.
+- **AI Strategist**: answers from your real numbers (messages, hellos and replies, followers, follow-ups, your
+  content plan), shows those numbers beside the chat, and never makes up a statistic. It can save post ideas to
+  your library when you ask.
+- The Dashboard's Upcoming list now includes your scheduled posts.
+
 ## 5.1.0-preview.1
 
 Stage 2: everyday work in the new design, Convo on your phone, and follow-ups.

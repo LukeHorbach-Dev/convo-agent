@@ -154,8 +154,10 @@ class Assistant:
             if self.s.phone_access and self.practice is None and not self.phone.listening:
                 self.phone.start()                  # Tailscale came on after Convo, or the Mac woke on a new network
             try:
+                from .content import due_now
                 from .followups import remind_due
                 remind_due(self.store, self.notify)
+                due_now(self.store, self.notify)
             except Exception as e:
                 self.store.log("warn", f"Couldn't check reminders ({e}).")
             try:
@@ -394,7 +396,7 @@ def create_api(a: Assistant, token: str) -> FastAPI:
             return JSONResponse({"detail": "forbidden host"}, status_code=403)
         resp = await call_next(request)
         resp.headers["Content-Security-Policy"] = ("default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                                                   "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                                                   "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; "
                                                    "connect-src 'self'")
         resp.headers["X-Frame-Options"] = "DENY"
         resp.headers["Referrer-Policy"] = "no-referrer"
@@ -950,7 +952,9 @@ def create_api(a: Assistant, token: str) -> FastAPI:
 
     from .hub import register as register_hub
     from .followups import register as register_followups
+    from .content import register as register_content
     register_hub(api, a, auth)
     register_followups(api, a, auth)
+    register_content(api, a, auth, token)
     a.phone.app = api
     return api

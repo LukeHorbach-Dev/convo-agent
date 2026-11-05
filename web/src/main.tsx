@@ -11,9 +11,11 @@ import { AccountGroups, ConnectedAccounts, LaunchNetwork } from "./pages/Account
 import { AutomationHistory, Notifications } from "./pages/Activity";
 import Analytics from "./pages/Analytics";
 import Automations from "./pages/Automations";
-import {
-  Collaborations, ContentLibrary, ContentStudio, EngagementAssistant, GrowthGoals, OrganicIndependence, PublishingCalendar, ScheduledPosts, WeeklyMissions,
-} from "./pages/Coming";
+import { Collaborations, EngagementAssistant, GrowthGoals, OrganicIndependence, WeeklyMissions } from "./pages/Coming";
+import Calendar from "./pages/Calendar";
+import Library from "./pages/Library";
+import Scheduled from "./pages/Scheduled";
+import Studio from "./pages/Studio";
 import Contacts from "./pages/Contacts";
 import Conversations from "./pages/Conversations";
 import Dashboard from "./pages/Dashboard";
@@ -61,10 +63,11 @@ function App() {
         <Route path="/accounts" element={<ConnectedAccounts />} />
         <Route path="/launch" element={<LaunchNetwork />} />
         <Route path="/groups" element={<AccountGroups />} />
-        <Route path="/studio" element={<ContentStudio />} />
-        <Route path="/library" element={<ContentLibrary />} />
-        <Route path="/calendar" element={<PublishingCalendar />} />
-        <Route path="/scheduled" element={<ScheduledPosts />} />
+        <Route path="/studio" element={<Studio />} />
+        <Route path="/studio/:id" element={<Studio />} />
+        <Route path="/library" element={<Library />} />
+        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/scheduled" element={<Scheduled />} />
         <Route path="/hello" element={<Hello />} />
         <Route path="/review/hellos" element={<Review kind="hello" key="hello" />} />
         <Route path="/review/replies" element={<Review kind="reply" key="reply" />} />

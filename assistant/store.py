@@ -151,6 +151,27 @@ CREATE TABLE IF NOT EXISTS followups (
     done_at       TEXT
 )
 """),
+    (3, """
+CREATE TABLE IF NOT EXISTS content (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    title         TEXT NOT NULL DEFAULT '',
+    kind          TEXT NOT NULL DEFAULT 'idea',     -- idea | video | short | photo | carousel | text
+    status        TEXT NOT NULL DEFAULT 'idea',     -- idea | draft | ready | scheduled | due | posted
+    notes         TEXT NOT NULL DEFAULT '',         -- the idea, script or shot list
+    platforms     TEXT NOT NULL DEFAULT '[]',       -- JSON list: instagram, tiktok, youtube
+    account_id    INTEGER,                          -- which account it's for (accounts.id), if chosen
+    versions      TEXT NOT NULL DEFAULT '{}',       -- JSON per platform: caption, title, description, hashtags
+    media         TEXT,                             -- file name in data/library/<id>/
+    media_type    TEXT,                             -- image/... or video/...
+    thumb         TEXT,                             -- file name of a preview image
+    scheduled_at  TEXT,
+    posted_at     TEXT,
+    post_url      TEXT,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS content_when ON content(scheduled_at)
+"""),
 ]
 
 
@@ -285,7 +306,7 @@ class Store:
             spend[day] = round(spend.get(day, 0.0) + usd, 6)
             spend[counter] = spend.get(counter, 0) + 1
             spend[counter + "_usd"] = round(spend.get(counter + "_usd", 0.0) + usd, 6)
-            keep = ("total", "drafts", "drafts_usd", "web", "web_usd", "reports", "reports_usd", "ask", "ask_usd")
+            keep = ("total", "drafts", "drafts_usd", "web", "web_usd", "reports", "reports_usd", "ask", "ask_usd", "content", "content_usd")
             self.set("ai_spend", {k: v for k, v in spend.items() if k in keep or k >= iso_ago(days=31)[:10]})
 
     def spent_today(self) -> float:

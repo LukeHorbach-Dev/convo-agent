@@ -1,59 +1,12 @@
 // Pages whose main feature arrives in a later stage. Each says exactly what's coming and what it needs, and shows
 // the real data that already exists for it. No fake buttons.
 import { useQuery } from "@tanstack/react-query";
-import { CalendarClock, Handshake, Send, Sprout, Star, Trophy } from "lucide-react";
+import { Handshake, Sprout, Star, Trophy } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Avatar, Badge, Button, Card, Empty, PageHeader, Planned, Skeleton } from "../components/ui";
+import { Avatar, Badge, Card, Empty, PageHeader, Planned, Skeleton } from "../components/ui";
 import { api } from "../lib/api";
-import { num, plural } from "../lib/format";
-import { useAppState } from "../lib/state";
+import { num } from "../lib/format";
 import { PersonDrawer } from "./Contacts";
-
-const CONTENT_NEEDS = ["Somewhere to store your files (this Mac)", "Your AI key for captions and hooks"];
-
-export function ContentStudio() {
-  return (<div><PageHeader title="Content Studio" subtitle="Upload once, get a version for every platform." />
-    <Planned stage={3} title="Upload a video or photo once, and Convo prepares each platform's version"
-      what={["Reads still frames and your notes (Claude can't watch video itself)", "Suggests several hooks", "Captions for Instagram, TikTok and YouTube",
-             "Hashtags and YouTube titles", "Best times from your real analytics, once connected", "You review and edit everything before it's scheduled"]}
-      needs={CONTENT_NEEDS} /></div>);
-}
-
-export function ContentLibrary() {
-  return (<div><PageHeader title="Content Library" subtitle="Every video and image, with drafts and how each version performed." />
-    <Planned stage={3} title="Your videos, images and drafts in one place" what={["Video and image library with previews", "Drafts and versions per platform",
-      "Search and tags", "Performance of each published version (from stage 4)"]} needs={CONTENT_NEEDS} /></div>);
-}
-
-function UpcomingMessages() {
-  const st = useAppState().data;
-  const nav = useNavigate();
-  if (!st) return <Skeleton className="h-24" />;
-  return (
-    <Card title="Already scheduled today" icon={Send}>
-      {st.counts.approved ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[14px] text-ink-2">{plural(st.counts.approved, "approved message")} {st.settings.send_at ? `send by themselves at ${st.settings.send_at}` : "go when you press Send"}.</p>
-          <Button onClick={() => nav("/hello")}>Open Hello Message</Button></div>
-      ) : <Empty icon={CalendarClock} title="Nothing scheduled">Approved messages appear here; posts join them in stage 3.</Empty>}
-    </Card>
-  );
-}
-
-export function PublishingCalendar() {
-  return (<div className="flex flex-col gap-6"><PageHeader title="Publishing Calendar" subtitle="Your week of posts across every account and platform." />
-    <UpcomingMessages />
-    <Planned stage={3} title="A calendar for every account" what={["Week and month views", "Drag to reschedule", "Launch network posts alongside your main account",
-      "Publishing through the official APIs from stage 4"]} needs={["Content Studio (stage 3)", "Platform connections to publish (stages 4 and 5)"]} /></div>);
-}
-
-export function ScheduledPosts() {
-  return (<div className="flex flex-col gap-6"><PageHeader title="Scheduled Posts" subtitle="Everything waiting to go out, and its status." />
-    <UpcomingMessages />
-    <Planned stage={3} title="Posts waiting to publish" what={["Each post's time, account and platform", "Status: waiting, published, or needs attention",
-      "Edit or cancel before it goes"]} needs={["Content Studio (stage 3)"]} /></div>);
-}
 
 export function EngagementAssistant() {
   return (<div><PageHeader title="Engagement Assistant" subtitle="Comments worth answering, with replies drafted for your approval." />

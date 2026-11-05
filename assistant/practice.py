@@ -252,6 +252,13 @@ class PracticeLLM:
 
     def complete_json(self, system, user, schema) -> dict:
         self.calls += 1
+        props = schema.get("properties", {})
+        if props and set(props) <= {"instagram", "tiktok", "youtube"}:          # captions for a post
+            out = {}
+            for p in props:
+                out[p] = ({"title": "A practice video title", "description": "A practice description in your voice.", "hashtags": ["practice"]}
+                          if p == "youtube" else {"caption": f"A practice {p} caption in your voice", "hashtags": ["practice", "convo"]})
+            return out
         if "overview" in schema.get("properties", {}):
             return {"overview": "A practice contact. They're friendly and easy to talk to.", "talks_about": ["everyday things"],
                     "common_ground": [], "open_questions": [], "careful": [], "next_idea": "hows your week going ?"}

@@ -215,3 +215,46 @@ def test_reviewing_hellos_in_the_new_design(running):
         page.wait_for_selector("main >> text=Undo approval")
         b.close()
     assert count("sent") == 0 and not a.sender.active                      # nothing was sent
+
+
+def test_a_post_from_idea_to_posted(running, tmp_path):
+    from playwright.sync_api import expect, sync_playwright
+    a, url = running
+    a.store.set("whats_new_seen", __version__)
+    png = tmp_path / "cake.png"
+    png.write_bytes(bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082"))
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        page = b.new_page(viewport={"width": 1400, "height": 900})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(url + "/#token=tok")
+        page.wait_for_selector("text=Good")
+        page.goto(url + "/#/studio")
+        import re
+        page.locator("main").get_by_role("button", name=re.compile(r"^Photo")).click()
+        page.wait_for_selector("#c-title")
+        cid = a.store.scalar("SELECT MAX(id) FROM content")
+        page.fill("#c-title", "Lemon cake")
+        page.fill("#c-notes", "first try, too sweet, mum loved it")
+        page.set_input_files("input[type=file]", str(png))
+        assert until(lambda: a.store.scalar("SELECT media FROM content WHERE id = ?", (cid,)) == "media.png")
+        page.wait_for_selector("main img[src*='/media/']")
+        page.fill("#v-cap", "lemon cake attempt one :)")
+        assert until(lambda: "lemon cake attempt one" in (a.store.scalar("SELECT versions FROM content WHERE id = ?", (cid,)) or ""))
+        assert a.store.scalar("SELECT title FROM content WHERE id = ?", (cid,)) == "Lemon cake"
+        # Schedule for tomorrow 6pm, then it's on the calendar.
+        page.fill("#c-when", (__import__("datetime").date.today() + __import__("datetime").timedelta(days=1)).isoformat() + "T18:00")
+        page.locator("main").get_by_role("button", name="Schedule", exact=True).click()
+        assert until(lambda: a.store.scalar("SELECT status FROM content WHERE id = ?", (cid,)) == "scheduled")
+        page.goto(url + "/#/calendar")
+        expect(page.locator("main button", has_text="Lemon cake")).to_have_count(1)
+        # Mark posted from the Studio.
+        page.goto(url + f"/#/studio/{cid}")
+        page.fill("#c-url", "https://www.instagram.com/p/abc/")
+        page.click("main >> text=Mark posted")
+        assert until(lambda: a.store.scalar("SELECT status FROM content WHERE id = ?", (cid,)) == "posted")
+        page.goto(url + "/#/library")
+        page.wait_for_selector("main >> text=Lemon cake")
+        b.close()
+    assert errors == []

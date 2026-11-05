@@ -56,7 +56,7 @@ export const NAV: NavSection[] = [
 
 export const ALL_ITEMS = NAV.flatMap((s) => s.items);
 const EXTRA: Record<string, string> = { "/review/hellos": "Review hellos", "/review/replies": "Review replies" };
-export const titleFor = (path: string) => EXTRA[path] || ALL_ITEMS.find((i) => i.path === path)?.label || "Convo";
+export const titleFor = (path: string) => EXTRA[path] || ALL_ITEMS.find((i) => i.path === path)?.label || (path.startsWith("/studio/") ? "Content Studio" : "Convo");
 
 // The phone's bottom bar: the things you check on the go.
 export const MOBILE_TABS = ["/", "/hello", "/conversations", "/strategist"];
