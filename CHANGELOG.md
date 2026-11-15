@@ -2,6 +2,11 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.6.1-preview.1
+
+- Easier to read: today's date in the Calendar and your own messages in the AI Strategist use a slightly deeper
+  purple, so the white text meets the contrast standard.
+
 ## 5.6.0-preview.1
 
 Stages 7 and 8: tested and polished.

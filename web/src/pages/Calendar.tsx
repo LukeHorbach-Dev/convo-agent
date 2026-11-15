@@ -76,7 +76,7 @@ export default function Calendar() {
                   <div key={key(d)} onDragOver={(e) => e.preventDefault()} onDrop={onDrop(d)}
                     className={cx("min-h-[96px] border-b border-r border-line p-1.5 transition-colors", view === "week" && "md:min-h-[360px]", other && "bg-bg-2/40")}>
                     <div className={cx("mb-1 flex items-center gap-1.5 px-1 text-[12px]", key(d) === today ? "font-semibold text-violet-2" : other ? "text-faint" : "text-muted")}>
-                      {key(d) === today ? <span className="grid size-5 place-items-center rounded-full bg-violet text-[11px] text-white">{d.getDate()}</span> : d.getDate()}
+                      {key(d) === today ? <span className="grid size-5 place-items-center rounded-full bg-[#7444e0] text-[11px] text-white">{d.getDate()}</span> : d.getDate()}
                       {view === "week" && <span className="md:hidden">{d.toLocaleDateString(undefined, { weekday: "long" })}</span>}
                     </div>
                     <div className="flex flex-col gap-1">{items.map((c) => <Chip key={c.id} c={c} compact={view === "month"} />)}</div>
