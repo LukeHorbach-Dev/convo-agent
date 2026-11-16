@@ -45,3 +45,21 @@ def test_one_button_unfollows_everyone_and_nothing_else(tmp_path):
     st.execute("UPDATE unfollows SET status = 'done'")
     assert c.post("/api/unfollow/everyone/start", headers=H).status_code == 400
     assert st.scalar("SELECT status FROM drafts WHERE kind = 'reply'") == "approved"         # the reply was left alone
+
+
+def test_a_new_instagram_username_keeps_the_history(tmp_path):
+    shutil.copy(Path(__file__).parent / "fixtures" / "profile.json", tmp_path / "profile.json")
+    s = AssistantSettings(_env_file=None, data_dir=tmp_path, profile_path=tmp_path / "profile.json", never_list_path=tmp_path / "n.txt")
+    a = Assistant(s, store=Store(tmp_path / "a.db"), make_web=lambda: None, llm=PracticeLLM(), notify=lambda *x: None, env_path=tmp_path / ".env")
+    c = TestClient(create_api(a, "t"), base_url="http://127.0.0.1")
+    main = a.store.one("SELECT id, handle FROM accounts WHERE role = 'main'")
+    assert main["handle"] == "lukehorbach2"
+    a.store.execute("INSERT INTO snapshots(account_id, at, source, followers) VALUES (?, '2026-11-01T00:00:00+00:00', 'download', 812)", (main["id"],))
+    assert c.post("/api/settings", json={"account_username": "not a name!"}, headers=H).status_code == 400
+    assert c.post("/api/settings", json={"account_username": "@JustLukeH"}, headers=H).status_code == 200
+    assert a.s.account_username == "justlukeh" and "AGENT_ACCOUNT_USERNAME=justlukeh" in (tmp_path / ".env").read_text()
+    row = a.store.one("SELECT id, handle FROM accounts WHERE role = 'main'")
+    assert row == {"id": main["id"], "handle": "justlukeh"}                                  # same account, new name
+    assert a.store.scalar("SELECT followers FROM snapshots WHERE account_id = ?", (main["id"],)) == 812
+    assert a.store.scalar("SELECT COUNT(*) FROM accounts WHERE platform = 'instagram'") == 1
+    assert c.get("/api/state", headers=H).json()["you"] == "justlukeh"

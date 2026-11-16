@@ -262,7 +262,9 @@ class Sender:
             if not self.identity_ok:
                 me = self.web.whoami()
                 if me.lower() != self.s.account_username.lower():
-                    raise AuthenticationRequired(f"signed in as {me}, not {self.s.account_username}")
+                    raise AuthenticationRequired(f"Convo's browser is signed in as @{me}, but Convo is set up for "
+                                                 f"@{self.s.account_username}. If you changed your username, put the new one in "
+                                                 f"Account Settings, Your Instagram username.")
                 self.identity_ok = True
             return True
         except Exception as e:

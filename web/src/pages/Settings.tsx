@@ -198,6 +198,8 @@ export function AccountSettings() {
       </Card>
 
       <Card title="Instagram" icon={LogIn}>
+        <Row title="Your Instagram username" hint="If you change it on Instagram, change it here too. Your history and hellos stay.">
+          <UsernameBox current={st.you} /></Row>
         <Row title="Sign in" hint="Opens Instagram in Convo's own browser. Sign in there, then press Done.">
           <div className="flex gap-2"><Button icon={LogIn} loading={login.isPending} onClick={() => login.mutate()}>Open sign-in</Button><Button variant="ghost" loading={done.isPending} onClick={() => done.mutate()}>Done</Button></div></Row>
         <Row title="Self-check" hint="Claude tries every step on your account without sending anything. About 5¢.">
@@ -237,3 +239,17 @@ export function AccountSettings() {
   );
 }
 
+
+function UsernameBox({ current }: { current: string }) {
+  const [v, setV] = useState(current);
+  const save = useSave();
+  useEffect(() => setV(current), [current]);
+  const clean = v.trim().replace(/^@/, "").toLowerCase();
+  return (
+    <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (clean && clean !== current) save.mutate({ account_username: clean }); }}>
+      <div className="relative grow"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint">@</span>
+        <Input aria-label="Your Instagram username" className="pl-7" value={v} onChange={(e) => setV(e.target.value)} autoComplete="off" /></div>
+      <Button loading={save.isPending} disabled={!clean || clean === current}>Save</Button>
+    </form>
+  );
+}

@@ -326,7 +326,8 @@ def apply_export(store: Store, data: ExportData, me_username: str) -> dict:
     parts.append(f"{summary['conversations']} conversations ({new_msgs} new messages)")
     store.log("good", "Loaded your Instagram download: " + ", ".join(parts) + ".")
     if data.me_username and data.me_username != me_username.lower():
-        store.log("problem", f"This download is for @{data.me_username}, but the app is set up for @{me_username}.")
+        store.log("problem", f"This download is for @{data.me_username}, but Convo is set up for @{me_username}. If you changed "
+                             "your username, put the new one in Account Settings, Your Instagram username.")
     return summary
 
 

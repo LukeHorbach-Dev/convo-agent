@@ -2,6 +2,12 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.6.3-preview.1
+
+- **Changed your Instagram username?** Account Settings, Instagram, Your Instagram username: type the new one and
+  Save. Your account keeps its history, hellos and people. If you forget, Convo stops before sending and says so,
+  instead of sending from the wrong account.
+
 ## 5.6.2-preview.1
 
 - **Unfollow everyone, in one button**: Contacts, Unfollow everyone. After one "are you sure", Convo starts

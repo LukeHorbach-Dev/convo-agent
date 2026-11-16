@@ -384,6 +384,7 @@ class SettingsBody(BaseModel):
     github_token: str | None = None  # "" removes it
     update_previews: bool | None = None
     phone_access: bool | None = None
+    account_username: str | None = None   # your Instagram username (after you change it on Instagram)
 
 
 HHMM = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
@@ -921,6 +922,24 @@ def create_api(a: Assistant, token: str) -> FastAPI:
             a.s.github_token = SecretStr(key) if key else None
             env["AGENT_GITHUB_TOKEN"] = key or None
             st.log("good" if key else "info", "GitHub key saved; Convo will look for updates." if key else "GitHub key removed.")
+        if body.account_username is not None:
+            new = body.account_username.strip().lstrip("@").lower()
+            if not re.fullmatch(r"[a-z0-9._]{1,30}", new):
+                raise HTTPException(400, "That doesn't look like an Instagram username (letters, numbers, dots and underscores).")
+            old = a.s.account_username.lower()
+            if new != old:
+                if a.practice is not None:
+                    raise HTTPException(400, "Practice uses its own pretend account.")
+                clash = st.one("SELECT id, role FROM accounts WHERE platform = 'instagram' AND handle = ?", (new,))
+                main = st.one("SELECT id FROM accounts WHERE platform = 'instagram' AND role = 'main' ORDER BY id LIMIT 1")
+                if clash and main and clash["id"] != main["id"]:
+                    raise HTTPException(400, f"@{new} is already one of your other accounts in Convo. Remove it there first.")
+                if main:                               # same account, new name: its history stays with it
+                    st.execute("UPDATE accounts SET handle = ?, updated_at = ? WHERE id = ?", (new, now_iso(), main["id"]))
+                a.s.account_username = new
+                env["AGENT_ACCOUNT_USERNAME"] = new
+                a.sender.reset_browser()               # check who's signed in again before the next send
+                st.log("good", f"Your Instagram username is now @{new} (was @{old}). Your history and hellos are kept.")
         if body.phone_access is not None:
             if a.practice is not None:
                 raise HTTPException(400, "Phone access is for the real Convo, not practice.")
