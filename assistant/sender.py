@@ -86,6 +86,7 @@ class Sender:
         self.identity_ok = False
         self._reset = False
         self.just_one = False                   # "Send just one first": pause after the first message goes
+        self.unfollow_only = False              # "Unfollow everyone": unfollow, and leave approved messages alone
         self._budget_logged = False
 
     # ------------------------------------------------------------------ control
@@ -94,16 +95,17 @@ class Sender:
         self._thread.start()
         return self
 
-    def go(self, just_one: bool = False) -> None:
+    def go(self, just_one: bool = False, unfollow_only: bool = False) -> None:
         self.halt.clear()
         self.active, self.wait_until, self.page_failures = True, 0.0, 0
         self.just_one = just_one
+        self.unfollow_only = unfollow_only
         self.status = "Starting"
 
     def stop_now(self) -> None:
         """Stop straight away: the current step ends at Claude's next click, and nothing else starts."""
         self.halt.set()
-        self.active, self.just_one = False, False
+        self.active, self.just_one, self.unfollow_only = False, False, False
         self.status = "Stopped by you. Nothing else goes until you press Send again."
 
     def run_on_browser(self, fn: Callable[[object], object]) -> Future:
@@ -204,7 +206,8 @@ class Sender:
             self.wait_until = time.time() + 300
             return False
         pace = self.s.pace
-        msg = self.store.one("SELECT * FROM drafts WHERE status = 'approved' ORDER BY kind = 'hello', tries, id LIMIT 1")
+        msg = None if self.unfollow_only else \
+            self.store.one("SELECT * FROM drafts WHERE status = 'approved' ORDER BY kind = 'hello', tries, id LIMIT 1")
         unf = self.store.one("SELECT * FROM unfollows WHERE status = 'queued' ORDER BY tries, queued_at, username LIMIT 1")
         if msg and self.store.sent_today() >= pace.daily_messages:
             msg = None
@@ -223,7 +226,7 @@ class Sender:
             return False
         self._budget_logged = False
         if not msg and not unf:
-            if self.store.scalar("SELECT COUNT(*) FROM drafts WHERE status = 'approved'") == 0 and \
+            if (self.unfollow_only or self.store.scalar("SELECT COUNT(*) FROM drafts WHERE status = 'approved'") == 0) and \
                self.store.scalar("SELECT COUNT(*) FROM unfollows WHERE status = 'queued'") == 0:
                 if self.status.startswith(("Sending", "Unfollowing", "Starting")):
                     self.store.log("good", "All done for now.")

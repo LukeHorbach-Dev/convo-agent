@@ -770,6 +770,26 @@ def create_api(a: Assistant, token: str) -> FastAPI:
         st.log("info", f"Added {queued} people to the unfollow list.")
         return {"queued": queued}
 
+    @api.post("/api/unfollow/everyone/start", dependencies=[Depends(auth)])
+    def unfollow_everyone_start():
+        """The one button: put everyone you follow on the unfollow list and start unfollowing (only unfollowing:
+        approved messages wait for Send). Goes at your daily number, with the usual gaps, until done."""
+        if a.practice is not None:
+            raise HTTPException(400, "Practice has its own pretend list: use the classic People page there.")
+        names = [r["username"] for r in st.all("SELECT username FROM people WHERE i_follow = 1")]
+        queued = 0
+        for n in names:
+            queued += st.execute("INSERT OR IGNORE INTO unfollows(username, queued_at) VALUES (?, ?)", (n, now_iso())).rowcount
+            st.execute("UPDATE drafts SET status = 'skipped', note = 'you unfollowed them' WHERE kind = 'hello' "
+                       "AND username = ? AND status IN ('draft', 'approved')", (n,))
+        waiting = st.scalar("SELECT COUNT(*) FROM unfollows WHERE status = 'queued'") or 0
+        if not waiting:
+            raise HTTPException(400, "There's nobody left to unfollow (load a newer download if you've followed people since).")
+        a.sender.go(unfollow_only=True)
+        per_day = max(1, a.s.pace.daily_unfollows)
+        st.log("info", f"Unfollowing everyone: {waiting} to go, {per_day} a day.")
+        return {"queued": queued, "waiting": waiting, "per_day": per_day, "days": -(-waiting // per_day)}
+
     @api.post("/api/unfollow/cancel", dependencies=[Depends(auth)])
     def cancel_unfollow():
         n = st.execute("DELETE FROM unfollows WHERE status = 'queued'").rowcount

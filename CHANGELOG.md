@@ -2,6 +2,13 @@
 
 Each section is shown once in Convo ("What's new") after it updates to that version.
 
+## 5.6.2-preview.1
+
+- **Unfollow everyone, in one button**: Contacts, Unfollow everyone. After one "are you sure", Convo starts
+  unfollowing everyone you follow at your daily number (60 a day unless you change it), carrying on by itself each
+  day. Only unfollowing runs: replies you've approved wait for Send. Your waiting hellos are skipped (they're to
+  people you follow). Contacts shows how many are left, with Cancel the rest; Stop now pauses it.
+
 ## 5.6.1-preview.1
 
 - Easier to read: today's date in the Calendar and your own messages in the AI Strategist use a slightly deeper

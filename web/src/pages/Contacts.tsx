@@ -1,9 +1,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, BellRing, Download, ExternalLink, Search, Sparkles, Star, TriangleAlert, Users } from "lucide-react";
+import { Ban, BellRing, Download, ExternalLink, Search, Sparkles, Star, TriangleAlert, UserMinus, Users } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { ReminderForm } from "./Followups";
 import { useEffect, useState } from "react";
-import { Avatar, Badge, Bubble, Button, Card, cx, Drawer, Empty, ErrorState, Input, PageHeader, Segmented, Skeleton, Textarea, useToast } from "../components/ui";
+import { Avatar, Badge, Bubble, Button, Card, cx, Drawer, Empty, ErrorState, Input, PageHeader, Segmented, Skeleton, Textarea, useConfirm, useToast } from "../components/ui";
 import { api, download, post } from "../lib/api";
 import { ago, num } from "../lib/format";
 import { useAppState } from "../lib/state";
@@ -28,7 +28,9 @@ export default function Contacts() {
   return (
     <div>
       <PageHeader title="Contacts" subtitle="Everyone from your Instagram downloads, with what Convo has learned about them."
-        actions={<Button icon={Download} onClick={() => download("/api/people.csv", "convo-people.csv").catch((e) => toast(e.message, "bad"))}>Spreadsheet</Button>} />
+        actions={<><Button icon={Download} onClick={() => download("/api/people.csv", "convo-people.csv").catch((e) => toast(e.message, "bad"))}>Spreadsheet</Button>
+          <UnfollowEveryone /></>} />
+      <UnfollowProgress />
       <Card bodyClass="!p-0">
         <div className="flex flex-col gap-3 border-b border-line p-4 md:flex-row md:items-center">
           <div className="relative md:w-80"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint" />
@@ -138,5 +140,48 @@ export function PersonDrawer({ username, onClose }: { username: string | null; o
         </div>
       )}
     </Drawer>
+  );
+}
+
+// ------------------------------------------------------------------------------------------------ unfollow everyone
+function UnfollowEveryone() {
+  const st = useAppState().data;
+  const toast = useToast();
+  const confirm = useConfirm();
+  const qc = useQueryClient();
+  const following = st?.counts.following ?? 0;
+  const perDay = st?.settings?.daily_unfollows ?? 60;
+  const hellos = (st?.counts.hellos_to_check ?? 0);
+  const go = async () => {
+    if (!await confirm({ title: `Unfollow everyone you follow?`, danger: true, ok: "Start unfollowing",
+      text: <div className="grid gap-2">
+        <p>Convo unfollows all {following.toLocaleString()} people you follow, {perDay} a day with gaps between, carrying on by itself each day (about {Math.max(1, Math.ceil(following / Math.max(perDay, 1)))} days).</p>
+        <p><b className="text-ink">Your waiting hellos{hellos ? ` (${hellos.toLocaleString()})` : ""} are skipped</b>, since they're to people you follow.</p>
+        <p>Only unfollowing runs: replies you've approved wait for Send. Stop now pauses it; Cancel the rest takes everyone not yet unfollowed off the list.</p>
+      </div> })) return;
+    try {
+      const r = await post("/api/unfollow/everyone/start");
+      toast(`Unfollowing started: ${r.waiting.toLocaleString()} to go, ${r.per_day} a day.`);
+      qc.invalidateQueries();
+    } catch (e) { toast((e as Error).message, "bad"); }
+  };
+  return <Button variant="danger-soft" icon={UserMinus} disabled={!following} onClick={go}>Unfollow everyone</Button>;
+}
+
+function UnfollowProgress() {
+  const st = useAppState().data;
+  const qc = useQueryClient();
+  const toast = useToast();
+  const waiting = st?.counts.unfollow_queued ?? 0;
+  const done = st?.counts.unfollowed_total ?? 0;
+  if (!waiting) return null;
+  const perDay = st?.settings?.daily_unfollows ?? 60;
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-[13.5px]">
+      <UserMinus className="size-4 text-violet-2" />
+      <span className="grow text-ink-2"><b className="text-ink">{waiting.toLocaleString()}</b> waiting to unfollow · {done.toLocaleString()} done · {perDay} a day
+        {st?.sender.active && st.sender.status.startsWith("Unfollowing") ? ` · ${st.sender.status}` : st?.sender.stopped ? " · stopped (press Start again)" : ""}</span>
+      <Button size="sm" variant="ghost" onClick={async () => { const r = await post("/api/unfollow/cancel"); toast(`Cancelled ${r.cancelled.toLocaleString()}.`); qc.invalidateQueries(); }}>Cancel the rest</Button>
+    </div>
   );
 }
